@@ -1,0 +1,981 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Lucian's World Model Mouse Hunt — Top-Down Furniture</title>
+<style>
+  :root{
+    --bg:#10131d;
+    --panel:#181d2b;
+    --panel2:#20283b;
+    --text:#f5f6fb;
+    --muted:#b6bfd3;
+    --accent:#9ab7ff;
+    --good:#8ce0a8;
+    --warn:#ffd56b;
+    --bad:#ff8b8b;
+    --line:#34405e;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    background:linear-gradient(180deg,#0e1119,#121727 45%,#10131d);
+    color:var(--text);
+  }
+  .wrap{max-width:1220px;margin:auto;padding:24px}
+  h1{margin:0 0 6px;font-size:clamp(28px,4vw,46px)}
+  .sub{color:var(--muted);margin-bottom:18px}
+  .grid{display:grid;grid-template-columns:1.25fr .75fr;gap:16px}
+  .card{
+    background:rgba(24,29,43,.97);
+    border:1px solid var(--line);
+    border-radius:18px;
+    padding:18px;
+    box-shadow:0 18px 45px rgba(0,0,0,.2);
+  }
+  canvas{
+    width:100%;
+    height:auto;
+    display:block;
+    background:#202638;
+    border:1px solid var(--line);
+    border-radius:16px;
+  }
+  .controls{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+  button{
+    border:1px solid var(--line);
+    background:#24314b;color:var(--text);
+    border-radius:12px;padding:10px 12px;
+    font-weight:750;cursor:pointer;
+  }
+  button:hover{background:#2e3e60}
+  button.primary{background:#4a67ba}
+  button.math{background:#2a3348}
+
+  button.active{
+    outline:2px solid #ffd56b;
+    box-shadow:0 0 0 2px rgba(255,213,107,.18) inset;
+    background:#38507d;
+  }
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px}
+  .stat{background:#111827;border:1px solid var(--line);padding:10px;border-radius:12px}
+  .stat b{display:block;font-size:17px}
+  .small{font-size:12px;color:var(--muted)}
+  .msg{margin-top:12px;padding:11px 12px;background:#111827;border-radius:12px;color:#e6ebfb}
+  .node{
+    background:#111827;border:1px solid var(--line);border-radius:14px;padding:12px;
+    display:grid;grid-template-columns:42px 1fr auto;gap:10px;align-items:center;margin-bottom:8px;
+  }
+  .node h3{margin:0;font-size:15px}
+  .node p{margin:3px 0 0;font-size:13px;color:var(--muted)}
+  .icon{font-size:25px;text-align:center}
+  .mathpanel{
+    display:none;background:#0b1220;border:1px dashed #5974aa;border-radius:12px;
+    padding:12px;margin:-2px 0 9px;line-height:1.6;color:#dfe9ff;
+  }
+  .mathpanel.show{display:block}
+  .rollouts{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+  .rollout{border:1px solid var(--line);background:#111827;border-radius:12px;padding:10px}
+  .rollout.best{border-color:#66c58c;box-shadow:inset 0 0 0 1px #66c58c}
+  .bar{height:8px;background:#202a40;border-radius:99px;overflow:hidden;margin-top:6px}
+  .fill{height:100%;background:#9ab7ff}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:9px;font-size:12px;color:var(--muted)}
+  .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px}
+  input[type=range]{width:100%}
+  label{font-size:13px;color:var(--muted)}
+  .tip{margin-top:16px;color:var(--muted);font-size:13px}
+  @media(max-width:900px){.grid{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🐈 Lucian's World Model Mouse Hunt</h1>
+  <div class="sub">Top-down room view: Lucian treats the <b>chair, sofa, and table as physical obstacles</b> and plans future paths around them while also avoiding moving people.</div>
+
+  <div class="grid">
+    <section class="card">
+      <b>Mission: catch the mouse without hitting the furniture</b>
+      <div class="small">Chair, sofa, and table are hard obstacles in Lucian's internal world model. Moving people are dynamic obstacles. Yellow = your selected path.</div>
+
+      <canvas id="world" width="760" height="500"></canvas>
+
+      <div class="controls">
+        <button id="btn-left" onclick="setAction(-1)">↖ Veer Left</button>
+        <button id="btn-forward" class="primary" onclick="setAction(0)">↑ Run Forward</button>
+        <button id="btn-right" onclick="setAction(1)">↗ Veer Right</button>
+      </div>
+
+      <div style="margin-top:12px">
+        <label>Prediction horizon: <b id="horizonVal">5</b> steps</label>
+        <input id="horizon" type="range" min="2" max="10" value="5">
+      </div>
+
+      <div class="controls">
+        <button onclick="imagine()">Imagine Futures</button>
+        <button onclick="commit()">Commit Move</button>
+        <button onclick="resetGame()">Reset Room</button>
+      </div>
+
+      <div class="stats">
+        <div class="stat"><span class="small">Reward</span><b id="reward">0.00</b></div>
+        <div class="stat"><span class="small">Mouse distance</span><b id="distance">—</b></div>
+        <div class="stat"><span class="small">Collision proximity risk</span><b id="risk">—</b></div>
+        <div class="stat"><span class="small">Latent z</span><b id="latent">—</b></div>
+      </div>
+
+      <div class="msg" style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px">
+        <b>Observation vector oₜ</b><br>
+        <span id="obsVector">—</span><br>
+        <span style="color:#aebcdf">Static obstacles: chair, sofa, table · Dynamic obstacles: people · Furniture spacing enlarged</span><br>
+        <span style="color:#aebcdf">Planner: beam search over action sequences; obstacles are collision constraints. Risk % is display-only: 100% at contact and 0% at ≥90 px separation.</span>
+      </div>
+
+      <div class="msg" id="message">
+        Pick an action and click <b>Imagine Futures</b>. Lucian predicts the chair, sofa, table, and moving people at each future time step.
+      </div>
+
+      <div class="legend">
+        <span><span class="dot" style="background:#d8a66d"></span>Lucian</span>
+        <span><span class="dot" style="background:#d8dce7"></span>Moving mouse</span>
+        <span><span class="dot" style="background:#cf8b5d"></span>Chair</span>
+        <span><span class="dot" style="background:#6c96d1"></span>Sofa</span>
+        <span><span class="dot" style="background:#87b487"></span>Table</span>
+        <span><span class="dot" style="background:#b997ff"></span>Moving people</span>
+        <span><span class="dot" style="background:#ffd56b"></span>Selected future</span>
+      </div>
+    </section>
+
+    <section class="card">
+      <b>What Lucian's world model is doing</b>
+
+      <div class="node">
+        <div class="icon">👀</div>
+        <div><h3>1. Observation</h3><p>Lucian observes the moving mouse position/velocity, obstacle coordinates, and each moving person's position/velocity.</p></div>
+        <button class="math" onclick="toggleMath('m1')">Math Concept</button>
+      </div>
+      <div id="m1" class="mathpanel">
+        <b>oₜ = [x_cat, y_cat, θ, x_mouse, y_mouse, mouse_vx, mouse_vy,<br>
+        chair_x, sofa_x, sofa_y, table_x, table_y,<br>
+        p1_x, p1_y, p1_vx, p1_vy, p2_x, p2_y, p2_vx, p2_vy]</b><br>
+        <span style="color:#aebcdf">chair / sofa / table coordinates define static obstacle geometry used by the planner.</span>
+      </div>
+
+      <div class="node">
+        <div class="icon">🧩</div>
+        <div><h3>2. Latent State</h3><p>The room is compressed into useful variables.</p></div>
+        <button class="math" onclick="toggleMath('m2')">Math Concept</button>
+      </div>
+      <div id="m2" class="mathpanel">
+        <b>zₜ = f_enc(oₜ)</b><br>
+        Latent features include mouse distance, nearest-obstacle distance, heading error, and motion information from the moving people.
+      </div>
+
+      <div class="node">
+        <div class="icon">⚙️</div>
+        <div><h3>3. Dynamics</h3><p>Lucian predicts how each move changes his future state.</p></div>
+        <button class="math" onclick="toggleMath('m3')">Math Concept</button>
+      </div>
+      <div id="m3" class="mathpanel">
+        <b>ẑₜ₊₁ = fθ(zₜ, aₜ)</b><br>
+        Future states are rejected or penalized when Lucian intersects the chair, sofa, or table; moving people add time-dependent collision risk.
+      </div>
+
+      <div class="node">
+        <div class="icon">💭</div>
+        <div><h3>4. Imagination</h3><p>Lucian rolls forward multiple candidate futures.</p></div>
+        <button class="math" onclick="toggleMath('m4')">Math Concept</button>
+      </div>
+      <div id="m4" class="mathpanel">
+        <b>(zₜ, Oₜ) → (ẑₜ₊₁, Ôₜ₊₁) → … → (ẑₜ₊ᴴ, Ôₜ₊ᴴ)</b><br>
+        O contains static furniture plus predicted moving people. Every candidate future is checked against these obstacles.
+      </div>
+
+      <div class="node">
+        <div class="icon">🧠</div>
+        <div><h3>5. Planning</h3><p>He searches multi-step action sequences that avoid collisions with the chair, sofa, table, and predicted people while minimizing distance to the moving mouse.</p></div>
+        <button class="math" onclick="toggleMath('m5')">Math Concept</button>
+      </div>
+      <div id="m5" class="mathpanel">
+        <b>J(A) = progress_to_mouse − μ·turn_cost − κ·collision</b><br>
+        <b>A* = argmax_A J(A), &nbsp; A=[aₜ,…,aₜ₊ᴴ₋₁]</b><br>
+        Obstacles are avoidance constraints: extra clearance gives no reward. Execute the first action of the best collision-free sequence, then re-plan.
+      </div>
+
+      <div style="margin-top:14px"><b>Imagined futures</b></div>
+      <div id="rollouts" class="rollouts">
+        <div class="rollout">Left<br><span class="small">not simulated</span></div>
+        <div class="rollout">Forward<br><span class="small">not simulated</span></div>
+        <div class="rollout">Right<br><span class="small">not simulated</span></div>
+      </div>
+    </section>
+  </div>
+
+  <section class="card" style="margin-top:16px">
+    <b>Learning challenge</b>
+    <div class="small" style="margin-top:5px">Try short and long prediction horizons. Lucian predicts both moving people and the slowly moving mouse, then searches sequences such as L→F→R that avoid collisions while intercepting the mouse.</div>
+    <div style="margin-top:10px">
+      <button class="math" onclick="toggleMath('m6')">Math Concept</button>
+    </div>
+    <div id="m6" class="mathpanel">
+      Model-based planning can be written as:<br><br>
+      <b>a* = argmaxₐ E[ Σ γᵏ rₜ₊ₖ ]</b><br><br>
+      Lucian maximizes future reward by approaching the moving mouse while simply avoiding collisions with the chair, sofa, table, and moving people.
+    </div>
+  </section>
+
+  <div class="tip">Tip: the room is top-down. Lucian's planner checks imagined paths against the furniture layout before you commit a move.</div>
+</div>
+
+<script>
+const canvas = document.getElementById('world');
+const ctx = canvas.getContext('2d');
+
+const initialMouse = {x:686, y:95, vx:-3.2, vy:1.6, r:14};
+let mouse = {...initialMouse};
+
+const obstacles = [
+  // Furniture is deliberately spaced to leave clear traversable corridors.
+  {type:'chair', x:125, y:105, w:92, h:92, pad:10, color:'#cf8b5d', label:'CHAIR'},
+  {type:'sofa', x:335, y:215, w:150, h:86, pad:12, color:'#6c96d1', label:'SOFA'},
+  {type:'table', x:620, y:365, r:46, pad:12, color:'#87b487', label:'TABLE'}
+];
+
+const initialPeople = [
+  {id:'p1', x:290, y:390, vx:18, vy:-7, r:16},
+  {id:'p2', x:590, y:185, vx:-15, vy:10, r:16}
+];
+
+let people = initialPeople.map(p => ({...p}));
+
+
+let cat, selectedAction=0, recommendedAction=0, rollouts=[], totalReward=0, gameOver=false;
+
+function resetGame(){
+  cat = {x:75, y:430, theta:-0.55};
+  selectedAction = 0;
+  recommendedAction = 0;
+  people = initialPeople.map(p => ({...p}));
+  mouse = {...initialMouse};
+  rollouts = [];
+  totalReward = 0;
+  gameOver = false;
+  document.getElementById('reward').textContent = '0.00';
+  document.getElementById('message').innerHTML = 'Pick an action and click <b>Imagine Futures</b>.';
+  updateActionButtons();
+  renderRollouts();
+  updateStats();
+  draw();
+}
+
+function setAction(a){
+  selectedAction = a;
+  updateActionButtons();
+  document.getElementById('message').textContent =
+    'Selected ' + ({[-1]:'LEFT',[0]:'FORWARD',[1]:'RIGHT'}[a]) + '. Now imagine the futures, then commit your chosen move.';
+  draw();
+}
+
+function updateActionButtons(){
+  const map = {
+    [-1]: document.getElementById('btn-left'),
+    [0]: document.getElementById('btn-forward'),
+    [1]: document.getElementById('btn-right')
+  };
+  Object.values(map).forEach(btn => btn && btn.classList.remove('active'));
+  if(map[selectedAction]) map[selectedAction].classList.add('active');
+}
+
+function dist(a,b){ return Math.hypot(a.x-b.x, a.y-b.y); }
+
+function pointRectDistance(px, py, r){
+  const cx = Math.max(r.x, Math.min(px, r.x + r.w));
+  const cy = Math.max(r.y, Math.min(py, r.y + r.h));
+  return Math.hypot(px - cx, py - cy);
+}
+
+function pointCircleDistance(px, py, c){
+  return Math.hypot(px - c.x, py - c.y) - c.r;
+}
+
+
+
+function advanceMouse(m){
+  let n = {...m, x:m.x+m.vx, y:m.y+m.vy};
+
+  // Slow mouse bounces off room boundaries.
+  if(n.x < 24 || n.x > 736){
+    n.vx *= -1;
+    n.x = Math.max(24, Math.min(736, n.x));
+  }
+  if(n.y < 24 || n.y > 476){
+    n.vy *= -1;
+    n.y = Math.max(24, Math.min(476, n.y));
+  }
+
+  // Mouse also avoids furniture by reversing the dominant velocity component.
+  let blocked = false;
+  obstacles.forEach(o=>{
+    if(o.type === 'table'){
+      if(pointCircleDistance(n.x,n.y,o) < n.r + 4) blocked = true;
+    } else {
+      if(pointRectDistance(n.x,n.y,o) < n.r + 4) blocked = true;
+    }
+  });
+
+  if(blocked){
+    if(Math.abs(n.vx) >= Math.abs(n.vy)) n.vx *= -1;
+    else n.vy *= -1;
+    n.x = m.x + n.vx;
+    n.y = m.y + n.vy;
+  }
+
+  return n;
+}
+
+function advancePerson(p){
+  let n = {...p, x:p.x+p.vx, y:p.y+p.vy};
+
+  // Bounce from room boundaries.
+  if(n.x < 28 || n.x > 732){ n.vx *= -1; n.x = Math.max(28, Math.min(732, n.x)); }
+  if(n.y < 28 || n.y > 472){ n.vy *= -1; n.y = Math.max(28, Math.min(472, n.y)); }
+
+  // People walk around furniture rather than through it: if the proposed
+  // position overlaps furniture, reverse the dominant movement component.
+  const test = {x:n.x, y:n.y};
+  let furnitureHit = false;
+  obstacles.forEach(o=>{
+    if(o.type === 'table'){
+      if(pointCircleDistance(test.x,test.y,o) < n.r + 6) furnitureHit = true;
+    } else {
+      if(pointRectDistance(test.x,test.y,o) < n.r + 6) furnitureHit = true;
+    }
+  });
+
+  if(furnitureHit){
+    if(Math.abs(n.vx) >= Math.abs(n.vy)) n.vx *= -1;
+    else n.vy *= -1;
+    n.x = p.x + n.vx;
+    n.y = p.y + n.vy;
+  }
+  return n;
+}
+
+function advancePeople(ps){
+  return ps.map(advancePerson);
+}
+
+function personDistance(s, ps=people){
+  let d = Infinity;
+  ps.forEach(p => d = Math.min(d, Math.hypot(s.x-p.x, s.y-p.y) - p.r));
+  return d;
+}
+
+const CAT_RADIUS = 15;
+
+function furnitureDistance(s){
+  let d = Infinity;
+
+  obstacles.forEach(o=>{
+    if(o.type === 'table'){
+      // Circular tabletop: distance from cat centre to table boundary.
+      d = Math.min(d, pointCircleDistance(s.x, s.y, o) - CAT_RADIUS);
+    } else {
+      // Chair and sofa are axis-aligned top-down footprints.
+      d = Math.min(d, pointRectDistance(s.x, s.y, o) - CAT_RADIUS);
+    }
+  });
+
+  return d;
+}
+
+function obstacleDistance(s, ps=people){
+  const staticDistance = furnitureDistance(s);
+  const dynamicDistance = personDistance(s, ps) - CAT_RADIUS;
+  return Math.min(staticDistance, dynamicDistance);
+}
+
+const RISK_ZONE_PX = 90;
+
+function obstacleRisk(s, ps=people){
+  // Display-only collision risk indicator.
+  //
+  // d is signed edge-to-edge separation:
+  //   d <= 0          => contact / overlap => 100%
+  //   d >= RISK_ZONE  => comfortably outside danger zone => 0%
+  //
+  // IMPORTANT: this percentage is NOT part of the planning objective.
+  const d = obstacleDistance(s, ps);
+
+  if(d <= 0) return 1;
+  if(d >= RISK_ZONE_PX) return 0;
+
+  return (RISK_ZONE_PX - d) / RISK_ZONE_PX;
+}
+
+function furnitureCollision(s){
+  return obstacles.some(o=>{
+    if(o.type === 'table'){
+      return pointCircleDistance(s.x, s.y, o) <= CAT_RADIUS;
+    }
+    return pointRectDistance(s.x, s.y, o) <= CAT_RADIUS;
+  });
+}
+
+function personCollision(s, ps=people){
+  return ps.some(p =>
+    Math.hypot(s.x-p.x, s.y-p.y) <= CAT_RADIUS + p.r
+  );
+}
+
+function collision(s, ps=people){
+  return furnitureCollision(s) || personCollision(s, ps);
+}
+
+function step(s, a){
+  const turn = a * 0.24;
+  const speed = 31;
+  const theta = s.theta + turn;
+  return {
+    x: s.x + Math.cos(theta) * speed,
+    y: s.y + Math.sin(theta) * speed,
+    theta
+  };
+}
+
+function latent(s=cat){
+  const dm = dist(s, mouse);
+  const desired = Math.atan2(mouse.y - s.y, mouse.x - s.x);
+  let err = desired - s.theta;
+  while(err > Math.PI) err -= 2*Math.PI;
+  while(err < -Math.PI) err += 2*Math.PI;
+  const dObs = obstacleDistance(s);
+  return [dm/760, Math.max(-1, Math.min(1, dObs/250)), err/Math.PI];
+}
+
+function simulateSequence(actions){
+  let s = {...cat};
+  let predictedPeople = people.map(p => ({...p}));
+  let predictedMouse = {...mouse};
+
+  const path = [];
+  const peoplePath = predictedPeople.map(() => []);
+  const mousePath = [];
+
+  let collisionCount = 0;
+  let maxRisk = 0;
+  let cumulativeProgress = 0;
+  let cumulativeTurnCost = 0;
+  let previousMouseDistance = dist(s, predictedMouse);
+
+  for(let i=0; i<actions.length; i++){
+    const a = actions[i];
+
+    // Predict all moving entities at the same future time step.
+    predictedPeople = advancePeople(predictedPeople);
+    predictedPeople.forEach((p,j)=>peoplePath[j].push({...p}));
+
+    predictedMouse = advanceMouse(predictedMouse);
+    mousePath.push({...predictedMouse});
+
+    const next = step(s, a);
+
+    // Obstacles are avoidance constraints, not a clearance objective.
+    const staticHit = furnitureCollision(next);
+    const dynamicHit = personCollision(next, predictedPeople);
+    if(staticHit || dynamicHit) collisionCount += 1;
+
+    // Risk is reported for explanation/UI only.
+    // It does NOT contribute to the score.
+    maxRisk = Math.max(maxRisk, obstacleRisk(next, predictedPeople));
+
+    // Progress is measured relative to the predicted moving mouse.
+    const nextMouseDistance = dist(next, predictedMouse);
+    cumulativeProgress += previousMouseDistance - nextMouseDistance;
+    previousMouseDistance = nextMouseDistance;
+
+    cumulativeTurnCost += Math.abs(a) * 0.18;
+
+    path.push({...next});
+    s = next;
+  }
+
+  const end = path[path.length-1] || {...cat};
+  const finalMouse = mousePath[mousePath.length-1] || {...mouse};
+  const out = path.some(p=>p.x<10 || p.x>750 || p.y<10 || p.y>490);
+
+  // Planning goal:
+  // 1. approach/intercept the moving mouse;
+  // 2. avoid collisions;
+  // 3. avoid unnecessary steering.
+  //
+  // Extra obstacle clearance receives NO reward.
+  let score =
+    cumulativeProgress * 0.09
+    - cumulativeTurnCost
+    - collisionCount * 100;
+
+  if(out) score -= 20;
+
+  // Reward reaching the predicted mouse location.
+  if(dist(end, finalMouse) < finalMouse.r + 20) score += 20;
+
+  return {
+    actions,
+    a: actions[0] ?? 0,
+    path,
+    peoplePath,
+    mousePath,
+    score,
+    maxRisk,
+    hit: collisionCount > 0,
+    collisionCount
+  };
+}
+
+function planObstacleAware(H){
+  // Beam search keeps the best partial action sequences at each future step.
+  // This lets Lucian turn left/right later in the same imagined future.
+  const ACTIONS = [-1, 0, 1];
+  const BEAM_WIDTH = 18;
+
+  let beam = [{
+    actions: [],
+    score: 0
+  }];
+
+  for(let depth=0; depth<H; depth++){
+    const expanded = [];
+
+    for(const partial of beam){
+      for(const a of ACTIONS){
+        const actions = [...partial.actions, a];
+        const rollout = simulateSequence(actions);
+
+        // Hard-obstacle futures stay possible for visualization,
+        // but are ranked far below collision-free futures.
+        expanded.push(rollout);
+      }
+    }
+
+    expanded.sort((x,y)=>y.score-x.score);
+    beam = expanded.slice(0, BEAM_WIDTH);
+  }
+
+  return beam.sort((x,y)=>y.score-x.score);
+}
+
+function imagine(){
+  if(gameOver) return;
+
+  const H = +document.getElementById('horizon').value;
+  const candidates = planObstacleAware(H);
+
+  // Best sequence overall.
+  const best = candidates[0];
+
+  // Best sequence for each possible first action.
+  rollouts = [-1,0,1].map(firstAction => {
+    const matching = candidates.filter(r => r.actions[0] === firstAction);
+    if(matching.length) return matching[0];
+
+    // Fallback if a beam-pruned first action disappeared.
+    const fallbackActions = Array.from({length:H}, (_,i)=>i===0 ? firstAction : 0);
+    return simulateSequence(fallbackActions);
+  });
+
+  recommendedAction = best.a;
+
+  document.getElementById('message').innerHTML =
+    'Obstacle-aware planner recommends <b>' +
+    ({[-1]:'LEFT',[0]:'FORWARD',[1]:'RIGHT'}[recommendedAction]) +
+    '</b>. It searched multi-step futures where later actions may change direction. ' +
+    'Chair, sofa, table, and predicted people positions are checked for collisions at every future time step; extra clearance is not rewarded. The mouse is also predicted forward. ' +
+    'Your selected move is <b>' +
+    ({[-1]:'LEFT',[0]:'FORWARD',[1]:'RIGHT'}[selectedAction]) +
+    '</b>.';
+
+  updateActionButtons();
+  renderRollouts();
+  draw();
+}
+
+function commit(){
+  if(gameOver) return;
+  if(!rollouts.length) imagine();
+
+  const chosenName = ({[-1]:'LEFT',[0]:'FORWARD',[1]:'RIGHT'}[selectedAction]);
+  const before = dist(cat, mouse);
+
+  // One real time step: people move, mouse moves slowly, and Lucian moves.
+  people = advancePeople(people);
+  mouse = advanceMouse(mouse);
+  cat = step(cat, selectedAction);
+
+  const after = dist(cat, mouse);
+  const risk = obstacleRisk(cat, people);
+  let r = (before-after)*0.055 - risk*2;
+
+  if(collision(cat, people)){
+    r -= 8;
+    gameOver = true;
+    document.getElementById('message').innerHTML =
+      '<b>Collision!</b> Lucian intersected a static or dynamic obstacle after moving <b>' + chosenName + '</b>. Reset and choose a safer predicted future.';
+  } else if(after < mouse.r + 20){
+    r += 12;
+    gameOver = true;
+    document.getElementById('message').innerHTML =
+      '<b>Mouse caught!</b> Lucian successfully planned and moved <b>' + chosenName + '</b>.';
+  } else {
+    document.getElementById('message').innerHTML =
+      'Move committed: <b>' + chosenName + '</b>. Re-imagine from Lucian’s new position.';
+  }
+
+  totalReward += r;
+  rollouts = [];
+  document.getElementById('reward').textContent = totalReward.toFixed(2);
+  renderRollouts();
+  updateStats();
+  draw();
+}
+
+function renderRollouts(){
+  const el = document.getElementById('rollouts');
+  if(!rollouts.length){
+    el.innerHTML = ['Left','Forward','Right'].map(n=>`<div class="rollout">${n}<br><span class="small">not simulated</span></div>`).join('');
+    return;
+  }
+  el.innerHTML = rollouts.map(r=>{
+    const name = {[-1]:'Left',[0]:'Forward',[1]:'Right'}[r.a];
+    const pct = Math.max(5, Math.min(100, (r.score+20)*3));
+    const note = r.a === recommendedAction ? ' · Recommended' : (r.a === selectedAction ? ' · Selected' : '');
+    const seq = r.actions.map(a => ({[-1]:'L',[0]:'F',[1]:'R'}[a])).join('→');
+    const collisionNote = r.hit ? ' · COLLISION' : '';
+    return `<div class="rollout ${r.a===recommendedAction?'best':''}">
+      <b>${name}</b><br>
+      <span class="small">Plan ${seq}</span><br>
+      <span class="small">Score ${r.score.toFixed(2)} · Risk ${(r.maxRisk*100).toFixed(0)}%${collisionNote}${note}</span>
+      <div class="bar"><div class="fill" style="width:${pct}%"></div></div>
+    </div>`
+  }).join('');
+}
+
+function updateStats(){
+  const z = latent(cat);
+  document.getElementById('distance').textContent = Math.round(dist(cat,mouse)) + ' px';
+  document.getElementById('risk').textContent = (obstacleRisk(cat,people)*100).toFixed(0) + '%';
+  document.getElementById('latent').textContent = '[' + z.map(v=>v.toFixed(2)).join(', ') + ']';
+
+  const chair = obstacles.find(o=>o.type==='chair');
+  const sofa = obstacles.find(o=>o.type==='sofa');
+  const table = obstacles.find(o=>o.type==='table');
+  const p1 = people[0], p2 = people[1];
+
+  const obs = [
+    cat.x, cat.y, cat.theta,
+    mouse.x, mouse.y, mouse.vx, mouse.vy,
+    chair.x, sofa.x, sofa.y, table.x, table.y,
+    p1.x, p1.y, p1.vx, p1.vy,
+    p2.x, p2.y, p2.vx, p2.vy
+  ];
+
+  document.getElementById('obsVector').textContent =
+    '[' + obs.map((v,i)=>{
+      const decimalIndices = new Set([2,5,6,14,15,18,19]);
+      return decimalIndices.has(i) ? Number(v).toFixed(2) : Math.round(v);
+    }).join(', ') + ']';
+}
+
+function roundRect(ctx, x, y, w, h, r){
+  ctx.beginPath();
+  ctx.moveTo(x+r, y);
+  ctx.lineTo(x+w-r, y);
+  ctx.quadraticCurveTo(x+w, y, x+w, y+r);
+  ctx.lineTo(x+w, y+h-r);
+  ctx.quadraticCurveTo(x+w, y+h, x+w-r, y+h);
+  ctx.lineTo(x+r, y+h);
+  ctx.quadraticCurveTo(x, y+h, x, y+h-r);
+  ctx.lineTo(x, y+r);
+  ctx.quadraticCurveTo(x, y, x+r, y);
+  ctx.closePath();
+}
+
+function drawChair(o){
+  // seat
+  ctx.fillStyle = '#cf8b5d';
+  roundRect(ctx, o.x+18, o.y+20, o.w-36, o.h-34, 10);
+  ctx.fill();
+  ctx.strokeStyle = '#7a4e2e';
+  ctx.lineWidth = 3;
+  ctx.stroke();
+
+  // backrest
+  ctx.fillStyle = '#d79a6d';
+  roundRect(ctx, o.x+10, o.y+8, o.w-20, 18, 7);
+  ctx.fill();
+  ctx.stroke();
+
+  // legs
+  ctx.fillStyle = '#7a4e2e';
+  [[o.x+16,o.y+16],[o.x+o.w-16,o.y+16],[o.x+16,o.y+o.h-16],[o.x+o.w-16,o.y+o.h-16]].forEach(([x,y])=>{
+    ctx.beginPath();
+    ctx.arc(x,y,4,0,Math.PI*2);
+    ctx.fill();
+  });
+
+  ctx.fillStyle = '#452919';
+  ctx.font = 'bold 12px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('CHAIR', o.x+o.w/2, o.y+o.h+15);
+}
+
+function drawSofa(o){
+  ctx.fillStyle = '#6c96d1';
+  roundRect(ctx, o.x, o.y+18, o.w, o.h-36, 20); // seat
+  ctx.fill();
+  ctx.strokeStyle = '#355987';
+  ctx.lineWidth = 3;
+  ctx.stroke();
+
+  // backrest
+  ctx.fillStyle = '#7da5dc';
+  roundRect(ctx, o.x+8, o.y, o.w-16, 24, 12);
+  ctx.fill();
+  ctx.stroke();
+
+  // arms
+  ctx.fillStyle = '#5c88c6';
+  roundRect(ctx, o.x, o.y+10, 22, o.h-20, 12);
+  ctx.fill();
+  ctx.stroke();
+  roundRect(ctx, o.x+o.w-22, o.y+10, 22, o.h-20, 12);
+  ctx.fill();
+  ctx.stroke();
+
+  // cushions
+  ctx.strokeStyle = '#4a73a6';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(o.x + o.w/2, o.y+26);
+  ctx.lineTo(o.x + o.w/2, o.y+o.h-20);
+  ctx.stroke();
+
+  ctx.fillStyle = '#264264';
+  ctx.font = 'bold 12px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('SOFA', o.x+o.w/2, o.y+o.h+15);
+}
+
+function drawTable(o){
+  // top
+  ctx.fillStyle = '#87b487';
+  ctx.beginPath();
+  ctx.arc(o.x, o.y, o.r, 0, Math.PI*2);
+  ctx.fill();
+  ctx.strokeStyle = '#4f754f';
+  ctx.lineWidth = 3;
+  ctx.stroke();
+
+  // center
+  ctx.fillStyle = '#6b8f6b';
+  ctx.beginPath();
+  ctx.arc(o.x, o.y, 10, 0, Math.PI*2);
+  ctx.fill();
+
+  // legs hints
+  ctx.strokeStyle = '#5a7d5a';
+  ctx.lineWidth = 2;
+  [[-18,-18],[18,-18],[-18,18],[18,18]].forEach(([dx,dy])=>{
+    ctx.beginPath();
+    ctx.moveTo(o.x, o.y);
+    ctx.lineTo(o.x+dx, o.y+dy);
+    ctx.stroke();
+  });
+
+  ctx.fillStyle = '#294129';
+  ctx.font = 'bold 12px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('TABLE', o.x, o.y+o.r+16);
+}
+
+
+function drawPerson(p, alpha=1){
+  ctx.save();
+  ctx.globalAlpha = alpha;
+
+  // top-down head
+  ctx.fillStyle = '#d8b08c';
+  ctx.beginPath();
+  ctx.arc(p.x, p.y, 8, 0, Math.PI*2);
+  ctx.fill();
+
+  // shoulders/body seen from above
+  ctx.fillStyle = '#b997ff';
+  ctx.beginPath();
+  ctx.ellipse(p.x, p.y+10, 14, 10, 0, 0, Math.PI*2);
+  ctx.fill();
+
+  // velocity direction
+  const m = Math.hypot(p.vx,p.vy) || 1;
+  ctx.strokeStyle = '#eadfff';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(p.x, p.y);
+  ctx.lineTo(p.x + p.vx/m*20, p.y + p.vy/m*20);
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+function drawMouse(){
+  ctx.fillStyle = '#d8dce7';
+  ctx.beginPath();
+  ctx.ellipse(mouse.x, mouse.y, 14, 10, 0, 0, Math.PI*2);
+  ctx.fill();
+  ctx.beginPath(); ctx.arc(mouse.x-7, mouse.y-8, 4, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(mouse.x+1, mouse.y-9, 4, 0, Math.PI*2); ctx.fill();
+  ctx.strokeStyle = '#d8dce7';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(mouse.x-14, mouse.y+2);
+  ctx.quadraticCurveTo(mouse.x-28, mouse.y+10, mouse.x-34, mouse.y+2);
+  ctx.stroke();
+  ctx.fillStyle = '#202020';
+  ctx.beginPath();
+  ctx.arc(mouse.x+7, mouse.y-2, 1.5, 0, Math.PI*2);
+  ctx.fill();
+}
+
+function drawCat(x,y,theta){
+  ctx.save();
+  ctx.translate(x,y);
+  ctx.rotate(theta);
+
+  ctx.fillStyle = '#d8a66d';
+  ctx.beginPath();
+  ctx.ellipse(-3,0,19,13,0,0,Math.PI*2);
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.arc(15,0,11,0,Math.PI*2);
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.moveTo(10,-8); ctx.lineTo(12,-19); ctx.lineTo(18,-9);
+  ctx.moveTo(18,-9); ctx.lineTo(23,-18); ctx.lineTo(24,-5);
+  ctx.fill();
+
+  ctx.strokeStyle = '#d8a66d';
+  ctx.lineWidth = 5;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(-18,2);
+  ctx.quadraticCurveTo(-31,-8,-26,-18);
+  ctx.stroke();
+
+  ctx.fillStyle = '#161616';
+  ctx.beginPath();
+  ctx.arc(19,-2,1.7,0,Math.PI*2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function draw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  // floor
+  ctx.fillStyle = '#252d40';
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.strokeStyle = '#313b52';
+  ctx.lineWidth = 1;
+  for(let x=0;x<canvas.width;x+=40){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,canvas.height); ctx.stroke(); }
+  for(let y=0;y<canvas.height;y+=40){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(canvas.width,y); ctx.stroke(); }
+
+  // imagined future trajectories
+  rollouts.forEach(r=>{
+    ctx.save();
+    if(r.a === selectedAction){
+      ctx.strokeStyle = '#ffd56b';
+      ctx.lineWidth = 4;
+    } else if(r.a === recommendedAction){
+      ctx.strokeStyle = '#8ce0a8';
+      ctx.lineWidth = 3;
+      ctx.setLineDash([10,6]);
+    } else {
+      ctx.strokeStyle = '#6f7b98';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([7,7]);
+    }
+    ctx.beginPath();
+    ctx.moveTo(cat.x, cat.y);
+    r.path.forEach(p=>ctx.lineTo(p.x,p.y));
+    ctx.stroke();
+    ctx.restore();
+  });
+
+  // Predicted positions of moving people and mouse for the selected imagined future.
+  const selectedRollout = rollouts.find(r => r.a === selectedAction);
+  if(selectedRollout && selectedRollout.peoplePath){
+    selectedRollout.peoplePath.forEach(personTrack=>{
+      personTrack.forEach((p,i)=>{
+        ctx.save();
+        ctx.globalAlpha = 0.18 + 0.045*i;
+        ctx.strokeStyle = '#b997ff';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(p.x,p.y,10,0,Math.PI*2);
+        ctx.stroke();
+        ctx.restore();
+      });
+    });
+
+    if(selectedRollout.mousePath){
+      ctx.save();
+      ctx.strokeStyle = '#d8dce7';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([4,5]);
+      ctx.beginPath();
+      ctx.moveTo(mouse.x, mouse.y);
+      selectedRollout.mousePath.forEach(p=>ctx.lineTo(p.x,p.y));
+      ctx.stroke();
+      ctx.restore();
+
+      selectedRollout.mousePath.forEach((p,i)=>{
+        ctx.save();
+        ctx.globalAlpha = 0.18 + 0.05*i;
+        ctx.strokeStyle = '#f4f6fb';
+        ctx.beginPath();
+        ctx.arc(p.x,p.y,7,0,Math.PI*2);
+        ctx.stroke();
+        ctx.restore();
+      });
+    }
+  }
+
+  // top-down furniture
+  obstacles.forEach(o=>{
+    if(o.type === 'chair') drawChair(o);
+    else if(o.type === 'sofa') drawSofa(o);
+    else if(o.type === 'table') drawTable(o);
+  });
+
+  people.forEach(p=>drawPerson(p));
+  drawMouse();
+  drawCat(cat.x,cat.y,cat.theta);
+  updateStats();
+}
+
+function toggleMath(id){
+  document.getElementById(id).classList.toggle('show');
+}
+
+document.getElementById('horizon').addEventListener('input', e=>{
+  document.getElementById('horizonVal').textContent = e.target.value;
+  if(rollouts.length) imagine();
+});
+
+resetGame();
+</script>
+</body>
+</html>

@@ -1,0 +1,700 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Transformer Concept Explorer</title>
+  <style>
+    :root {
+      --bg: #f5f7fb;
+      --panel: #ffffff;
+      --text: #172033;
+      --muted: #64748b;
+      --line: #dbe3ef;
+      --accent: #4f46e5;
+      --accent-soft: #eef2ff;
+      --good: #0f766e;
+      --warn: #b45309;
+      --shadow: 0 12px 28px rgba(31, 41, 55, .08);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    button, input, select { font: inherit; }
+    .app { max-width: 1180px; margin: 0 auto; padding: 18px; }
+    .hero {
+      background: linear-gradient(135deg, #ffffff, #eef2ff);
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      padding: 24px;
+      box-shadow: var(--shadow);
+      margin-bottom: 18px;
+    }
+    .hero h1 { margin: 0 0 8px; font-size: clamp(1.7rem, 4vw, 2.5rem); }
+    .hero p { margin: 0; color: var(--muted); max-width: 820px; line-height: 1.55; }
+    .layout { display: grid; grid-template-columns: 250px 1fr; gap: 18px; }
+    .nav, .workspace {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      box-shadow: var(--shadow);
+    }
+    .nav { padding: 12px; align-self: start; position: sticky; top: 12px; }
+    .nav button {
+      width: 100%;
+      border: 0;
+      background: transparent;
+      color: var(--text);
+      text-align: left;
+      padding: 11px 12px;
+      border-radius: 12px;
+      cursor: pointer;
+      margin: 2px 0;
+    }
+    .nav button:hover { background: #f8fafc; }
+    .nav button.active { background: var(--accent-soft); color: var(--accent); font-weight: 700; }
+    .workspace { padding: 22px; min-height: 680px; }
+    .section { display: none; }
+    .section.active { display: block; animation: fade .24s ease; }
+    @keyframes fade { from { opacity: .25; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+    h2 { margin-top: 0; font-size: 1.65rem; }
+    h3 { margin: 0 0 8px; }
+    .lead { color: var(--muted); line-height: 1.55; }
+    .grid { display: grid; gap: 14px; }
+    .grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 16px;
+      background: #fff;
+    }
+    .control {
+      display: grid;
+      gap: 7px;
+      margin: 12px 0;
+    }
+    .control label { font-weight: 700; }
+    input[type="text"], select {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      padding: 10px 12px;
+      color: var(--text);
+      background: white;
+    }
+    input[type="range"] { width: 100%; }
+    .tokens { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0; }
+    .token {
+      border: 1px solid #c7d2fe;
+      background: var(--accent-soft);
+      color: #3730a3;
+      border-radius: 10px;
+      padding: 8px 11px;
+      transition: .18s ease;
+    }
+    .token.selected { background: var(--accent); color: white; transform: translateY(-2px); }
+    .flow {
+      display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
+      padding: 12px 0;
+    }
+    .node {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px 12px;
+      background: #f8fafc;
+      font-weight: 700;
+    }
+    .arrow { color: var(--muted); font-size: 1.2rem; }
+    .matrix-wrap { overflow-x: auto; padding-bottom: 4px; }
+    table.matrix { border-collapse: separate; border-spacing: 4px; margin: 8px 0; }
+    .matrix td, .matrix th {
+      min-width: 50px;
+      height: 42px;
+      text-align: center;
+      border-radius: 8px;
+      padding: 5px;
+      border: 1px solid rgba(99,102,241,.15);
+      font-variant-numeric: tabular-nums;
+    }
+    .matrix th { color: var(--muted); background: #f8fafc; font-weight: 600; }
+    .cell {
+      background: color-mix(in srgb, var(--accent) calc(var(--v) * 80%), white);
+      color: var(--text);
+      transition: transform .15s ease;
+    }
+    .cell:hover { transform: scale(1.08); outline: 2px solid var(--accent); }
+    .equation {
+      font-family: "SFMono-Regular", Consolas, monospace;
+      background: #111827;
+      color: #f8fafc;
+      border-radius: 13px;
+      padding: 13px 15px;
+      overflow-x: auto;
+      margin: 12px 0;
+    }
+    .callout {
+      border-left: 4px solid var(--accent);
+      background: var(--accent-soft);
+      padding: 12px 14px;
+      border-radius: 10px;
+      line-height: 1.5;
+    }
+    .bar-list { display: grid; gap: 9px; margin-top: 12px; }
+    .bar-row { display: grid; grid-template-columns: 90px 1fr 58px; gap: 8px; align-items: center; }
+    .track { height: 12px; background: #e2e8f0; border-radius: 999px; overflow: hidden; }
+    .fill { height: 100%; background: var(--accent); border-radius: 999px; transition: width .35s ease; }
+    .mini-svg { width: 100%; height: auto; max-height: 330px; }
+    .chip { display: inline-block; padding: 4px 8px; border-radius: 999px; background: #f1f5f9; color: var(--muted); font-size: .85rem; }
+    .legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 14px; }
+    .switch-row { display: flex; gap: 10px; align-items: center; margin: 10px 0; }
+    .switch-row input { width: 18px; height: 18px; }
+    .footer-note { color: var(--muted); margin-top: 18px; font-size: .92rem; }
+    @media (max-width: 850px) {
+      .layout { grid-template-columns: 1fr; }
+      .nav { position: static; display: flex; overflow-x: auto; gap: 5px; }
+      .nav button { width: auto; min-width: max-content; }
+      .grid.two, .grid.three { grid-template-columns: 1fr; }
+      .workspace { min-height: unset; }
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+  <header class="hero">
+    <h1>Transformer Concept Explorer</h1>
+    <p>Adjust the controls and watch each concept change. This version is an interactive illustration rather than a game: no points, no timer, and no wrong answers.</p>
+  </header>
+
+  <div class="layout">
+    <nav class="nav" aria-label="Concepts">
+      <button class="active" data-section="pipeline">1. Pipeline</button>
+      <button data-section="tokens">2. Tokenization</button>
+      <button data-section="embeddings">3. Embeddings</button>
+      <button data-section="position">4. Position</button>
+      <button data-section="qkv">5. Q, K, V</button>
+      <button data-section="scores">6. Attention scores</button>
+      <button data-section="values">7. Value mixing</button>
+      <button data-section="heads">8. Multi-head</button>
+      <button data-section="ffn">9. Feed-forward</button>
+      <button data-section="mask">10. Causal mask</button>
+      <button data-section="vocab">11. Next token</button>
+    </nav>
+
+    <main class="workspace">
+      <section id="pipeline" class="section active">
+        <h2>The complete transformation</h2>
+        <p class="lead">A Transformer repeatedly changes the representation of the same sequence. Each matrix operation adds, compares, selects, or transforms information.</p>
+        <div class="flow">
+          <div class="node">Raw text</div><span class="arrow">→</span>
+          <div class="node">Tokens</div><span class="arrow">→</span>
+          <div class="node">Embeddings + position</div><span class="arrow">→</span>
+          <div class="node">Q, K, V</div><span class="arrow">→</span>
+          <div class="node">Attention</div><span class="arrow">→</span>
+          <div class="node">FFN</div><span class="arrow">→</span>
+          <div class="node">Vocabulary probabilities</div>
+        </div>
+        <svg class="mini-svg" viewBox="0 0 900 300" role="img" aria-label="Transformer matrix pipeline">
+          <defs>
+            <marker id="a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0 0 L10 5 L0 10 z" fill="#64748b"></path>
+            </marker>
+          </defs>
+          <g font-family="system-ui" text-anchor="middle">
+            <rect x="25" y="110" width="120" height="70" rx="14" fill="#eef2ff" stroke="#4f46e5"/>
+            <text x="85" y="140" font-weight="700">X</text>
+            <text x="85" y="161" font-size="13">token matrix</text>
+
+            <rect x="210" y="30" width="120" height="58" rx="12" fill="#fff" stroke="#94a3b8"/>
+            <text x="270" y="64">XWQ = Q</text>
+            <rect x="210" y="121" width="120" height="58" rx="12" fill="#fff" stroke="#94a3b8"/>
+            <text x="270" y="155">XWK = K</text>
+            <rect x="210" y="212" width="120" height="58" rx="12" fill="#fff" stroke="#94a3b8"/>
+            <text x="270" y="246">XWV = V</text>
+
+            <rect x="415" y="83" width="150" height="86" rx="14" fill="#eef2ff" stroke="#4f46e5"/>
+            <text x="490" y="115" font-weight="700">QKT / √dk</text>
+            <text x="490" y="140" font-size="13">compatibility scores</text>
+
+            <rect x="635" y="83" width="120" height="86" rx="14" fill="#fff" stroke="#94a3b8"/>
+            <text x="695" y="115" font-weight="700">Softmax</text>
+            <text x="695" y="140" font-size="13">attention weights</text>
+
+            <rect x="790" y="83" width="85" height="86" rx="14" fill="#eef2ff" stroke="#4f46e5"/>
+            <text x="832" y="115" font-weight="700">AV</text>
+            <text x="832" y="140" font-size="13">output</text>
+
+            <line x1="145" y1="145" x2="198" y2="60" stroke="#64748b" stroke-width="2" marker-end="url(#a)"/>
+            <line x1="145" y1="145" x2="198" y2="150" stroke="#64748b" stroke-width="2" marker-end="url(#a)"/>
+            <line x1="145" y1="145" x2="198" y2="240" stroke="#64748b" stroke-width="2" marker-end="url(#a)"/>
+            <line x1="330" y1="60" x2="405" y2="110" stroke="#64748b" stroke-width="2" marker-end="url(#a)"/>
+            <line x1="330" y1="150" x2="405" y2="135" stroke="#64748b" stroke-width="2" marker-end="url(#a)"/>
+            <line x1="565" y1="126" x2="625" y2="126" stroke="#64748b" stroke-width="2" marker-end="url(#a)"/>
+            <line x1="755" y1="126" x2="780" y2="126" stroke="#64748b" stroke-width="2" marker-end="url(#a)"/>
+            <line x1="330" y1="240" x2="832" y2="180" stroke="#64748b" stroke-width="2" marker-end="url(#a)"/>
+          </g>
+        </svg>
+        <div class="callout">The important idea is not one matrix. It is a sequence of matrices, each performing a distinct information-processing role.</div>
+      </section>
+
+      <section id="tokens" class="section">
+        <h2>Tokenization</h2>
+        <p class="lead">Text is divided into units that the model can index. Try changing the sentence and tokenization mode.</p>
+        <div class="control">
+          <label for="sentence">Input text</label>
+          <input id="sentence" type="text" value="The cat sat on the mat." />
+        </div>
+        <div class="control">
+          <label for="tokenMode">Tokenization mode</label>
+          <select id="tokenMode">
+            <option value="word">Word-like tokens</option>
+            <option value="subword">Toy subword tokens</option>
+            <option value="char">Characters</option>
+          </select>
+        </div>
+        <div id="tokenOutput" class="tokens" aria-live="polite"></div>
+        <div class="grid two">
+          <div class="card"><h3>What changes?</h3><p id="tokenExplain" class="lead"></p></div>
+          <div class="card"><h3>Token IDs</h3><div id="tokenIds" class="equation"></div></div>
+        </div>
+      </section>
+
+      <section id="embeddings" class="section">
+        <h2>Embedding lookup</h2>
+        <p class="lead">A token ID is only an address. The embedding matrix replaces it with a learned feature vector.</p>
+        <div class="control">
+          <label for="embedDim">Embedding dimension: <span id="embedDimLabel">4</span></label>
+          <input id="embedDim" type="range" min="2" max="8" value="4" />
+        </div>
+        <div id="embedTokens" class="tokens"></div>
+        <div class="grid two">
+          <div>
+            <h3>Selected embedding row</h3>
+            <div id="embeddingVector" class="matrix-wrap"></div>
+          </div>
+          <div>
+            <h3>Sequence matrix X</h3>
+            <div id="embeddingMatrix" class="matrix-wrap"></div>
+          </div>
+        </div>
+        <div class="equation">token ID i → E[i] = xᵢ</div>
+        <div class="callout">Rows represent token positions. Columns represent learned features.</div>
+      </section>
+
+      <section id="position" class="section">
+        <h2>Positional encoding</h2>
+        <p class="lead">Token embeddings say what is present. Positional encodings say where it occurs.</p>
+        <div class="control">
+          <label for="positionStrength">Position contribution: <span id="positionStrengthLabel">1.0</span></label>
+          <input id="positionStrength" type="range" min="0" max="2" value="1" step="0.1" />
+        </div>
+        <div class="grid three">
+          <div><h3>Token matrix</h3><div id="posTokenMatrix" class="matrix-wrap"></div></div>
+          <div><h3>Position matrix</h3><div id="posMatrix" class="matrix-wrap"></div></div>
+          <div><h3>Combined X</h3><div id="posCombined" class="matrix-wrap"></div></div>
+        </div>
+        <div class="equation">X = X_token + α · PE</div>
+      </section>
+
+      <section id="qkv" class="section">
+        <h2>Query, Key, and Value projections</h2>
+        <p class="lead">The same input is projected into three representations with different functions.</p>
+        <div class="control">
+          <label for="qkvChoice">Highlight representation</label>
+          <select id="qkvChoice">
+            <option value="Q">Query — what am I looking for?</option>
+            <option value="K">Key — what can be matched?</option>
+            <option value="V">Value — what content can be retrieved?</option>
+          </select>
+        </div>
+        <div class="grid three">
+          <div class="card"><h3>Q</h3><p>Search intent for each token.</p><div id="qMatrix"></div></div>
+          <div class="card"><h3>K</h3><p>Matchable description of each token.</p><div id="kMatrix"></div></div>
+          <div class="card"><h3>V</h3><p>Content passed to the output.</p><div id="vMatrix"></div></div>
+        </div>
+        <div id="qkvExplain" class="callout"></div>
+      </section>
+
+      <section id="scores" class="section">
+        <h2>Attention scores and softmax</h2>
+        <p class="lead">Choose a query token. Its query vector is compared with every key vector.</p>
+        <div class="control">
+          <label for="queryIndex">Query position: <span id="queryLabel"></span></label>
+          <input id="queryIndex" type="range" min="0" max="3" value="0" />
+        </div>
+        <div class="switch-row">
+          <input id="scaleToggle" type="checkbox" checked />
+          <label for="scaleToggle">Divide scores by √dₖ</label>
+        </div>
+        <div class="switch-row">
+          <input id="softmaxToggle" type="checkbox" checked />
+          <label for="softmaxToggle">Apply softmax</label>
+        </div>
+        <div id="scoreBars" class="bar-list"></div>
+        <div id="scoreEquation" class="equation"></div>
+        <div id="scoreExplain" class="callout"></div>
+      </section>
+
+      <section id="values" class="section">
+        <h2>Weighted value mixing</h2>
+        <p class="lead">Attention weights decide how much of each value vector is included in the output.</p>
+        <div class="control">
+          <label for="mix1">Weight for token 1: <span id="mix1Label">0.40</span></label>
+          <input id="mix1" type="range" min="0" max="1" value="0.4" step="0.01" />
+        </div>
+        <div class="control">
+          <label for="mix2">Weight for token 2: <span id="mix2Label">0.20</span></label>
+          <input id="mix2" type="range" min="0" max="1" value="0.2" step="0.01" />
+        </div>
+        <div class="control">
+          <label for="mix3">Weight for token 3: <span id="mix3Label">0.40</span></label>
+          <input id="mix3" type="range" min="0" max="1" value="0.4" step="0.01" />
+        </div>
+        <div class="grid two">
+          <div><h3>Value vectors</h3><div id="valueVectors"></div></div>
+          <div><h3>Output vector</h3><div id="mixedVector"></div></div>
+        </div>
+        <div id="mixEquation" class="equation"></div>
+      </section>
+
+      <section id="heads" class="section">
+        <h2>Multi-head attention</h2>
+        <p class="lead">Different heads can emphasize different relation patterns while reading the same sequence.</p>
+        <div class="control">
+          <label for="headSelect">Inspect head</label>
+          <select id="headSelect">
+            <option value="0">Head 1 — local relations</option>
+            <option value="1">Head 2 — subject relation</option>
+            <option value="2">Head 3 — long-range relation</option>
+          </select>
+        </div>
+        <div id="headTokens" class="tokens"></div>
+        <div id="headBars" class="bar-list"></div>
+        <div class="flow">
+          <div class="node">Head 1 output</div><span class="arrow">+</span>
+          <div class="node">Head 2 output</div><span class="arrow">+</span>
+          <div class="node">Head 3 output</div><span class="arrow">→</span>
+          <div class="node">Concatenate</div><span class="arrow">→</span>
+          <div class="node">Wᴼ</div>
+        </div>
+      </section>
+
+      <section id="ffn" class="section">
+        <h2>Position-wise feed-forward network</h2>
+        <p class="lead">Attention mixes information across positions. The FFN transforms features inside each position.</p>
+        <div class="control">
+          <label for="ffnInput">Input feature 1: <span id="ffnInputLabel">1.0</span></label>
+          <input id="ffnInput" type="range" min="-2" max="2" value="1" step="0.1" />
+        </div>
+        <div class="switch-row">
+          <input id="reluToggle" type="checkbox" checked />
+          <label for="reluToggle">Apply ReLU between the two linear layers</label>
+        </div>
+        <div class="flow">
+          <div class="node" id="ffnNodeInput">[1.0, 0.5]</div><span class="arrow">× W₁ →</span>
+          <div class="node" id="ffnNodeExpand"></div><span class="arrow">ReLU →</span>
+          <div class="node" id="ffnNodeRelu"></div><span class="arrow">× W₂ →</span>
+          <div class="node" id="ffnNodeOutput"></div>
+        </div>
+        <div class="equation">FFN(x) = activation(xW₁ + b₁)W₂ + b₂</div>
+      </section>
+
+      <section id="mask" class="section">
+        <h2>Causal masking</h2>
+        <p class="lead">A decoder may attend to the current and previous positions, but not future positions.</p>
+        <div class="control">
+          <label for="maskSize">Sequence length: <span id="maskSizeLabel">5</span></label>
+          <input id="maskSize" type="range" min="3" max="8" value="5" />
+        </div>
+        <div class="control">
+          <label for="maskQuery">Query position: <span id="maskQueryLabel">3</span></label>
+          <input id="maskQuery" type="range" min="1" max="5" value="3" />
+        </div>
+        <div id="maskMatrix" class="matrix-wrap"></div>
+        <div id="maskExplain" class="callout"></div>
+      </section>
+
+      <section id="vocab" class="section">
+        <h2>Vocabulary projection and next-token probabilities</h2>
+        <p class="lead">The final hidden state is multiplied by a vocabulary matrix to produce one logit for every possible token.</p>
+        <div class="control">
+          <label for="temperature">Softmax temperature: <span id="temperatureLabel">1.0</span></label>
+          <input id="temperature" type="range" min="0.3" max="2" value="1" step="0.1" />
+        </div>
+        <div id="vocabBars" class="bar-list"></div>
+        <div class="equation">p(token k) = softmax(logitₖ / temperature)</div>
+        <div id="vocabExplain" class="callout"></div>
+      </section>
+
+      <p class="footer-note">All numerical values are intentionally small and illustrative so that the effect of each operation remains visible.</p>
+    </main>
+  </div>
+</div>
+
+<script>
+  const qs = s => document.querySelector(s);
+  const qsa = s => [...document.querySelectorAll(s)];
+
+  qsa('.nav button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      qsa('.nav button').forEach(b => b.classList.remove('active'));
+      qsa('.section').forEach(s => s.classList.remove('active'));
+      btn.classList.add('active');
+      qs('#' + btn.dataset.section).classList.add('active');
+    });
+  });
+
+  function hash(str) {
+    let h = 2166136261;
+    for (let i = 0; i < str.length; i++) {
+      h ^= str.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return Math.abs(h);
+  }
+  function seeded(token, d) {
+    return Array.from({length: d}, (_, i) => {
+      const x = Math.sin((hash(token) % 997 + 1) * (i + 1) * 0.017) * 0.95;
+      return Number(x.toFixed(2));
+    });
+  }
+  function tokenize(text, mode) {
+    const clean = text.trim().toLowerCase().replace(/\s+/g, ' ');
+    if (!clean) return [];
+    if (mode === 'char') return [...clean].filter(c => c !== ' ');
+    const words = clean.match(/[a-z0-9]+|[^\s\w]/gi) || [];
+    if (mode === 'word') return words;
+    const out = [];
+    words.forEach(w => {
+      if (!/^[a-z0-9]+$/i.test(w) || w.length <= 3) out.push(w);
+      else if (w.length <= 6) out.push(w.slice(0, 2), '##' + w.slice(2));
+      else out.push(w.slice(0, 3), '##' + w.slice(3, 6), '##' + w.slice(6));
+    });
+    return out;
+  }
+  function table(data, rowLabels = [], colLabels = [], digits = 2) {
+    const maxAbs = Math.max(1, ...data.flat().map(v => Math.abs(Number(v))));
+    let h = '<table class="matrix">';
+    if (colLabels.length) {
+      h += '<tr><th></th>' + colLabels.map(c => '<th>' + c + '</th>').join('') + '</tr>';
+    }
+    data.forEach((row, i) => {
+      h += '<tr>' + (rowLabels.length ? '<th>' + rowLabels[i] + '</th>' : '');
+      h += row.map(v => {
+        const n = Number(v);
+        const opacity = Math.min(1, Math.abs(n) / maxAbs);
+        return '<td class="cell" style="--v:' + opacity.toFixed(2) + '" title="' + n.toFixed(digits) + '">' + n.toFixed(digits) + '</td>';
+      }).join('') + '</tr>';
+    });
+    return h + '</table>';
+  }
+  function softmax(xs) {
+    const m = Math.max(...xs);
+    const e = xs.map(x => Math.exp(x - m));
+    const s = e.reduce((a,b) => a+b, 0);
+    return e.map(x => x/s);
+  }
+
+  // Tokenization
+  function renderTokens() {
+    const mode = qs('#tokenMode').value;
+    const toks = tokenize(qs('#sentence').value, mode);
+    qs('#tokenOutput').innerHTML = toks.map(t => '<span class="token">' + t.replace(/</g,'&lt;') + '</span>').join('');
+    qs('#tokenIds').textContent = '[' + toks.map(t => hash(t) % 100).join(', ') + ']';
+    const explanations = {
+      word: 'Words and punctuation are separated into intuitive units. Unknown or rare words can be a problem.',
+      subword: 'Longer words are decomposed into reusable pieces. This reduces unknown-token problems.',
+      char: 'Every character is represented separately. The sequence becomes longer, but the vocabulary becomes small.'
+    };
+    qs('#tokenExplain').textContent = explanations[mode] + ' Token count: ' + toks.length + '.';
+  }
+  qs('#sentence').addEventListener('input', renderTokens);
+  qs('#tokenMode').addEventListener('change', renderTokens);
+  renderTokens();
+
+  // Embeddings
+  let selectedEmbed = 0;
+  function renderEmbeddings() {
+    const d = +qs('#embedDim').value;
+    qs('#embedDimLabel').textContent = d;
+    const toks = ['the','cat','sat','mat'];
+    qs('#embedTokens').innerHTML = toks.map((t,i) => '<button class="token ' + (i===selectedEmbed?'selected':'') + '" data-i="'+i+'">'+t+'</button>').join('');
+    qsa('#embedTokens button').forEach(b => b.addEventListener('click', () => { selectedEmbed = +b.dataset.i; renderEmbeddings(); }));
+    const mat = toks.map(t => seeded(t,d));
+    qs('#embeddingVector').innerHTML = table([mat[selectedEmbed]], [toks[selectedEmbed]], Array.from({length:d},(_,i)=>'f'+(i+1)));
+    qs('#embeddingMatrix').innerHTML = table(mat, toks, Array.from({length:d},(_,i)=>'f'+(i+1)));
+  }
+  qs('#embedDim').addEventListener('input', renderEmbeddings);
+  renderEmbeddings();
+
+  // Position
+  function positionMatrix(L,D) {
+    return Array.from({length:L},(_,pos)=>Array.from({length:D},(_,i)=>{
+      const denom = Math.pow(10000, (2*Math.floor(i/2))/D);
+      return i%2===0 ? Math.sin(pos/denom) : Math.cos(pos/denom);
+    }));
+  }
+  function renderPosition() {
+    const alpha = +qs('#positionStrength').value;
+    qs('#positionStrengthLabel').textContent = alpha.toFixed(1);
+    const toks = ['the','cat','sat','mat'];
+    const base = toks.map(t => seeded(t,4));
+    const pe = positionMatrix(4,4);
+    const combined = base.map((r,i)=>r.map((v,j)=>v+alpha*pe[i][j]));
+    const cols = ['f1','f2','f3','f4'];
+    qs('#posTokenMatrix').innerHTML = table(base,toks,cols);
+    qs('#posMatrix').innerHTML = table(pe,['p0','p1','p2','p3'],cols);
+    qs('#posCombined').innerHTML = table(combined,toks,cols);
+  }
+  qs('#positionStrength').addEventListener('input', renderPosition);
+  renderPosition();
+
+  // QKV
+  const Xsmall = [[1,0],[0,1],[1,1]];
+  const WQ = [[1,0],[0,1]];
+  const WK = [[1,1],[0,1]];
+  const WV = [[1,0],[1,-1]];
+  const mul = (A,B) => A.map(r => B[0].map((_,j)=>r.reduce((s,v,k)=>s+v*B[k][j],0)));
+  const Q = mul(Xsmall,WQ), K = mul(Xsmall,WK), V = mul(Xsmall,WV);
+  function renderQKV() {
+    const c = qs('#qkvChoice').value;
+    qs('#qMatrix').innerHTML = table(Q,['t1','t2','t3'],['d1','d2']);
+    qs('#kMatrix').innerHTML = table(K,['t1','t2','t3'],['d1','d2']);
+    qs('#vMatrix').innerHTML = table(V,['t1','t2','t3'],['d1','d2']);
+    const text = {
+      Q:'Q changes each token into a search vector. Similarity with keys determines where attention goes.',
+      K:'K changes each token into a match vector. It determines how easily other queries can find that token.',
+      V:'V changes each token into a content vector. These vectors are mixed to form the attention output.'
+    };
+    qs('#qkvExplain').textContent = text[c];
+    qsa('#qkv .card').forEach(card => card.style.outline = '');
+    const idx = {Q:0,K:1,V:2}[c];
+    qsa('#qkv .card')[idx].style.outline = '3px solid var(--accent)';
+  }
+  qs('#qkvChoice').addEventListener('change', renderQKV);
+  renderQKV();
+
+  // Scores
+  const labels = ['the','cat','sat','mat'];
+  const qVecs = [[1,0],[0,1],[1,1],[0.6,1.2]];
+  const kVecs = [[1,1],[0,1],[1,2],[0.5,1.4]];
+  function renderScores() {
+    const qi = +qs('#queryIndex').value;
+    qs('#queryLabel').textContent = (qi+1) + ' (' + labels[qi] + ')';
+    const raw = kVecs.map(k => qVecs[qi][0]*k[0] + qVecs[qi][1]*k[1]);
+    const scaled = qs('#scaleToggle').checked ? raw.map(v=>v/Math.sqrt(2)) : raw;
+    const final = qs('#softmaxToggle').checked ? softmax(scaled) : scaled;
+    const max = Math.max(...final.map(Math.abs), 1e-6);
+    qs('#scoreBars').innerHTML = final.map((v,i)=>`
+      <div class="bar-row">
+        <span>${labels[i]}</span>
+        <div class="track"><div class="fill" style="width:${Math.max(0, Math.abs(v)/max*100)}%"></div></div>
+        <strong>${v.toFixed(3)}</strong>
+      </div>`).join('');
+    qs('#scoreEquation').textContent = `q_${qi+1} · Kᵀ = [${raw.map(v=>v.toFixed(2)).join(', ')}]` +
+      (qs('#scaleToggle').checked ? ' → divide by √2' : '') +
+      (qs('#softmaxToggle').checked ? ' → softmax' : '');
+    qs('#scoreExplain').textContent = qs('#softmaxToggle').checked
+      ? 'The values now form a probability distribution and sum to 1.'
+      : 'These are still unnormalized compatibility scores. They may be negative or may not sum to 1.';
+  }
+  ['#queryIndex','#scaleToggle','#softmaxToggle'].forEach(id => qs(id).addEventListener('input', renderScores));
+  renderScores();
+
+  // Value mixing
+  function renderMix() {
+    let ws = [+qs('#mix1').value,+qs('#mix2').value,+qs('#mix3').value];
+    const sum = ws.reduce((a,b)=>a+b,0) || 1;
+    ws = ws.map(v=>v/sum);
+    ['1','2','3'].forEach((n,i)=>qs('#mix'+n+'Label').textContent = ws[i].toFixed(2));
+    const vals = [[1,0],[1,-1],[2,-1]];
+    const out = [0,1].map(j=>ws.reduce((s,w,i)=>s+w*vals[i][j],0));
+    qs('#valueVectors').innerHTML = table(vals,['v1','v2','v3'],['d1','d2']);
+    qs('#mixedVector').innerHTML = table([out],['o'],['d1','d2'],3);
+    qs('#mixEquation').textContent = `o = ${ws[0].toFixed(2)}v₁ + ${ws[1].toFixed(2)}v₂ + ${ws[2].toFixed(2)}v₃ = [${out.map(v=>v.toFixed(3)).join(', ')}]`;
+  }
+  ['#mix1','#mix2','#mix3'].forEach(id => qs(id).addEventListener('input', renderMix));
+  renderMix();
+
+  // Heads
+  const headPatterns = [
+    [0.12,0.55,0.25,0.08],
+    [0.58,0.17,0.18,0.07],
+    [0.10,0.12,0.22,0.56]
+  ];
+  function renderHeads() {
+    const h = +qs('#headSelect').value;
+    qs('#headTokens').innerHTML = labels.map((t,i)=>'<span class="token '+(i===2?'selected':'')+'">'+t+'</span>').join('');
+    qs('#headBars').innerHTML = headPatterns[h].map((v,i)=>`
+      <div class="bar-row">
+        <span>${labels[i]}</span>
+        <div class="track"><div class="fill" style="width:${v*100}%"></div></div>
+        <strong>${v.toFixed(2)}</strong>
+      </div>`).join('');
+  }
+  qs('#headSelect').addEventListener('change', renderHeads);
+  renderHeads();
+
+  // FFN
+  function renderFFN() {
+    const x1 = +qs('#ffnInput').value;
+    const x = [x1,0.5];
+    qs('#ffnInputLabel').textContent = x1.toFixed(1);
+    const W1 = [[1,-1,0.5],[0.5,1,-1]];
+    const W2 = [[1,0],[0.5,1],[-1,0.5]];
+    const z = [0,1,2].map(j=>x[0]*W1[0][j]+x[1]*W1[1][j]);
+    const a = qs('#reluToggle').checked ? z.map(v=>Math.max(0,v)) : z;
+    const y = [0,1].map(j=>a.reduce((s,v,i)=>s+v*W2[i][j],0));
+    qs('#ffnNodeInput').textContent = '['+x.map(v=>v.toFixed(2)).join(', ')+']';
+    qs('#ffnNodeExpand').textContent = '['+z.map(v=>v.toFixed(2)).join(', ')+']';
+    qs('#ffnNodeRelu').textContent = '['+a.map(v=>v.toFixed(2)).join(', ')+']';
+    qs('#ffnNodeOutput').textContent = '['+y.map(v=>v.toFixed(2)).join(', ')+']';
+  }
+  ['#ffnInput','#reluToggle'].forEach(id=>qs(id).addEventListener('input',renderFFN));
+  renderFFN();
+
+  // Mask
+  function renderMask() {
+    const n = +qs('#maskSize').value;
+    qs('#maskSizeLabel').textContent = n;
+    qs('#maskQuery').max = n;
+    if (+qs('#maskQuery').value > n) qs('#maskQuery').value = n;
+    const qi = +qs('#maskQuery').value;
+    qs('#maskQueryLabel').textContent = qi;
+    const data = Array.from({length:n},(_,i)=>Array.from({length:n},(_,j)=>j<=i?1:0));
+    const rows = Array.from({length:n},(_,i)=>'q'+(i+1));
+    const cols = Array.from({length:n},(_,i)=>'k'+(i+1));
+    qs('#maskMatrix').innerHTML = table(data,rows,cols,0);
+    qs('#maskExplain').textContent = `Query ${qi} may attend to key positions 1–${qi}. Positions ${qi+1}–${n} are future information and are blocked.`;
+    const tr = qs('#maskMatrix table').rows[qi];
+    if (tr) [...tr.cells].forEach(c => c.style.outline = '2px solid var(--accent)');
+  }
+  ['#maskSize','#maskQuery'].forEach(id=>qs(id).addEventListener('input',renderMask));
+  renderMask();
+
+  // Vocabulary
+  const vocab = ['the','cat','sat','on','mat','.','<eos>'];
+  const logits = [0.7,1.1,2.4,1.6,0.9,0.4,1.2];
+  function renderVocab() {
+    const t = +qs('#temperature').value;
+    qs('#temperatureLabel').textContent = t.toFixed(1);
+    const p = softmax(logits.map(v=>v/t));
+    const max = Math.max(...p);
+    qs('#vocabBars').innerHTML = p.map((v,i)=>`
+      <div class="bar-row">
+        <span>${vocab[i]}</span>
+        <div class="track"><div class="fill" style="width:${v/max*100}%"></div></div>
+        <strong>${(v*100).toFixed(1)}%</strong>
+      </div>`).join('');
+    const best = p.indexOf(max);
+    qs('#vocabExplain').textContent = `Highest-probability next token: “${vocab[best]}”. Lower temperature makes the distribution sharper; higher temperature makes it flatter.`;
+  }
+  qs('#temperature').addEventListener('input', renderVocab);
+  renderVocab();
+</script>
+</body>
+</html>

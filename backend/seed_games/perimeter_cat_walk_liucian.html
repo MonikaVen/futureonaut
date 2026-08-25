@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Perimeter Cat Walk</title>
+  <style>
+    :root{
+      --viz-panel:#f6f7f8;
+      --viz-card:#ffffff;
+      --viz-text:#1f2937;
+      --viz-muted:#6b7280;
+      --viz-border:#d1d5db;
+      --viz-accent:#6b7280;
+      --viz-accent-text:#ffffff;
+      --viz-accent-bg:#e5e7eb;
+      --viz-accent-bg-subtle:#f3f4f6;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+      color:var(--viz-text);
+      background:#fff;
+    }
+    main{max-width:900px;margin:0 auto;padding:24px}
+    h1{font-size:28px;margin:0 0 18px}
+    .grid{display:grid;gap:12px}
+    .metrics{grid-template-columns:repeat(4,minmax(0,1fr))}
+    .metric-card,.card{
+      border:1px solid var(--viz-border);
+      border-radius:16px;
+      padding:14px;
+      background:var(--viz-card);
+    }
+    .label{font-size:13px;color:var(--viz-muted)}
+    .value{font-size:24px;font-weight:700;margin-top:4px}
+    .toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}
+    button,select{
+      border:1px solid var(--viz-border);
+      border-radius:12px;
+      padding:10px 14px;
+      font-size:16px;
+      background:#fff;
+      color:var(--viz-text);
+    }
+    button.primary{
+      background:var(--viz-accent);
+      color:var(--viz-accent-text);
+    }
+    .callout{
+      border:1px solid var(--viz-border);
+      border-radius:16px;
+      padding:14px;
+      background:var(--viz-accent-bg-subtle);
+      margin-bottom:14px;
+    }
+    .board{
+      overflow:hidden;
+      border:1px solid var(--viz-border);
+      border-radius:18px;
+      background:var(--viz-panel);
+    }
+    .two-col{
+      grid-template-columns:repeat(2,minmax(0,1fr));
+      margin-top:14px;
+    }
+    .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+    #feedback{margin-top:14px;font-size:16px}
+    @media(max-width:700px){
+      .metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .two-col{grid-template-columns:1fr}
+      main{padding:14px}
+    }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Perimeter Cat Walk</h1>
+
+  <div class="grid metrics">
+    <div class="metric-card">
+      <div class="label">Perimeter</div>
+      <div id="perimeterValue" class="value">0 units</div>
+    </div>
+    <div class="metric-card">
+      <div class="label">Vertices</div>
+      <div id="vertexValue" class="value">0</div>
+    </div>
+    <div class="metric-card">
+      <div class="label">Shape</div>
+      <div id="shapeStatus" class="value">Open</div>
+    </div>
+    <div class="metric-card">
+      <div class="label">Cat distance</div>
+      <div id="catDistance" class="value">0 units</div>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <button id="closeBtn" type="button">Close shape</button>
+    <button id="walkBtn" type="button" class="primary">🐾 Walk the perimeter</button>
+    <button id="undoBtn" type="button">Undo point</button>
+    <button id="clearBtn" type="button">New shape</button>
+  </div>
+
+  <div class="callout">
+    Click grid intersections to draw a shape. Each grid square is <strong>1 × 1 unit</strong>.
+    Close the shape, then let Liucian the grey long-haired tabby check your perimeter by walking all the way around it.
+  </div>
+
+  <div class="board">
+    <svg id="board" viewBox="0 0 700 480" role="img" aria-label="Interactive coordinate grid for drawing a polygon and calculating its perimeter" style="display:block;width:100%;height:auto;touch-action:none">
+      <g id="grid"></g>
+      <polygon id="fillShape" points="" fill="var(--viz-accent-bg-subtle)" stroke="none"></polygon>
+      <polyline id="shapeLine" points="" fill="none" stroke="var(--viz-accent)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"></polyline>
+      <g id="points"></g>
+
+      <g id="cat" transform="translate(70 70)" style="display:none;pointer-events:none">
+        <ellipse cx="0" cy="5" rx="24" ry="16" fill="#777" stroke="#4b4b4b" stroke-width="2"></ellipse>
+        <circle cx="19" cy="-7" r="13" fill="#808080" stroke="#4b4b4b" stroke-width="2"></circle>
+        <path d="M10 -16 L14 -31 L22 -17 Z" fill="#777" stroke="#4b4b4b" stroke-width="2"></path>
+        <path d="M22 -18 L30 -30 L31 -12 Z" fill="#777" stroke="#4b4b4b" stroke-width="2"></path>
+        <path d="M-20 5 Q-43 -17 -48 6 Q-51 25 -35 29" fill="none" stroke="#707070" stroke-width="9" stroke-linecap="round"></path>
+        <path d="M-19 -3 Q-5 7 8 -3 M-17 5 Q-4 14 9 5 M-14 12 Q-2 20 8 11" fill="none" stroke="#4f4f4f" stroke-width="3" opacity=".9"></path>
+        <path d="M12 -10 Q19 -5 27 -9 M12 -4 Q19 1 28 -3" fill="none" stroke="#4f4f4f" stroke-width="2.5"></path>
+        <circle cx="15" cy="-8" r="2" fill="#222"></circle>
+        <circle cx="24" cy="-8" r="2" fill="#222"></circle>
+        <path d="M19 -3 l3 2 l-3 2" fill="#444"></path>
+        <path d="M31 -2 L44 -5 M31 1 L45 2 M30 4 L43 8" stroke="#555" stroke-width="1.5"></path>
+        <path d="M-10 15 l-3 13 M8 15 l2 13" stroke="#666" stroke-width="7" stroke-linecap="round"></path>
+        <text x="0" y="-40" text-anchor="middle" font-size="13" fill="var(--viz-text)">Liucian</text>
+      </g>
+    </svg>
+  </div>
+
+  <div class="grid two-col">
+    <div class="card">
+      <div><strong>Perimeter rule</strong></div>
+      <div id="formula" style="margin-top:8px">Add the lengths of every outside edge.</div>
+    </div>
+    <div class="card">
+      <div><strong>Challenge</strong></div>
+      <div class="row" style="margin-top:8px">
+        <label for="target">Make perimeter</label>
+        <select id="target">
+          <option value="12">12 units</option>
+          <option value="16">16 units</option>
+          <option value="20">20 units</option>
+          <option value="24">24 units</option>
+          <option value="30">30 units</option>
+        </select>
+      </div>
+      <div id="challengeMessage" class="label" style="margin-top:8px" aria-live="polite">Draw a closed shape with perimeter 12 units.</div>
+    </div>
+  </div>
+
+  <div id="feedback" aria-live="polite"></div>
+</main>
+
+<script>
+(() => {
+  const svg = document.getElementById('board');
+  const gridG = document.getElementById('grid');
+  const pointsG = document.getElementById('points');
+  const line = document.getElementById('shapeLine');
+  const fill = document.getElementById('fillShape');
+  const cat = document.getElementById('cat');
+  const perimeterValue = document.getElementById('perimeterValue');
+  const vertexValue = document.getElementById('vertexValue');
+  const shapeStatus = document.getElementById('shapeStatus');
+  const catDistance = document.getElementById('catDistance');
+  const formula = document.getElementById('formula');
+  const feedback = document.getElementById('feedback');
+  const target = document.getElementById('target');
+  const challengeMessage = document.getElementById('challengeMessage');
+
+  const left = 50, top = 40, spacing = 50, cols = 13, rows = 9;
+  let pts = [];
+  let closed = false;
+  let walkFrame = null;
+
+  function addSvg(tag, attrs, parent) {
+    const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+    Object.entries(attrs).forEach(([k,v]) => el.setAttribute(k,v));
+    parent.appendChild(el);
+    return el;
+  }
+
+  for (let c=0;c<cols;c++) {
+    addSvg('line',{x1:left+c*spacing,y1:top,x2:left+c*spacing,y2:top+(rows-1)*spacing,stroke:'var(--viz-border)','stroke-width':'1'},gridG);
+  }
+  for (let r=0;r<rows;r++) {
+    addSvg('line',{x1:left,y1:top+r*spacing,x2:left+(cols-1)*spacing,y2:top+r*spacing,stroke:'var(--viz-border)','stroke-width':'1'},gridG);
+  }
+  for (let c=0;c<cols;c++) for (let r=0;r<rows;r++) {
+    addSvg('circle',{cx:left+c*spacing,cy:top+r*spacing,r:'3',fill:'var(--viz-muted)'},gridG);
+  }
+
+  function unitDistance(a,b) {
+    const dx=(b.x-a.x)/spacing, dy=(b.y-a.y)/spacing;
+    return Math.sqrt(dx*dx+dy*dy);
+  }
+
+  function perimeter() {
+    if (pts.length < 2) return 0;
+    let p=0;
+    for(let i=1;i<pts.length;i++) p+=unitDistance(pts[i-1],pts[i]);
+    if(closed && pts.length>2) p+=unitDistance(pts[pts.length-1],pts[0]);
+    return p;
+  }
+
+  function fmt(n) {
+    return Math.abs(n-Math.round(n))<0.001 ? String(Math.round(n)) : n.toFixed(1);
+  }
+
+  function edgeLengths() {
+    if(pts.length<2) return [];
+    const arr=[];
+    for(let i=1;i<pts.length;i++) arr.push(unitDistance(pts[i-1],pts[i]));
+    if(closed && pts.length>2) arr.push(unitDistance(pts[pts.length-1],pts[0]));
+    return arr;
+  }
+
+  function redraw() {
+    pointsG.innerHTML='';
+    const displayPts = pts.map(p=>`${p.x},${p.y}`);
+    if(closed && pts.length>2) displayPts.push(`${pts[0].x},${pts[0].y}`);
+    line.setAttribute('points',displayPts.join(' '));
+    fill.setAttribute('points',closed ? pts.map(p=>`${p.x},${p.y}`).join(' ') : '');
+
+    pts.forEach((p,i)=>{
+      addSvg('circle',{cx:p.x,cy:p.y,r:'8',fill:'var(--viz-accent)',stroke:'var(--viz-panel)','stroke-width':'3'},pointsG);
+      const t=addSvg('text',{x:p.x+10,y:p.y-10,'font-size':'12',fill:'var(--viz-text)'},pointsG);
+      t.textContent=String.fromCharCode(65+i);
+    });
+
+    const p=perimeter();
+    perimeterValue.textContent=`${fmt(p)} units`;
+    vertexValue.textContent=pts.length;
+    shapeStatus.textContent=closed ? 'Closed' : 'Open';
+    const lengths=edgeLengths();
+    formula.textContent = lengths.length ? `${lengths.map(fmt).join(' + ')}${closed ? ` = ${fmt(p)} units` : ' …'}` : 'Add the lengths of every outside edge.';
+
+    const goal=Number(target.value);
+    challengeMessage.textContent=`Draw a closed shape with perimeter ${goal} units.`;
+    if(closed) {
+      if(Math.abs(p-goal)<0.05) feedback.textContent=`⭐ Perfect! Liucian says your perimeter is exactly ${fmt(p)} units.`;
+      else feedback.textContent=`Your perimeter is ${fmt(p)} units. Target: ${goal}. Try changing the shape.`;
+    } else feedback.textContent='';
+  }
+
+  function svgPoint(evt) {
+    const rect=svg.getBoundingClientRect();
+    const x=(evt.clientX-rect.left)*700/rect.width;
+    const y=(evt.clientY-rect.top)*480/rect.height;
+    let gx=Math.round((x-left)/spacing);
+    let gy=Math.round((y-top)/spacing);
+    gx=Math.max(0,Math.min(cols-1,gx));
+    gy=Math.max(0,Math.min(rows-1,gy));
+    return {x:left+gx*spacing,y:top+gy*spacing};
+  }
+
+  svg.addEventListener('pointerdown',e=>{
+    if(closed) return;
+    const p=svgPoint(e);
+    const last=pts[pts.length-1];
+    if(last && last.x===p.x && last.y===p.y) return;
+    pts.push(p);
+    redraw();
+  });
+
+  document.getElementById('closeBtn').addEventListener('click',()=>{
+    if(pts.length<3){ feedback.textContent='Add at least 3 points before closing the shape.'; return; }
+    closed=true; redraw();
+  });
+
+  document.getElementById('undoBtn').addEventListener('click',()=>{
+    if(walkFrame) cancelAnimationFrame(walkFrame);
+    cat.style.display='none';
+    if(closed) closed=false; else pts.pop();
+    redraw();
+  });
+
+  document.getElementById('clearBtn').addEventListener('click',()=>{
+    if(walkFrame) cancelAnimationFrame(walkFrame);
+    pts=[]; closed=false; cat.style.display='none'; catDistance.textContent='0 units'; redraw();
+  });
+
+  target.addEventListener('change',redraw);
+
+  document.getElementById('walkBtn').addEventListener('click',()=>{
+    if(!closed || pts.length<3){ feedback.textContent='Close your shape first so Liucian has a complete path to walk.'; return; }
+    if(walkFrame) cancelAnimationFrame(walkFrame);
+    cat.style.display='block';
+    const path=[...pts,pts[0]];
+    const segs=[];
+    let totalPx=0;
+    for(let i=1;i<path.length;i++) {
+      const dx=path[i].x-path[i-1].x, dy=path[i].y-path[i-1].y;
+      const len=Math.hypot(dx,dy);
+      segs.push({a:path[i-1],b:path[i],len,start:totalPx,angle:Math.atan2(dy,dx)*180/Math.PI});
+      totalPx+=len;
+    }
+    const duration=Math.max(2500,totalPx*8);
+    const start=performance.now();
+    feedback.textContent='🐾 Liucian is checking every outside edge…';
+
+    function animate(now){
+      const t=Math.min(1,(now-start)/duration);
+      const dist=t*totalPx;
+      let s=segs[segs.length-1];
+      for(const candidate of segs){ if(dist<=candidate.start+candidate.len){s=candidate;break;} }
+      const local=Math.max(0,Math.min(1,(dist-s.start)/s.len));
+      const x=s.a.x+(s.b.x-s.a.x)*local;
+      const y=s.a.y+(s.b.y-s.a.y)*local;
+      cat.setAttribute('transform',`translate(${x} ${y-22}) rotate(${s.angle})`);
+      catDistance.textContent=`${fmt(t*perimeter())} units`;
+      if(t<1) walkFrame=requestAnimationFrame(animate);
+      else {
+        cat.setAttribute('transform',`translate(${pts[0].x} ${pts[0].y-22})`);
+        catDistance.textContent=`${fmt(perimeter())} units`;
+        feedback.textContent=`🐈 Liucian walked ${fmt(perimeter())} units — exactly the perimeter of your shape!`;
+      }
+    }
+    walkFrame=requestAnimationFrame(animate);
+  });
+
+  redraw();
+})();
+</script>
+</body>
+</html>

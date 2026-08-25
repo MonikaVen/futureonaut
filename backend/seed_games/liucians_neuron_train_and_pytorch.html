@@ -1,0 +1,1127 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Liucian's Neuron</title>
+  <style>
+    :root{
+      --bg:#f7f7f8; --card:#ffffff; --text:#1f2937; --muted:#6b7280;
+      --border:#d1d5db; --accent:#6b7280; --good:#2f855a; --bad:#b45309;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0; font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+      color:var(--text); background:#fff;
+    }
+    main{max-width:1050px;margin:0 auto;padding:22px}
+    h1{margin:0 0 6px;font-size:30px}
+    .sub{color:var(--muted);margin-bottom:18px}
+    .grid{display:grid;gap:14px}
+    .metrics{grid-template-columns:repeat(4,minmax(0,1fr))}
+    .two{grid-template-columns:1.1fr .9fr}
+    .card{
+      border:1px solid var(--border); border-radius:16px; background:var(--card); padding:16px;
+    }
+    .metric{border:1px solid var(--border);border-radius:14px;padding:12px;background:#fff}
+    .label{font-size:13px;color:var(--muted)}
+    .value{font-size:24px;font-weight:700;margin-top:3px}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:end}
+    .control{margin-top:12px}
+    input[type=range]{width:100%}
+    input[type=number]{
+      width:100%;border:1px solid var(--border);border-radius:10px;padding:9px 10px;font-size:16px;
+    }
+    button{
+      border:1px solid var(--border);border-radius:12px;padding:10px 14px;font-size:16px;background:#fff;cursor:pointer;
+    }
+    button.primary{background:var(--accent);color:#fff}
+    .formula{
+      margin-top:12px;padding:12px;border-radius:12px;background:var(--bg);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+      overflow-wrap:anywhere;
+    }
+    .decision{
+      margin-top:12px;padding:14px;border-radius:14px;text-align:center;font-weight:700;font-size:24px;border:1px solid var(--border);
+    }
+    .decision.play{background:#ecfdf5;color:var(--good)}
+    .decision.nap{background:#fff7ed;color:var(--bad)}
+    .challenge{margin-top:14px;padding:12px;border-radius:12px;background:var(--bg)}
+    .feedback{margin-top:10px}
+    svg{display:block;width:100%;height:auto}
+    .tiny{font-size:13px;color:var(--muted)}
+    .scoreline{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+    .pill{border:1px solid var(--border);border-radius:999px;padding:6px 10px;font-size:14px}
+
+    .train-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:14px}
+    .train-status{padding:12px;border:1px solid var(--border);border-radius:12px;background:var(--bg);min-height:92px}
+    .train-status strong{font-weight:750}
+    .progress-track{height:10px;border-radius:999px;background:#e5e7eb;overflow:hidden;margin-top:8px}
+    .progress-fill{height:100%;width:0%;background:#6b7280;transition:width .35s ease}
+    .weight-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:10px}
+    .weight-box{border:1px solid var(--border);border-radius:12px;padding:10px;background:#fff;text-align:center}
+    .weight-box .old{font-size:12px;color:var(--muted)}
+    .weight-box .new{font-size:18px;font-weight:750;margin-top:3px}
+    .delta{font-size:12px;color:var(--muted);margin-top:3px}
+    .flash{animation:flashWeight .55s ease}
+    @keyframes flashWeight{0%{transform:scale(1)}45%{transform:scale(1.06);background:#f3f4f6}100%{transform:scale(1)}}
+    .connection-active{animation:pulseConnection .7s ease}
+    @keyframes pulseConnection{0%,100%{stroke-width:4;opacity:1}50%{stroke-width:9;opacity:.55}}
+    .learn-equation{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;background:#fff;border:1px dashed var(--border);border-radius:10px;padding:10px;margin-top:10px}
+    .dataset{display:grid;gap:6px;margin-top:10px}
+    .data-row{display:grid;grid-template-columns:1.5fr .8fr .8fr;gap:8px;align-items:center;border:1px solid var(--border);border-radius:10px;padding:8px 10px;background:#fff;font-size:14px}
+    .data-row.active{outline:3px solid #e5e7eb}
+    .data-row.good{background:#ecfdf5}
+    .data-row.bad{background:#fff7ed}
+    .code-shell{border:1px solid var(--border);border-radius:14px;overflow:hidden;background:#111827;color:#e5e7eb}
+    .code-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px;background:#1f2937}
+    .code-toolbar button{background:#fff;color:#111827}
+    .code-toolbar .primary{background:#e5e7eb;color:#111827}
+    .code-body{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(250px,.65fr);min-height:420px}
+    .code-panel{overflow:auto;padding:10px 0;background:#111827}
+    .code-line{display:grid;grid-template-columns:42px 1fr;gap:10px;padding:3px 12px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;line-height:1.55;white-space:pre}
+    .code-line .ln{text-align:right;color:#6b7280;user-select:none}
+    .code-line.active{background:#374151}
+    .code-line.done{background:#18251f}
+    .code-commentary{padding:16px;background:#fff;color:var(--text);border-left:1px solid var(--border)}
+    .code-commentary h3{margin-top:0}
+    .terminal{margin-top:12px;background:#0b1020;color:#d1fae5;border-radius:10px;padding:10px;min-height:125px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;white-space:pre-wrap}
+    .hidden{display:none!important}
+    @media(max-width:800px){
+      .train-grid{grid-template-columns:1fr}
+      .weight-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .code-body{grid-template-columns:1fr}
+      .code-commentary{border-left:0;border-top:1px solid var(--border)}
+      .data-row{grid-template-columns:1fr}
+    }
+
+    @media(max-width:800px){
+      .metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .two{grid-template-columns:1fr}
+      .row{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+<body>
+<main>
+  <h1>🐈 Liucian's Neuron</h1>
+  <div class="sub">Teach one artificial neuron how to decide whether Liucian should <strong>PLAY</strong> or <strong>NAP</strong>.</div>
+
+  <div class="grid metrics">
+    <div class="metric"><div class="label">Hunger</div><div id="mHunger" class="value">6</div></div>
+    <div class="metric"><div class="label">Energy</div><div id="mEnergy" class="value">7</div></div>
+    <div class="metric"><div class="label">Toy nearby</div><div id="mToy" class="value">1</div></div>
+    <div class="metric"><div class="label">Neuron output</div><div id="mOutput" class="value">?</div></div>
+  </div>
+
+  <div class="grid two" style="margin-top:16px">
+    <section class="card">
+      <h2 style="margin-top:0">1. Inputs</h2>
+      <div class="tiny">Inputs are facts the neuron receives about Liucian.</div>
+
+      <div class="control">
+        <label for="hunger">Hunger: <strong><span id="hungerOut">6</span></strong></label>
+        <input id="hunger" type="range" min="0" max="10" value="6" step="1">
+      </div>
+      <div class="control">
+        <label for="energy">Energy: <strong><span id="energyOut">7</span></strong></label>
+        <input id="energy" type="range" min="0" max="10" value="7" step="1">
+      </div>
+      <div class="control">
+        <label for="toy">Toy nearby: <strong><span id="toyOut">1</span></strong></label>
+        <input id="toy" type="range" min="0" max="1" value="1" step="1">
+        <div class="tiny">0 = no toy, 1 = toy nearby</div>
+      </div>
+
+      <h2>2. Weights</h2>
+      <div class="tiny">Weights tell the neuron how important each input is. Real neural networks usually begin with small random weights, then learn better values during training.</div>
+
+      <div class="row">
+        <label>Hunger weight
+          <input id="wHunger" type="number" value="0" step="0.1">
+        </label>
+        <label>Energy weight
+          <input id="wEnergy" type="number" value="0" step="0.1">
+        </label>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <label>Toy weight
+          <input id="wToy" type="number" value="0" step="0.1">
+        </label>
+        <label>Bias
+          <input id="bias" type="number" value="0" step="0.1">
+        </label>
+      </div>
+
+      <div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <button id="randomizeBtn" type="button">🎲 Randomize weights</button>
+        <span class="tiny">Starts with small random values between −0.3 and +0.3.</span>
+      </div>
+
+      <div id="formula" class="formula"></div>
+
+      <div id="decision" class="decision">?</div>
+    </section>
+
+    <section class="card">
+      <h2 style="margin-top:0">Neuron map</h2>
+      <svg viewBox="0 0 520 350" role="img" aria-label="Diagram of Liucian's neuron with three inputs, weighted connections, and an output">
+        <g font-family="system-ui">
+          <rect x="20" y="50" width="110" height="48" rx="12" fill="#fff" stroke="#d1d5db"/>
+          <rect x="20" y="145" width="110" height="48" rx="12" fill="#fff" stroke="#d1d5db"/>
+          <rect x="20" y="240" width="110" height="48" rx="12" fill="#fff" stroke="#d1d5db"/>
+          <text x="75" y="78" text-anchor="middle" font-size="16">Hunger</text>
+          <text x="75" y="173" text-anchor="middle" font-size="16">Energy</text>
+          <text x="75" y="268" text-anchor="middle" font-size="16">Toy</text>
+
+          <line id="lineHunger" x1="130" y1="74" x2="300" y2="160" stroke="#6b7280" stroke-width="4"/>
+          <line id="lineEnergy" x1="130" y1="169" x2="300" y2="169" stroke="#6b7280" stroke-width="4"/>
+          <line id="lineToy" x1="130" y1="264" x2="300" y2="178" stroke="#6b7280" stroke-width="4"/>
+
+          <text id="svgWH" x="190" y="95" font-size="13">w = -0.7</text>
+          <text id="svgWE" x="190" y="158" font-size="13">w = 0.9</text>
+          <text id="svgWT" x="190" y="244" font-size="13">w = 2.5</text>
+
+          <circle cx="340" cy="169" r="52" fill="#f3f4f6" stroke="#6b7280" stroke-width="4"/>
+          <text x="340" y="160" text-anchor="middle" font-size="15">NEURON</text>
+          <text x="340" y="181" text-anchor="middle" font-size="13">Σ + bias</text>
+
+          <line x1="392" y1="169" x2="475" y2="169" stroke="#6b7280" stroke-width="4"/>
+          <polygon points="475,169 462,161 462,177" fill="#6b7280"/>
+          <text id="svgDecision" x="440" y="145" text-anchor="middle" font-size="18">?</text>
+
+          <g transform="translate(395 245)">
+            <ellipse cx="0" cy="20" rx="42" ry="28" fill="#777" stroke="#4b4b4b" stroke-width="3"/>
+            <circle cx="38" cy="0" r="22" fill="#808080" stroke="#4b4b4b" stroke-width="3"/>
+            <path d="M24 -16 L29 -40 L40 -18 Z" fill="#777" stroke="#4b4b4b" stroke-width="3"/>
+            <path d="M39 -18 L54 -39 L57 -8 Z" fill="#777" stroke="#4b4b4b" stroke-width="3"/>
+            <path d="M-38 22 Q-70 -7 -80 25 Q-85 48 -60 55" fill="none" stroke="#707070" stroke-width="13" stroke-linecap="round"/>
+            <path d="M-32 5 Q-8 23 20 5 M-28 20 Q-6 35 21 18" fill="none" stroke="#4f4f4f" stroke-width="5"/>
+            <circle cx="33" cy="-2" r="3" fill="#222"/><circle cx="44" cy="-2" r="3" fill="#222"/>
+            <text x="0" y="75" text-anchor="middle" font-size="14">Liucian</text>
+          </g>
+        </g>
+      </svg>
+
+      <div class="challenge">
+        <strong>Challenge</strong>
+        <div id="challengeText" style="margin-top:6px">Make the neuron decide PLAY when energy is high and a toy is nearby.</div>
+        <div class="scoreline">
+          <span class="pill">⭐ Challenges solved: <span id="score">0</span></span>
+          <span class="pill">Attempts: <span id="attempts">0</span></span>
+          <span class="pill">Threshold: 0</span>
+        </div>
+        <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+          <button id="checkBtn" class="primary" type="button">Check challenge</button>
+          <button id="newBtn" type="button">New challenge</button>
+        </div>
+        <div id="feedback" class="feedback" aria-live="polite"></div>
+      </div>
+    </section>
+  </div>
+
+
+  <section class="card" id="trainingSection" style="margin-top:16px">
+    <h2 style="margin-top:0">🧠 3. Let the neuron train itself</h2>
+    <div class="sub" style="margin-bottom:10px">
+      Instead of guessing the weights by hand, use the <strong>perceptron learning rule</strong>.
+      Each mistake nudges the weights toward the correct answer.
+    </div>
+
+    <div class="train-grid">
+      <div>
+        <div class="row">
+          <label>Learning rate η
+            <input id="learningRate" type="number" min="0.01" max="1" value="0.1" step="0.05">
+          </label>
+          <label>Epochs
+            <input id="epochCount" type="number" min="1" max="50" value="12" step="1">
+          </label>
+        </div>
+
+        <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+          <button id="trainStepBtn" type="button">▶ Train one example</button>
+          <button id="autoTrainBtn" class="primary" type="button">⚡ Auto-train</button>
+          <button id="stopTrainBtn" type="button" disabled>Stop</button>
+          <button id="resetTrainBtn" type="button">🎲 Reset random</button>
+        </div>
+
+        <div id="learnEquation" class="learn-equation">
+          wᵢ ← wᵢ + η × (target − prediction) × xᵢ
+        </div>
+
+        <div class="weight-grid">
+          <div class="weight-box" id="boxWH"><div class="old">Hunger weight</div><div id="trainWH" class="new">0</div><div id="deltaWH" class="delta">Δ 0</div></div>
+          <div class="weight-box" id="boxWE"><div class="old">Energy weight</div><div id="trainWE" class="new">0</div><div id="deltaWE" class="delta">Δ 0</div></div>
+          <div class="weight-box" id="boxWT"><div class="old">Toy weight</div><div id="trainWT" class="new">0</div><div id="deltaWT" class="delta">Δ 0</div></div>
+          <div class="weight-box" id="boxB"><div class="old">Bias</div><div id="trainB" class="new">0</div><div id="deltaB" class="delta">Δ 0</div></div>
+        </div>
+      </div>
+
+      <div>
+        <div id="trainStatus" class="train-status">
+          Press <strong>Train one example</strong> to watch one learning step, or <strong>Auto-train</strong> to watch the neuron improve across the dataset.
+        </div>
+        <div style="margin-top:10px">
+          <div class="scoreline">
+            <span class="pill">Epoch: <span id="trainEpoch">0</span></span>
+            <span class="pill">Example: <span id="trainExample">0</span>/8</span>
+            <span class="pill">Accuracy: <span id="trainAccuracy">—</span></span>
+          </div>
+          <div class="progress-track"><div id="trainProgress" class="progress-fill"></div></div>
+        </div>
+
+        <div id="trainingDataset" class="dataset">
+          <div class="data-row" data-train-row="0"><span>H 2 · E 9 · Toy 1</span><strong>PLAY</strong><span id="trainPred0">—</span></div>
+          <div class="data-row" data-train-row="1"><span>H 9 · E 2 · Toy 0</span><strong>NAP</strong><span id="trainPred1">—</span></div>
+          <div class="data-row" data-train-row="2"><span>H 4 · E 6 · Toy 1</span><strong>PLAY</strong><span id="trainPred2">—</span></div>
+          <div class="data-row" data-train-row="3"><span>H 8 · E 3 · Toy 1</span><strong>NAP</strong><span id="trainPred3">—</span></div>
+          <div class="data-row" data-train-row="4"><span>H 1 · E 7 · Toy 0</span><strong>PLAY</strong><span id="trainPred4">—</span></div>
+          <div class="data-row" data-train-row="5"><span>H 7 · E 7 · Toy 1</span><strong>PLAY</strong><span id="trainPred5">—</span></div>
+          <div class="data-row" data-train-row="6"><span>H 6 · E 2 · Toy 1</span><strong>NAP</strong><span id="trainPred6">—</span></div>
+          <div class="data-row" data-train-row="7"><span>H 4 · E 3 · Toy 0</span><strong>NAP</strong><span id="trainPred7">—</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="generalizationBox" class="challenge hidden" style="margin-top:14px">
+      <strong>✨ Training finished — try unseen situations</strong>
+      <div class="tiny" style="margin-top:4px">These examples were not used during training.</div>
+      <div id="testResults" class="scoreline" style="margin-top:10px"></div>
+    </div>
+  </section>
+
+  <section class="card" id="pytorchSection" style="margin-top:16px">
+    <h2 style="margin-top:0">🔥 Run the same idea as a PyTorch script</h2>
+    <div class="sub" style="margin-bottom:10px">
+      The code below is a real PyTorch script you can copy into a Python environment with PyTorch installed.
+      In this browser game, <strong>Run walkthrough</strong> reproduces the same operations in JavaScript while highlighting the corresponding Python line and explaining what that line does.
+    </div>
+
+    <div class="code-shell">
+      <div class="code-toolbar">
+        <button id="runCodeBtn" class="primary" type="button">▶ Run walkthrough</button>
+        <button id="stepCodeBtn" type="button">Step one line</button>
+        <button id="resetCodeBtn" type="button">Reset</button>
+        <button id="copyCodeBtn" type="button">Copy PyTorch script</button>
+        <span id="codeRunState" class="tiny" style="color:#d1d5db">Ready</span>
+      </div>
+      <div class="code-body">
+        <div id="codePanel" class="code-panel">
+          <div class="code-line" data-code-line="1"><span class="ln">1</span><span>import torch</span></div>
+<div class="code-line" data-code-line="2"><span class="ln">2</span><span></span></div>
+<div class="code-line" data-code-line="3"><span class="ln">3</span><span># Training examples: [hunger, energy, toy]</span></div>
+<div class="code-line" data-code-line="4"><span class="ln">4</span><span>X = torch.tensor([</span></div>
+<div class="code-line" data-code-line="5"><span class="ln">5</span><span>    [2., 9., 1.],</span></div>
+<div class="code-line" data-code-line="6"><span class="ln">6</span><span>    [9., 2., 0.],</span></div>
+<div class="code-line" data-code-line="7"><span class="ln">7</span><span>    [4., 6., 1.],</span></div>
+<div class="code-line" data-code-line="8"><span class="ln">8</span><span>    [8., 3., 1.],</span></div>
+<div class="code-line" data-code-line="9"><span class="ln">9</span><span>    [1., 7., 0.],</span></div>
+<div class="code-line" data-code-line="10"><span class="ln">10</span><span>    [7., 7., 1.],</span></div>
+<div class="code-line" data-code-line="11"><span class="ln">11</span><span>    [6., 2., 1.],</span></div>
+<div class="code-line" data-code-line="12"><span class="ln">12</span><span>    [4., 3., 0.],</span></div>
+<div class="code-line" data-code-line="13"><span class="ln">13</span><span>])</span></div>
+<div class="code-line" data-code-line="14"><span class="ln">14</span><span></span></div>
+<div class="code-line" data-code-line="15"><span class="ln">15</span><span># PLAY = 1, NAP = 0</span></div>
+<div class="code-line" data-code-line="16"><span class="ln">16</span><span>y = torch.tensor([1., 0., 1., 0., 1., 1., 0., 0.])</span></div>
+<div class="code-line" data-code-line="17"><span class="ln">17</span><span></span></div>
+<div class="code-line" data-code-line="18"><span class="ln">18</span><span>weights = torch.randn(3) * 0.3</span></div>
+<div class="code-line" data-code-line="19"><span class="ln">19</span><span>bias = torch.randn(1).item() * 0.3</span></div>
+<div class="code-line" data-code-line="20"><span class="ln">20</span><span>learning_rate = 0.1</span></div>
+<div class="code-line" data-code-line="21"><span class="ln">21</span><span></span></div>
+<div class="code-line" data-code-line="22"><span class="ln">22</span><span>for epoch in range(12):</span></div>
+<div class="code-line" data-code-line="23"><span class="ln">23</span><span>    correct = 0</span></div>
+<div class="code-line" data-code-line="24"><span class="ln">24</span><span></span></div>
+<div class="code-line" data-code-line="25"><span class="ln">25</span><span>    for inputs, target in zip(X, y):</span></div>
+<div class="code-line" data-code-line="26"><span class="ln">26</span><span>        score = torch.dot(inputs, weights) + bias</span></div>
+<div class="code-line" data-code-line="27"><span class="ln">27</span><span>        prediction = 1.0 if score.item() &gt;= 0 else 0.0</span></div>
+<div class="code-line" data-code-line="28"><span class="ln">28</span><span>        error = target.item() - prediction</span></div>
+<div class="code-line" data-code-line="29"><span class="ln">29</span><span></span></div>
+<div class="code-line" data-code-line="30"><span class="ln">30</span><span>        weights += learning_rate * error * inputs</span></div>
+<div class="code-line" data-code-line="31"><span class="ln">31</span><span>        bias += learning_rate * error</span></div>
+<div class="code-line" data-code-line="32"><span class="ln">32</span><span></span></div>
+<div class="code-line" data-code-line="33"><span class="ln">33</span><span>        correct += int(prediction == target.item())</span></div>
+<div class="code-line" data-code-line="34"><span class="ln">34</span><span></span></div>
+<div class="code-line" data-code-line="35"><span class="ln">35</span><span>    accuracy = correct / len(X)</span></div>
+<div class="code-line" data-code-line="36"><span class="ln">36</span><span>    print(f&quot;epoch={epoch + 1:02d} accuracy={accuracy:.0%}&quot;)</span></div>
+<div class="code-line" data-code-line="37"><span class="ln">37</span><span></span></div>
+<div class="code-line" data-code-line="38"><span class="ln">38</span><span>print(&quot;weights:&quot;, weights)</span></div>
+<div class="code-line" data-code-line="39"><span class="ln">39</span><span>print(&quot;bias:&quot;, round(bias, 3))</span></div>
+<div class="code-line" data-code-line="40"><span class="ln">40</span><span></span></div>
+<div class="code-line" data-code-line="41"><span class="ln">41</span><span>test = torch.tensor([5., 7., 1.])</span></div>
+<div class="code-line" data-code-line="42"><span class="ln">42</span><span>score = torch.dot(test, weights) + bias</span></div>
+<div class="code-line" data-code-line="43"><span class="ln">43</span><span>print(&quot;new situation:&quot;, &quot;PLAY&quot; if score.item() &gt;= 0 else &quot;NAP&quot;)</span></div>
+        </div>
+        <aside class="code-commentary">
+          <h3>What is happening?</h3>
+          <div id="codeExplanation">
+            Press <strong>Run walkthrough</strong>. The active Python line will be highlighted here while the panel explains its role in training.
+          </div>
+          <div id="codeVariables" class="formula" style="margin-top:12px">weights = ?<br>bias = ?<br>prediction = ?<br>error = ?</div>
+          <div id="codeTerminal" class="terminal">$ python liucian_neuron.py</div>
+        </aside>
+      </div>
+    </div>
+
+    <details style="margin-top:10px">
+      <summary><strong>How to run the actual PyTorch file</strong></summary>
+      <div class="tiny" style="margin-top:8px">
+        Save the script as <code>liucian_neuron.py</code>, install PyTorch in your Python environment, then run
+        <code>python liucian_neuron.py</code>. The browser walkthrough is intentionally dependency-free.
+      </div>
+    </details>
+  </section>
+
+
+  <section class="card" style="margin-top:16px">
+    <h2 style="margin-top:0">🏆 Boss Challenge — Train One Neuron</h2>
+    <div class="sub" style="margin-bottom:10px">
+      Use <strong>one set of weights and one bias</strong> that works for all three situations.
+    </div>
+
+    <div class="grid" style="grid-template-columns:repeat(3,minmax(0,1fr));gap:10px">
+      <div class="metric">
+        <div class="label">Situation A</div>
+        <div><strong>Hunger 2 · Energy 9 · Toy 1</strong></div>
+        <div style="margin-top:5px">Correct answer: <strong>PLAY</strong></div>
+        <div id="bossA" class="tiny" style="margin-top:6px">Not checked</div>
+      </div>
+      <div class="metric">
+        <div class="label">Situation B</div>
+        <div><strong>Hunger 9 · Energy 2 · Toy 0</strong></div>
+        <div style="margin-top:5px">Correct answer: <strong>NAP</strong></div>
+        <div id="bossB" class="tiny" style="margin-top:6px">Not checked</div>
+      </div>
+      <div class="metric">
+        <div class="label">Situation C</div>
+        <div><strong>Hunger 4 · Energy 6 · Toy 1</strong></div>
+        <div style="margin-top:5px">Correct answer: <strong>PLAY</strong></div>
+        <div id="bossC" class="tiny" style="margin-top:6px">Not checked</div>
+      </div>
+    </div>
+
+    <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+      <button id="bossCheckBtn" class="primary" type="button">Check all 3 situations</button>
+      <button id="bossHintBtn" type="button">Hint</button>
+    </div>
+    <div id="bossFeedback" class="feedback" aria-live="polite"></div>
+  </section>
+
+  <section class="card" style="margin-top:16px">
+    <h2 style="margin-top:0">What is happening?</h2>
+    <div>
+      The neuron multiplies each input by its weight, adds the results, then adds a bias.
+      If the final number is <strong>0 or higher</strong>, Liucian chooses <strong>PLAY</strong>.
+      If it is below 0, he chooses <strong>NAP</strong>.
+    </div>
+  </section>
+</main>
+
+<script>
+(() => {
+  const els = {
+    hunger: document.getElementById('hunger'),
+    energy: document.getElementById('energy'),
+    toy: document.getElementById('toy'),
+    wHunger: document.getElementById('wHunger'),
+    wEnergy: document.getElementById('wEnergy'),
+    wToy: document.getElementById('wToy'),
+    bias: document.getElementById('bias')
+  };
+
+  const challenges = [
+    {text:'Make the neuron decide PLAY when energy is high and a toy is nearby.', setup:{hunger:3,energy:9,toy:1}, target:'PLAY'},
+    {text:'Make the neuron decide NAP when energy is low.', setup:{hunger:4,energy:1,toy:0}, target:'NAP'},
+    {text:'Make hunger strongly push Liucian toward NAP.', setup:{hunger:9,energy:5,toy:1}, target:'NAP'},
+    {text:'Make the toy strongly push Liucian toward PLAY.', setup:{hunger:5,energy:4,toy:1}, target:'PLAY'}
+  ];
+  let challengeIndex = 0;
+  let score = 0;
+  let attempts = 0;
+  let currentChallengeSolved = false;
+
+  function num(el){ return Number(el.value); }
+
+  function randomWeight(){
+    // One decimal place, in the common "small random initialization" spirit.
+    return Math.round((Math.random() * 0.6 - 0.3) * 100) / 100;
+  }
+
+  function randomizeWeights(){
+    els.wHunger.value = randomWeight();
+    els.wEnergy.value = randomWeight();
+    els.wToy.value = randomWeight();
+    els.bias.value = randomWeight();
+    update();
+  }
+
+  function update(){
+    const h=num(els.hunger), e=num(els.energy), t=num(els.toy);
+    const wh=num(els.wHunger), we=num(els.wEnergy), wt=num(els.wToy), b=num(els.bias);
+    const zh=h*wh, ze=e*we, zt=t*wt;
+    const z=zh+ze+zt+b;
+    const decision=z>=0?'PLAY':'NAP';
+
+    document.getElementById('hungerOut').textContent=h;
+    document.getElementById('energyOut').textContent=e;
+    document.getElementById('toyOut').textContent=t;
+    document.getElementById('mHunger').textContent=h;
+    document.getElementById('mEnergy').textContent=e;
+    document.getElementById('mToy').textContent=t;
+    document.getElementById('mOutput').textContent=z.toFixed(2);
+
+    document.getElementById('formula').textContent =
+      `${h}×(${wh}) + ${e}×(${we}) + ${t}×(${wt}) + (${b}) = ${z.toFixed(2)}`;
+
+    const d=document.getElementById('decision');
+    d.textContent=`Liucian chooses ${decision}`;
+    d.className='decision '+(decision==='PLAY'?'play':'nap');
+
+    document.getElementById('svgWH').textContent=`w = ${wh}`;
+    document.getElementById('svgWE').textContent=`w = ${we}`;
+    document.getElementById('svgWT').textContent=`w = ${wt}`;
+    document.getElementById('svgDecision').textContent=decision;
+  }
+
+  Object.values(els).forEach(el=>{
+    el.addEventListener(el.type==='range'?'input':'input',update);
+  });
+
+  function loadChallenge(){
+    const c=challenges[challengeIndex];
+    document.getElementById('challengeText').textContent=c.text;
+    els.hunger.value=c.setup.hunger;
+    els.energy.value=c.setup.energy;
+    els.toy.value=c.setup.toy;
+    document.getElementById('feedback').textContent='';
+    currentChallengeSolved = false;
+    update();
+  }
+
+  document.getElementById('checkBtn').addEventListener('click',()=>{
+    attempts++;
+    document.getElementById('attempts').textContent=attempts;
+
+    const h=num(els.hunger), e=num(els.energy), t=num(els.toy);
+    const z=h*num(els.wHunger)+e*num(els.wEnergy)+t*num(els.wToy)+num(els.bias);
+    const decision=z>=0?'PLAY':'NAP';
+    const target=challenges[challengeIndex].target;
+
+    if(decision===target){
+      if(!currentChallengeSolved){
+        score++;
+        currentChallengeSolved = true;
+        document.getElementById('score').textContent=score;
+      }
+      document.getElementById('feedback').textContent=
+        `⭐ Correct! The neuron output is ${z.toFixed(2)}, so Liucian chooses ${decision}.`;
+    }else{
+      document.getElementById('feedback').textContent=
+        `Not yet. The neuron output is ${z.toFixed(2)}, so Liucian chooses ${decision}. Adjust the weights or bias.`;
+    }
+  });
+
+  document.getElementById('newBtn').addEventListener('click',()=>{
+    challengeIndex=(challengeIndex+1)%challenges.length;
+    loadChallenge();
+  });
+
+  document.getElementById('randomizeBtn').addEventListener('click',()=>{
+    randomizeWeights();
+    syncTrainingWeightCards();
+    trainIndex=0;
+    trainEpoch=0;
+    document.getElementById('feedback').textContent =
+      '🎲 New small random weights generated. See what the neuron predicts, then train it.';
+  });
+
+
+
+  function bossDecision(h,e,t){
+    const z =
+      h*num(els.wHunger) +
+      e*num(els.wEnergy) +
+      t*num(els.wToy) +
+      num(els.bias);
+    return {z, decision:z>=0?'PLAY':'NAP'};
+  }
+
+  document.getElementById('bossCheckBtn').addEventListener('click',()=>{
+    const cases = [
+      {id:'bossA', h:2, e:9, t:1, target:'PLAY'},
+      {id:'bossB', h:9, e:2, t:0, target:'NAP'},
+      {id:'bossC', h:4, e:6, t:1, target:'PLAY'}
+    ];
+
+    let correct = 0;
+    cases.forEach(c=>{
+      const result = bossDecision(c.h,c.e,c.t);
+      const ok = result.decision === c.target;
+      if(ok) correct++;
+      document.getElementById(c.id).textContent =
+        `${ok ? '✅' : '❌'} ${result.decision} · output ${result.z.toFixed(2)}`;
+    });
+
+    const feedback = document.getElementById('bossFeedback');
+    if(correct === 3){
+      feedback.textContent =
+        '🎉 Boss challenge complete! One neuron now handles all three situations correctly. You trained a tiny classifier.';
+    } else {
+      feedback.textContent =
+        `${correct}/3 correct. Keep the same weights and bias, then adjust them until all three cases work at once.`;
+    }
+  });
+
+  document.getElementById('bossHintBtn').addEventListener('click',()=>{
+    document.getElementById('bossFeedback').textContent =
+      'Hint: energy and the toy should usually push toward PLAY, while hunger should push toward NAP. Try a negative hunger weight and positive energy/toy weights.';
+  });
+
+
+  // -----------------------------
+  // Automatic perceptron training
+  // -----------------------------
+  const trainingData = [
+    {x:[2,9,1], y:1, label:'PLAY'},
+    {x:[9,2,0], y:0, label:'NAP'},
+    {x:[4,6,1], y:1, label:'PLAY'},
+    {x:[8,3,1], y:0, label:'NAP'},
+    {x:[1,7,0], y:1, label:'PLAY'},
+    {x:[7,7,1], y:1, label:'PLAY'},
+    {x:[6,2,1], y:0, label:'NAP'},
+    {x:[4,3,0], y:0, label:'NAP'}
+  ];
+
+  const testData = [
+    {x:[2,8,0], label:'PLAY'},
+    {x:[8,4,0], label:'NAP'},
+    {x:[5,7,1], label:'PLAY'},
+    {x:[7,4,1], label:'NAP'}
+  ];
+
+  let trainIndex = 0;
+  let trainEpoch = 0;
+  let autoTraining = false;
+  let stopRequested = false;
+
+  const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+  function modelRaw(x){
+    return x[0]*num(els.wHunger) + x[1]*num(els.wEnergy) + x[2]*num(els.wToy) + num(els.bias);
+  }
+
+  function modelPrediction(x){
+    return modelRaw(x) >= 0 ? 1 : 0;
+  }
+
+  function syncTrainingWeightCards(deltas=[0,0,0,0]){
+    document.getElementById('trainWH').textContent=num(els.wHunger).toFixed(2);
+    document.getElementById('trainWE').textContent=num(els.wEnergy).toFixed(2);
+    document.getElementById('trainWT').textContent=num(els.wToy).toFixed(2);
+    document.getElementById('trainB').textContent=num(els.bias).toFixed(2);
+    document.getElementById('deltaWH').textContent=`Δ ${deltas[0]>=0?'+':''}${deltas[0].toFixed(2)}`;
+    document.getElementById('deltaWE').textContent=`Δ ${deltas[1]>=0?'+':''}${deltas[1].toFixed(2)}`;
+    document.getElementById('deltaWT').textContent=`Δ ${deltas[2]>=0?'+':''}${deltas[2].toFixed(2)}`;
+    document.getElementById('deltaB').textContent=`Δ ${deltas[3]>=0?'+':''}${deltas[3].toFixed(2)}`;
+  }
+
+  function trainingAccuracy(){
+    let correct = 0;
+    trainingData.forEach((d,i)=>{
+      const pred = modelPrediction(d.x);
+      const predLabel = pred ? 'PLAY' : 'NAP';
+      const ok = pred === d.y;
+      if(ok) correct++;
+      const predEl=document.getElementById(`trainPred${i}`);
+      predEl.textContent=`→ ${predLabel}`;
+      const row=document.querySelector(`[data-train-row="${i}"]`);
+      row.classList.toggle('good',ok);
+      row.classList.toggle('bad',!ok);
+    });
+    return correct / trainingData.length;
+  }
+
+  function setActiveTrainingRow(index){
+    document.querySelectorAll('[data-train-row]').forEach(r=>r.classList.remove('active'));
+    const row=document.querySelector(`[data-train-row="${index}"]`);
+    if(row) row.classList.add('active');
+  }
+
+  function pulse(id){
+    const el=document.getElementById(id);
+    if(!el) return;
+    el.classList.remove('connection-active');
+    void el.getBoundingClientRect();
+    el.classList.add('connection-active');
+  }
+
+  function flashWeightBox(id){
+    const el=document.getElementById(id);
+    if(!el) return;
+    el.classList.remove('flash');
+    void el.getBoundingClientRect();
+    el.classList.add('flash');
+  }
+
+  async function animateOneTrainingExample(fast=false){
+    const d=trainingData[trainIndex];
+    const eta=Math.max(0.01,Number(document.getElementById('learningRate').value)||0.1);
+    const delay=fast?110:480;
+
+    setActiveTrainingRow(trainIndex);
+    document.getElementById('trainExample').textContent=trainIndex+1;
+    document.getElementById('trainEpoch').textContent=trainEpoch+1;
+
+    // Show this example in the main neuron controls as well.
+    els.hunger.value=d.x[0];
+    els.energy.value=d.x[1];
+    els.toy.value=d.x[2];
+    update();
+
+    const z=modelRaw(d.x);
+    const pred=z>=0?1:0;
+    const predLabel=pred?'PLAY':'NAP';
+    const error=d.y-pred;
+
+    document.getElementById('trainStatus').innerHTML=
+      `<strong>1. Predict</strong><br>Inputs: hunger ${d.x[0]}, energy ${d.x[1]}, toy ${d.x[2]}. `+
+      `The neuron output is <strong>${z.toFixed(2)}</strong>, so it predicts <strong>${predLabel}</strong>. `+
+      `The correct answer is <strong>${d.label}</strong>.`;
+    pulse('lineHunger'); pulse('lineEnergy'); pulse('lineToy');
+    await sleep(delay);
+    if(stopRequested) return false;
+
+    document.getElementById('trainStatus').innerHTML=
+      `<strong>2. Measure the error</strong><br>target − prediction = ${d.y} − ${pred} = `+
+      `<strong>${error}</strong>. ${error===0?'No correction is needed.':'A mistake means the weights must move.'}`;
+    document.getElementById('learnEquation').textContent=
+      `error = ${d.y} - ${pred} = ${error}`;
+    await sleep(delay);
+    if(stopRequested) return false;
+
+    const deltas=[
+      eta*error*d.x[0],
+      eta*error*d.x[1],
+      eta*error*d.x[2],
+      eta*error
+    ];
+
+    if(error!==0){
+      document.getElementById('trainStatus').innerHTML=
+        `<strong>3. Update the weights</strong><br>`+
+        `Δw = η × error × input. With η = ${eta.toFixed(2)}, each input changes its own connection.`;
+      document.getElementById('learnEquation').textContent=
+        `wᵢ ← wᵢ + ${eta.toFixed(2)} × (${error}) × xᵢ`;
+
+      els.wHunger.value=(num(els.wHunger)+deltas[0]).toFixed(3);
+      els.wEnergy.value=(num(els.wEnergy)+deltas[1]).toFixed(3);
+      els.wToy.value=(num(els.wToy)+deltas[2]).toFixed(3);
+      els.bias.value=(num(els.bias)+deltas[3]).toFixed(3);
+
+      syncTrainingWeightCards(deltas);
+      update();
+      pulse('lineHunger'); pulse('lineEnergy'); pulse('lineToy');
+      ['boxWH','boxWE','boxWT','boxB'].forEach(flashWeightBox);
+      await sleep(delay);
+      if(stopRequested) return false;
+    }else{
+      syncTrainingWeightCards([0,0,0,0]);
+      await sleep(fast?60:240);
+    }
+
+    const newZ=modelRaw(d.x);
+    const newPred=newZ>=0?1:0;
+    document.getElementById('trainStatus').innerHTML=
+      `<strong>4. Try again</strong><br>After the update the score is <strong>${newZ.toFixed(2)}</strong> `+
+      `→ <strong>${newPred?'PLAY':'NAP'}</strong>. The next example will teach the neuron something else.`;
+
+    const acc=trainingAccuracy();
+    document.getElementById('trainAccuracy').textContent=`${Math.round(acc*100)}%`;
+    const completed=trainEpoch*trainingData.length+trainIndex+1;
+    const epochs=Math.max(1,Number(document.getElementById('epochCount').value)||12);
+    document.getElementById('trainProgress').style.width=
+      `${Math.min(100,100*completed/(epochs*trainingData.length))}%`;
+
+    trainIndex++;
+    if(trainIndex>=trainingData.length){
+      trainIndex=0;
+      trainEpoch++;
+    }
+    await sleep(fast?70:300);
+    return true;
+  }
+
+  function showGeneralization(){
+    const box=document.getElementById('generalizationBox');
+    const results=document.getElementById('testResults');
+    results.innerHTML='';
+    let correct=0;
+    testData.forEach(d=>{
+      const pred=modelPrediction(d.x)?'PLAY':'NAP';
+      const ok=pred===d.label;
+      if(ok) correct++;
+      const span=document.createElement('span');
+      span.className='pill';
+      span.textContent=`H${d.x[0]} E${d.x[1]} T${d.x[2]} → ${pred} ${ok?'✓':'✗'}`;
+      results.appendChild(span);
+    });
+    const summary=document.createElement('span');
+    summary.className='pill';
+    summary.innerHTML=`<strong>Unseen accuracy: ${correct}/${testData.length}</strong>`;
+    results.prepend(summary);
+    box.classList.remove('hidden');
+  }
+
+  async function runAutoTraining(){
+    if(autoTraining) return;
+    autoTraining=true;
+    stopRequested=false;
+    document.getElementById('autoTrainBtn').disabled=true;
+    document.getElementById('trainStepBtn').disabled=true;
+    document.getElementById('stopTrainBtn').disabled=false;
+    document.getElementById('generalizationBox').classList.add('hidden');
+
+    const maxEpochs=Math.max(1,Math.min(50,Number(document.getElementById('epochCount').value)||12));
+    trainIndex=0;
+    trainEpoch=0;
+
+    while(trainEpoch<maxEpochs && !stopRequested){
+      const ok=await animateOneTrainingExample(true);
+      if(!ok) break;
+
+      // If all training examples are already correct at the end of an epoch,
+      // stop early so students can see convergence.
+      if(trainIndex===0){
+        const acc=trainingAccuracy();
+        document.getElementById('trainAccuracy').textContent=`${Math.round(acc*100)}%`;
+        if(acc===1){
+          document.getElementById('trainStatus').innerHTML=
+            `<strong>🎉 Converged!</strong><br>All training examples are now classified correctly after ${trainEpoch} epoch${trainEpoch===1?'':'s'}.`;
+          break;
+        }
+      }
+    }
+
+    autoTraining=false;
+    document.getElementById('autoTrainBtn').disabled=false;
+    document.getElementById('trainStepBtn').disabled=false;
+    document.getElementById('stopTrainBtn').disabled=true;
+    showGeneralization();
+  }
+
+  document.getElementById('trainStepBtn').addEventListener('click',async()=>{
+    if(autoTraining) return;
+    stopRequested=false;
+    document.getElementById('generalizationBox').classList.add('hidden');
+    await animateOneTrainingExample(false);
+  });
+
+  document.getElementById('autoTrainBtn').addEventListener('click',runAutoTraining);
+  document.getElementById('stopTrainBtn').addEventListener('click',()=>{stopRequested=true;});
+  document.getElementById('resetTrainBtn').addEventListener('click',()=>{
+    stopRequested=true;
+    randomizeWeights();
+    trainIndex=0;
+    trainEpoch=0;
+    document.getElementById('trainEpoch').textContent='0';
+    document.getElementById('trainExample').textContent='0';
+    document.getElementById('trainAccuracy').textContent='—';
+    document.getElementById('trainProgress').style.width='0%';
+    document.getElementById('generalizationBox').classList.add('hidden');
+    document.querySelectorAll('[data-train-row]').forEach(r=>{
+      r.classList.remove('active','good','bad');
+    });
+    trainingData.forEach((_,i)=>document.getElementById(`trainPred${i}`).textContent='—');
+    syncTrainingWeightCards();
+    document.getElementById('trainStatus').innerHTML=
+      'New random weights generated. The neuron has forgotten what it learned — train it again.';
+  });
+
+  // -----------------------------
+  // PyTorch line-by-line walkthrough
+  // -----------------------------
+  const pytorchSource = `import torch
+
+# Training examples: [hunger, energy, toy]
+X = torch.tensor([
+    [2., 9., 1.],
+    [9., 2., 0.],
+    [4., 6., 1.],
+    [8., 3., 1.],
+    [1., 7., 0.],
+    [7., 7., 1.],
+    [6., 2., 1.],
+    [4., 3., 0.],
+])
+
+# PLAY = 1, NAP = 0
+y = torch.tensor([1., 0., 1., 0., 1., 1., 0., 0.])
+
+weights = torch.randn(3) * 0.3
+bias = torch.randn(1).item() * 0.3
+learning_rate = 0.1
+
+for epoch in range(12):
+    correct = 0
+
+    for inputs, target in zip(X, y):
+        score = torch.dot(inputs, weights) + bias
+        prediction = 1.0 if score.item() >= 0 else 0.0
+        error = target.item() - prediction
+
+        weights += learning_rate * error * inputs
+        bias += learning_rate * error
+
+        correct += int(prediction == target.item())
+
+    accuracy = correct / len(X)
+    print(f"epoch={epoch + 1:02d} accuracy={accuracy:.0%}")
+
+print("weights:", weights)
+print("bias:", round(bias, 3))
+
+test = torch.tensor([5., 7., 1.])
+score = torch.dot(test, weights) + bias
+print("new situation:", "PLAY" if score.item() >= 0 else "NAP")`;
+
+  const lineExplanations = {
+    1:'Import PyTorch. We use tensors for the inputs and weights.',
+    3:'This comment tells us what the three input columns mean.',
+    4:'Create the training input matrix X. Every row is one Liucian situation.',
+    5:'First training situation: hunger 2, energy 9, toy nearby.',
+    6:'Second situation: high hunger, low energy, no toy.',
+    7:'Another labelled training example.',
+    8:'A sleepy situation: high hunger and low energy.',
+    9:'Low hunger and high energy should encourage PLAY.',
+    10:'Both hunger and energy are high, but the toy helps PLAY.',
+    11:'Low energy and high hunger should be NAP.',
+    12:'No toy, modest energy and hunger: NAP.',
+    13:'Close the input tensor.',
+    15:'Encode the class labels numerically: PLAY is 1 and NAP is 0.',
+    16:'Create the target vector y, one correct answer for every row of X.',
+    18:'Start with three small random weights — one for hunger, energy and toy.',
+    19:'Start the bias randomly too. The bias shifts the decision threshold.',
+    20:'Set how large each correction step will be.',
+    22:'Repeat the whole dataset for up to 12 epochs.',
+    23:'Reset the epoch accuracy counter.',
+    25:'Visit each input row together with its correct target.',
+    26:'Compute the neuron score: weighted inputs plus bias.',
+    27:'Apply the threshold. Non-negative means PLAY; negative means NAP.',
+    28:'Measure the mistake: target minus prediction.',
+    30:'Perceptron learning rule: change each weight in proportion to input × error.',
+    31:'Update the bias too. It learns the overall tendency toward PLAY or NAP.',
+    33:'Count whether the prediction was correct before this update.',
+    35:'Compute the fraction of correctly classified training examples.',
+    36:'Print progress so we can watch training improve.',
+    38:'Show the final learned weights.',
+    39:'Show the final bias.',
+    41:'Create a brand-new situation that was not in the training set.',
+    42:'Run the learned neuron on that new situation.',
+    43:'Turn the final score back into the human-friendly PLAY/NAP answer.'
+  };
+
+  const walk = {
+    line:0,
+    weights:[0.18,-0.09,0.12],
+    bias:-0.05,
+    lr:0.1,
+    epoch:0,
+    sample:0,
+    correct:0,
+    score:null,
+    prediction:null,
+    error:null,
+    terminal:['$ python liucian_neuron.py']
+  };
+
+  function resetWalk(){
+    walk.line=0;
+    walk.weights=[
+      Math.round((Math.random()*.6-.3)*100)/100,
+      Math.round((Math.random()*.6-.3)*100)/100,
+      Math.round((Math.random()*.6-.3)*100)/100
+    ];
+    walk.bias=Math.round((Math.random()*.6-.3)*100)/100;
+    walk.lr=0.1;
+    walk.epoch=0;
+    walk.sample=0;
+    walk.correct=0;
+    walk.score=null;
+    walk.prediction=null;
+    walk.error=null;
+    walk.terminal=['$ python liucian_neuron.py'];
+    document.querySelectorAll('.code-line').forEach(el=>el.classList.remove('active','done'));
+    document.getElementById('codeExplanation').innerHTML=
+      'Ready. Press <strong>Run walkthrough</strong> or <strong>Step one line</strong>.';
+    updateWalkVariables();
+    renderTerminal();
+    document.getElementById('codeRunState').textContent='Ready';
+  }
+
+  function updateWalkVariables(){
+    const fmt=v=>v===null?'?':(Array.isArray(v)?`[${v.map(n=>n.toFixed(2)).join(', ')}]`:v);
+    document.getElementById('codeVariables').innerHTML=
+      `weights = ${fmt(walk.weights)}<br>`+
+      `bias = ${walk.bias.toFixed(2)}<br>`+
+      `prediction = ${walk.prediction===null?'?':(walk.prediction?'PLAY':'NAP')}<br>`+
+      `error = ${walk.error===null?'?':walk.error}`;
+  }
+
+  function renderTerminal(){
+    document.getElementById('codeTerminal').textContent=walk.terminal.join('\n');
+  }
+
+  function highlightCodeLine(n){
+    document.querySelectorAll('.code-line').forEach(el=>{
+      const ln=Number(el.dataset.codeLine);
+      el.classList.toggle('active',ln===n);
+      if(ln<n) el.classList.add('done');
+    });
+    const active=document.querySelector(`[data-code-line="${n}"]`);
+    if(active) active.scrollIntoView({block:'nearest'});
+  }
+
+  // This is a guided execution trace. Loop bodies are repeated internally
+  // while the corresponding Python line remains highlighted.
+  const executableOrder=[1,3,4,5,6,7,8,9,10,11,12,13,15,16,18,19,20,22,23,25,26,27,28,30,31,33,35,36,38,39,41,42,43];
+  let walkOrderIndex=0;
+
+  function stepWalk(){
+    if(walkOrderIndex>=executableOrder.length){
+      document.getElementById('codeRunState').textContent='Finished';
+      return false;
+    }
+
+    const line=executableOrder[walkOrderIndex++];
+    walk.line=line;
+    highlightCodeLine(line);
+    document.getElementById('codeExplanation').textContent=
+      lineExplanations[line] || 'This line prepares the program for the next training operation.';
+
+    const data=trainingData.map(d=>({x:d.x,y:d.y}));
+
+    if(line===18){
+      // already randomized in resetWalk()
+    }else if(line===19){
+      // bias already randomized in resetWalk()
+    }else if(line===20){
+      walk.lr=.1;
+    }else if(line===22){
+      walk.epoch=0;
+    }else if(line===23){
+      walk.correct=0;
+    }else if(line===25){
+      walk.sample=0;
+    }else if(line===26){
+      const d=data[walk.sample];
+      walk.score=d.x.reduce((s,x,i)=>s+x*walk.weights[i],walk.bias);
+    }else if(line===27){
+      walk.prediction=walk.score>=0?1:0;
+    }else if(line===28){
+      walk.error=data[walk.sample].y-walk.prediction;
+    }else if(line===30){
+      const d=data[walk.sample];
+      walk.weights=walk.weights.map((w,i)=>w+walk.lr*walk.error*d.x[i]);
+    }else if(line===31){
+      walk.bias+=walk.lr*walk.error;
+    }else if(line===33){
+      if(walk.prediction===data[walk.sample].y) walk.correct++;
+    }else if(line===35){
+      // For an educational but faithful preview, finish the rest of the current
+      // epoch here using the same perceptron rule.
+      for(let i=walk.sample+1;i<data.length;i++){
+        const d=data[i];
+        const score=d.x.reduce((s,x,j)=>s+x*walk.weights[j],walk.bias);
+        const pred=score>=0?1:0;
+        const err=d.y-pred;
+        if(pred===d.y) walk.correct++;
+        walk.weights=walk.weights.map((w,j)=>w+walk.lr*err*d.x[j]);
+        walk.bias+=walk.lr*err;
+      }
+    }else if(line===36){
+      const acc=walk.correct/data.length;
+      walk.terminal.push(`epoch=01 accuracy=${Math.round(acc*100)}%`);
+      // Continue epochs silently using the exact same rule so the final values
+      // represent a complete training run.
+      for(let epoch=1;epoch<12;epoch++){
+        let correct=0;
+        data.forEach(d=>{
+          const score=d.x.reduce((s,x,j)=>s+x*walk.weights[j],walk.bias);
+          const pred=score>=0?1:0;
+          const err=d.y-pred;
+          if(pred===d.y) correct++;
+          walk.weights=walk.weights.map((w,j)=>w+walk.lr*err*d.x[j]);
+          walk.bias+=walk.lr*err;
+        });
+        walk.terminal.push(`epoch=${String(epoch+1).padStart(2,'0')} accuracy=${Math.round(correct/data.length*100)}%`);
+      }
+    }else if(line===38){
+      walk.terminal.push(`weights: tensor([${walk.weights.map(v=>v.toFixed(3)).join(', ')}])`);
+    }else if(line===39){
+      walk.terminal.push(`bias: ${walk.bias.toFixed(3)}`);
+    }else if(line===41){
+      // test tensor introduced
+    }else if(line===42){
+      const x=[5,7,1];
+      walk.score=x.reduce((s,v,i)=>s+v*walk.weights[i],walk.bias);
+    }else if(line===43){
+      walk.prediction=walk.score>=0?1:0;
+      walk.terminal.push(`new situation: ${walk.prediction?'PLAY':'NAP'}`);
+      document.getElementById('codeRunState').textContent='Finished';
+    }
+
+    updateWalkVariables();
+    renderTerminal();
+    return true;
+  }
+
+  let codeRunning=false;
+  document.getElementById('runCodeBtn').addEventListener('click',async()=>{
+    if(codeRunning) return;
+    if(walkOrderIndex>=executableOrder.length){
+      walkOrderIndex=0;
+      resetWalk();
+    }
+    codeRunning=true;
+    document.getElementById('runCodeBtn').disabled=true;
+    document.getElementById('stepCodeBtn').disabled=true;
+    document.getElementById('codeRunState').textContent='Running…';
+    while(stepWalk()){
+      await sleep(320);
+    }
+    codeRunning=false;
+    document.getElementById('runCodeBtn').disabled=false;
+    document.getElementById('stepCodeBtn').disabled=false;
+  });
+
+  document.getElementById('stepCodeBtn').addEventListener('click',()=>{
+    if(codeRunning) return;
+    stepWalk();
+  });
+
+  document.getElementById('resetCodeBtn').addEventListener('click',()=>{
+    if(codeRunning) return;
+    walkOrderIndex=0;
+    resetWalk();
+  });
+
+  document.getElementById('copyCodeBtn').addEventListener('click',async()=>{
+    try{
+      await navigator.clipboard.writeText(pytorchSource);
+      document.getElementById('codeRunState').textContent='Copied PyTorch script';
+    }catch{
+      document.getElementById('codeRunState').textContent='Copy blocked by browser — select the code manually';
+    }
+  });
+
+  // Keep the training visual values synchronized with any manual edits.
+  Object.values(els).forEach(el=>el.addEventListener('input',()=>syncTrainingWeightCards()));
+  syncTrainingWeightCards();
+  resetWalk();
+
+  randomizeWeights();
+  syncTrainingWeightCards();
+  loadChallenge();
+})();
+</script>
+</body>
+</html>

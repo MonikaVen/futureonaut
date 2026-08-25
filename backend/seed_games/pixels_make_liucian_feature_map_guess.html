@@ -1,0 +1,477 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pixels Make Liucian</title>
+<style>
+:root{--bg:#f7f7f8;--card:#fff;--text:#1f2937;--muted:#6b7280;--border:#d1d5db;--accent:#6b7280;--good:#237a4b}
+*{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,sans-serif;color:var(--text);background:#fff}
+main{max-width:1080px;margin:auto;padding:22px}h1{margin:0 0 6px}.sub,.tiny{color:var(--muted)}.sub{margin-bottom:18px}
+.grid{display:grid;gap:14px}.metrics{grid-template-columns:repeat(4,1fr)}.two{grid-template-columns:1.08fr .92fr}
+.card,.metric{border:1px solid var(--border);border-radius:16px;padding:14px;background:var(--card)}
+.label{font-size:13px;color:var(--muted)}.value{font-size:23px;font-weight:700}
+button{padding:10px 14px;border:1px solid var(--border);border-radius:12px;background:white;font-size:15px;cursor:pointer;margin:4px}
+button.primary{background:var(--accent);color:#fff}.box{padding:11px;border-radius:12px;background:var(--bg);border:1px solid var(--border);margin-top:12px}
+.pixel-grid{display:grid;grid-template-columns:repeat(16,1fr);gap:1px;background:#d1d5db;border:1px solid var(--border);border-radius:12px;overflow:hidden;aspect-ratio:1/1}
+.pixel{aspect-ratio:1/1;background:#fff;display:flex;align-items:center;justify-content:center;font-size:9px;user-select:none;position:relative;transition:transform .18s ease,filter .18s ease}
+.pixel.hidden{background:#d1d5db!important;color:transparent}
+.pixel.hidden::after{content:"?";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#6b7280;font-size:10px;background:#e5e7eb}
+.pixel.revealing{animation:pixelReveal .42s ease}.pixel.scanned{filter:none}.pixel.feature{outline:3px solid #111827;z-index:3}.pixel.window{box-shadow:inset 0 0 0 3px #6b7280;z-index:2}
+.pixel.revealing::before{content:"";position:absolute;inset:0;border:2px solid #111827;animation:flashBorder .42s ease;pointer-events:none}
+.pixel.selected{outline:3px solid #111827;z-index:2}
+@keyframes pixelReveal{
+  0%{transform:scale(.72);filter:brightness(1.6)}
+  55%{transform:scale(1.12);filter:brightness(1.2)}
+  100%{transform:scale(1);filter:brightness(1)}
+}
+@keyframes flashBorder{
+  0%{opacity:1}
+  100%{opacity:0}
+}
+.legend{display:flex;gap:8px;flex-wrap:wrap}.pill{border:1px solid var(--border);border-radius:999px;padding:6px 10px;font-size:13px}
+.math{font-family:ui-monospace,monospace;background:#fff;padding:8px;border-radius:9px;margin-top:8px}
+.mathPanel{display:none}.mathPanel.show{display:block}.feedback{margin-top:10px}.good{color:var(--good)}
+input[type=range]{width:100%}
+.cnn-grid{display:grid;grid-template-columns:repeat(5,38px);gap:2px;margin-top:8px}
+.cnn-cell{width:38px;height:38px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:11px;background:#fff}
+.cnn-cell.kernel{outline:3px solid #111827;z-index:2}
+.kernel-grid{display:grid;grid-template-columns:repeat(3,42px);gap:2px;margin-top:8px}
+.kernel-cell{width:42px;height:42px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;background:#fff;font-family:ui-monospace,monospace}
+.conv-step{margin-top:8px;padding:9px;border-radius:10px;background:#fff;border:1px solid var(--border)}
+@media(max-width:800px){.metrics{grid-template-columns:repeat(2,1fr)}.two{grid-template-columns:1fr}}
+</style></head>
+<body><main>
+<h1>🖼️ Pixels Make Liucian</h1>
+<div class="sub">Learn how computers see images: a picture is a grid of tiny numbers called <strong>pixels</strong>.</div>
+
+<div class="grid metrics">
+<div class="metric"><div class="label">Image size</div><div class="value">16 × 16</div></div>
+<div class="metric"><div class="label">Pixels</div><div class="value">256</div></div>
+<div class="metric"><div class="label">Revealed</div><div id="mReveal" class="value">0%</div></div>
+<div class="metric"><div class="label">Selected pixel</div><div id="mPixel" class="value">—</div></div>
+</div>
+
+<div class="grid two" style="margin-top:15px">
+
+<section class="card">
+<h2>1. Convolutional reveal</h2>
+<div class="tiny">
+Liucian is hidden at first. A <strong>3 × 3 convolution kernel</strong> slides across the image.
+Only pixels that have been scanned by the kernel become visible. Strong filter responses are marked as detected features.
+</div>
+
+<div style="position:relative;margin-top:12px">
+  <div id="pixels" class="pixel-grid" aria-label="16 by 16 convolutionally revealed image of Liucian"></div>
+  <div id="scanBadge" style="position:absolute;top:8px;left:8px;padding:5px 8px;border-radius:999px;background:rgba(255,255,255,.9);border:1px solid #d1d5db;font-size:12px;font-weight:600">0 / 196 windows scanned</div>
+</div>
+
+<div class="box">
+  <div><strong>Sliding 3 × 3 kernel</strong></div>
+  <div class="tiny">Use the slider or animation button to move the filter across the picture.</div>
+  <label for="scanPos">Convolution position: <b><span id="scanPosOut">1</span> / 196</b></label>
+  <input id="scanPos" type="range" min="0" max="195" value="0" step="1">
+  <div style="margin-top:8px">
+    <button id="scanStep">▶ Scan next window</button>
+    <button id="scanPlay" class="primary">⏩ Animate convolution</button>
+    <button id="scanReset">Reset scan</button>
+  </div>
+</div>
+
+<div class="box">
+  <strong>Current convolution</strong>
+  <div id="scanEquation" class="math">—</div>
+  <div>Raw response: <strong id="scanResponse">—</strong></div>
+  <div>After ReLU: <strong id="scanRelu">—</strong></div>
+  <div>Feature detected: <strong id="scanFeature">—</strong></div>
+</div>
+
+<div class="box">
+  <strong>Detected features</strong>
+  <div id="featureCount">0 strong edge features marked</div>
+  <div class="tiny" style="margin-top:5px">
+    Strong responses are outlined on the image. These are places where the kernel sees a sharp brightness change—often an edge.
+  </div>
+</div>
+</section>
+
+
+<section class="card">
+<h2>2. Inspect one pixel</h2>
+<div class="tiny">Click any revealed square to inspect its number.</div>
+
+<div class="box">
+<div>Row: <b id="rowVal">—</b></div>
+<div>Column: <b id="colVal">—</b></div>
+<div>Grayscale value: <b id="grayVal">—</b></div>
+<div>Normalized value: <b id="normVal">—</b></div>
+</div>
+
+<div class="box">
+<b>Pixel brightness</b>
+<div class="math">0 = black</div>
+<div class="math">255 = white</div>
+<div class="math">normalized = pixel / 255</div>
+</div>
+
+<div class="box">
+<b>🎯 Challenge</b>
+<div style="margin-top:6px">Find one pixel darker than <strong>60</strong> and one pixel lighter than <strong>220</strong>.</div>
+<div id="challenge" class="feedback"></div>
+</div>
+
+<button id="mathBtn">📐 Mathematical concept</button>
+<div id="mathPanel" class="box mathPanel">
+<b>Images as matrices</b>
+<div class="math">Image = matrix of pixel values</div>
+<div class="math">16 × 16 = 256 numbers</div>
+<div class="tiny">A grayscale image stores one brightness value per pixel. A color image usually stores three values per pixel: red, green, and blue.</div>
+</div>
+
+<div class="box">
+<b>Why this matters for AI</b>
+<div class="tiny">A neural network does not initially see “Liucian.” It receives numbers. Later layers learn patterns such as edges, ears, whiskers, and fur.</div>
+</div>
+</section>
+
+<section class="card" style="margin-top:15px">
+<h2>3. Detected feature map</h2>
+<div class="tiny">
+After convolution, the CNN stores the filter responses in a new grid called a <strong>feature map</strong>.
+Bright cells mean the kernel found a strong vertical edge at that location.
+</div>
+
+<div class="grid two" style="margin-top:12px">
+  <div>
+    <div class="box">
+      <strong>14 × 14 edge feature map</strong>
+      <div id="featureMap" style="display:grid;grid-template-columns:repeat(14,1fr);gap:1px;background:#d1d5db;border:1px solid #d1d5db;border-radius:10px;overflow:hidden;aspect-ratio:1/1;margin-top:8px"></div>
+    </div>
+  </div>
+
+  <div>
+    <div class="box">
+      <strong>How to read it</strong>
+      <div class="tiny" style="margin-top:6px">
+        Each feature-map cell corresponds to one 3 × 3 convolution window.
+        Larger positive responses appear darker here, showing where strong vertical edges were detected.
+      </div>
+      <div class="math" id="featureMapStats">Scanned features: 0</div>
+    </div>
+
+    <div class="box">
+      <strong>🐾 Guess the animal</strong>
+      <div class="tiny" style="margin-top:6px">
+        Use the detected edges and partially revealed pixels. What animal do you think the CNN image represents?
+      </div>
+      <div style="margin-top:8px">
+        <button data-animal="cat">🐈 Cat</button>
+        <button data-animal="dog">🐕 Dog</button>
+        <button data-animal="rabbit">🐇 Rabbit</button>
+        <button data-animal="fox">🦊 Fox</button>
+      </div>
+      <button id="checkAnimal" class="primary" style="margin-top:8px">Check animal</button>
+      <div id="animalFeedback" class="feedback"></div>
+    </div>
+  </div>
+</div>
+</section>
+</div>
+
+
+
+
+<section class="card" style="margin-top:15px">
+<h2>What is this teaching?</h2>
+<div>Computer vision starts by converting images into numbers. Each pixel is one small measurement. A model learns useful patterns by combining many neighboring pixel values.</div>
+</section>
+</main>
+
+<script>
+(()=>{
+const W=16,H=16;
+const pattern=[
+"................",
+".....##..##.....",
+"....########....",
+"...##########...",
+"..############..",
+"..############..",
+".##############.",
+".##############.",
+".######..######.",
+".##############.",
+"..############..",
+"...##########...",
+"....########....",
+".....######.....",
+"......####......",
+".......##......."
+];
+
+const vals=[];
+for(let r=0;r<H;r++){
+  for(let c=0;c<W;c++){
+    let v;
+    if(pattern[r][c]==='#'){
+      const stripe=(c+r)%4===0?42:0;
+      v=80+Math.floor(Math.random()*55)-stripe;
+    }else{
+      v=225+Math.floor(Math.random()*25);
+    }
+    vals.push(Math.max(0,Math.min(255,v)));
+  }
+}
+
+
+const $=id=>document.getElementById(id);
+const holder=$('pixels');
+
+vals.forEach((v,i)=>{
+  const d=document.createElement('button');
+  d.className='pixel hidden';
+  d.type='button';
+  d.dataset.i=i;
+  d.style.background=`rgb(${v},${v},${v})`;
+  d.title='Pixel';
+  d.addEventListener('click',()=>{
+    if(d.classList.contains('hidden'))return;
+    document.querySelectorAll('.pixel').forEach(x=>x.classList.remove('selected'));
+    d.classList.add('selected');
+    const r=Math.floor(i/W),c=i%W;
+    $('rowVal').textContent=r+1;
+    $('colVal').textContent=c+1;
+    $('grayVal').textContent=v;
+    $('normVal').textContent=(v/255).toFixed(3);
+    $('mPixel').textContent=v;
+  });
+  holder.appendChild(d);
+});
+
+// Convolutional reveal state.
+const edgeKernel=[
+  [-1,0,1],
+  [-1,0,1],
+  [-1,0,1]
+];
+
+const windowsPerRow=W-2; // 14
+const totalWindows=windowsPerRow*(H-2); // 196
+let scanIndex=0;
+let scannedWindows=new Set();
+let detectedPixels=new Set();
+let scanTimer=null;
+
+function convolutionWindow(index){
+  const row=Math.floor(index/windowsPerRow);
+  const col=index%windowsPerRow;
+  let sum=0;
+  const terms=[];
+  const touched=[];
+
+  for(let kr=0;kr<3;kr++){
+    for(let kc=0;kc<3;kc++){
+      const pxIndex=(row+kr)*W+(col+kc);
+      const imageValue=vals[pxIndex];
+      const weight=edgeKernel[kr][kc];
+      sum += imageValue*weight;
+      terms.push(`${imageValue}×${weight}`);
+      touched.push(pxIndex);
+    }
+  }
+
+  return {row,col,sum,relu:Math.max(0,sum),terms,touched};
+}
+
+function redrawScan(){
+  const info=convolutionWindow(scanIndex);
+
+  // Current window highlight.
+  document.querySelectorAll('.pixel').forEach(x=>x.classList.remove('window'));
+  info.touched.forEach(i=>{
+    holder.children[i].classList.add('window');
+  });
+
+  // All scanned windows reveal their pixels.
+  const visible=new Set();
+  scannedWindows.forEach(wi=>{
+    convolutionWindow(wi).touched.forEach(i=>visible.add(i));
+  });
+
+  document.querySelectorAll('.pixel').forEach((d,i)=>{
+    d.classList.toggle('hidden',!visible.has(i));
+    d.classList.toggle('scanned',visible.has(i));
+    d.classList.toggle('feature',detectedPixels.has(i));
+  });
+
+  $('scanPos').value=scanIndex;
+  $('scanPosOut').textContent=scanIndex+1;
+  $('scanBadge').textContent=`${scannedWindows.size} / ${totalWindows} windows scanned`;
+  $('mReveal').textContent=Math.round(scannedWindows.size/totalWindows*100)+'%';
+
+  $('scanEquation').textContent=info.terms.join(' + ')+' = '+info.sum;
+  $('scanResponse').textContent=info.sum;
+  $('scanRelu').textContent=info.relu;
+
+  const strong=Math.abs(info.sum)>=180;
+  $('scanFeature').textContent=strong?'YES — strong edge':'No';
+
+  if(strong){
+    // Mark center of the current receptive field as a feature location.
+    const center=(info.row+1)*W+(info.col+1);
+    detectedPixels.add(center);
+  }
+  $('featureCount').textContent=`${detectedPixels.size} strong edge features marked`;
+}
+
+function scanCurrent(){
+  const before=new Set(scannedWindows);
+  scannedWindows.add(scanIndex);
+
+  const info=convolutionWindow(scanIndex);
+  if(Math.abs(info.sum)>=180){
+    detectedPixels.add((info.row+1)*W+(info.col+1));
+  }
+
+  // Animate pixels newly uncovered by this window.
+  info.touched.forEach(i=>{
+    if(holder.children[i].classList.contains('hidden')){
+      const d=holder.children[i];
+      d.classList.remove('revealing');
+      void d.getBoundingClientRect();
+      d.classList.add('revealing');
+      setTimeout(()=>d.classList.remove('revealing'),430);
+    }
+  });
+  redrawScan();
+}
+
+function setScanPosition(pos,scan=true){
+  scanIndex=Math.max(0,Math.min(totalWindows-1,pos));
+  if(scan) scanCurrent();
+  else redrawScan();
+}
+
+$('scanPos').addEventListener('input',e=>setScanPosition(+e.target.value,true));
+
+$('scanStep').addEventListener('click',()=>{
+  setScanPosition(scanIndex,true);
+  if(scanIndex<totalWindows-1) scanIndex++;
+  redrawScan();
+});
+
+$('scanPlay').addEventListener('click',()=>{
+  if(scanTimer){
+    clearInterval(scanTimer);
+    scanTimer=null;
+    $('scanPlay').textContent='⏩ Animate convolution';
+    return;
+  }
+  $('scanPlay').textContent='⏸ Pause convolution';
+  scanTimer=setInterval(()=>{
+    scanCurrent();
+    if(scanIndex>=totalWindows-1){
+      clearInterval(scanTimer);
+      scanTimer=null;
+      $('scanPlay').textContent='⏩ Animate convolution';
+      return;
+    }
+    scanIndex++;
+    redrawScan();
+  },90);
+});
+
+$('scanReset').addEventListener('click',()=>{
+  if(scanTimer){clearInterval(scanTimer);scanTimer=null;}
+  scanIndex=0;
+  scannedWindows.clear();
+  detectedPixels.clear();
+  document.querySelectorAll('.pixel').forEach(d=>{
+    d.classList.add('hidden');
+    d.classList.remove('feature','window','selected','scanned');
+  });
+  $('scanPlay').textContent='⏩ Animate convolution';
+  redrawScan();
+});
+
+redrawScan();
+
+
+// ---- Feature map ----
+const featureMapHolder=$('featureMap');
+const featureResponses=new Array(totalWindows).fill(null);
+let animalChoice=null;
+
+for(let i=0;i<totalWindows;i++){
+  const cell=document.createElement('div');
+  cell.style.aspectRatio='1/1';
+  cell.style.background='#f3f4f6';
+  cell.title='Not scanned yet';
+  featureMapHolder.appendChild(cell);
+}
+
+function updateFeatureMap(){
+  let scanned=0;
+  let strong=0;
+  let maxResp=1;
+
+  scannedWindows.forEach(idx=>{
+    const info=convolutionWindow(idx);
+    const relu=Math.max(0,info.sum);
+    featureResponses[idx]=relu;
+    scanned++;
+    if(relu>=180) strong++;
+    if(relu>maxResp) maxResp=relu;
+  });
+
+  featureResponses.forEach((v,i)=>{
+    const cell=featureMapHolder.children[i];
+    if(v===null){
+      cell.style.background='#f3f4f6';
+      cell.title='Not scanned yet';
+    }else{
+      const norm=Math.max(0,Math.min(1,v/maxResp));
+      const shade=Math.round(245 - norm*190);
+      cell.style.background=`rgb(${shade},${shade},${shade})`;
+      cell.title=`Feature response: ${v}`;
+    }
+  });
+
+  $('featureMapStats').textContent=
+    `Scanned windows: ${scanned}/${totalWindows} · Strong features: ${strong}`;
+}
+
+// Hook feature-map update into every scan redraw.
+const originalRedrawScan=redrawScan;
+redrawScan=function(){
+  originalRedrawScan();
+  updateFeatureMap();
+};
+
+document.querySelectorAll('[data-animal]').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    animalChoice=btn.dataset.animal;
+    document.querySelectorAll('[data-animal]').forEach(b=>b.classList.remove('primary'));
+    btn.classList.add('primary');
+    $('animalFeedback').textContent=`You chose ${animalChoice}.`;
+  });
+});
+
+$('checkAnimal').addEventListener('click',()=>{
+  if(!animalChoice){
+    $('animalFeedback').textContent='Choose an animal first.';
+    return;
+  }
+  if(animalChoice==='cat'){
+    $('animalFeedback').innerHTML='<span class="good">⭐ Correct — the feature map belongs to Liucian the cat!</span>';
+  }else{
+    $('animalFeedback').textContent='Not quite. Look for the ears, face outline, and body edges, then try again.';
+  }
+});
+
+updateFeatureMap();
+
+$('mathBtn').onclick=()=>{$('mathPanel').classList.toggle('show');$('mathBtn').textContent=$('mathPanel').classList.contains('show')?'📐 Hide mathematical concept':'📐 Mathematical concept'};
+
+})();
+</script>
+</body></html>

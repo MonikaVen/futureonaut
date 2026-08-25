@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Quiz</title>
+  <style>
+    :root { --bg:#f6f4ef; --ink:#1c1917; --accent:#0f766e; --muted:#78716c; --card:#fff; --bad:#b91c1c; --good:#15803d; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: "Segoe UI", Georgia, serif; background: radial-gradient(circle at top left,#d9f99d33,#f6f4ef 40%), linear-gradient(160deg,#f6f4ef,#e7e5e4); color:var(--ink); min-height:100vh; }
+    main { max-width:720px; margin:0 auto; padding:28px 18px 60px; }
+    h1 { font-size:1.8rem; margin:0 0 8px; }
+    .sub { color:var(--muted); margin-bottom:20px; }
+    .card { background:var(--card); border:1px solid #d6d3d1; border-radius:14px; padding:18px; margin-top:14px; }
+    button { cursor:pointer; border:1px solid #a8a29e; background:#fff; border-radius:10px; padding:10px 14px; margin:6px 6px 0 0; font:inherit; }
+    button.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+    button:disabled { opacity:.55; cursor:default; }
+    .opt { display:block; width:100%; text-align:left; margin-top:8px; }
+    .opt.good { border-color:var(--good); background:#dcfce7; }
+    .opt.bad { border-color:var(--bad); background:#fee2e2; }
+    .bar { display:flex; gap:12px; flex-wrap:wrap; color:var(--muted); font-size:.95rem; }
+  </style>
+</head>
+<body>
+<main>
+  <h1 id="title">Quiz</h1>
+  <p class="sub" id="desc"></p>
+  <div class="bar">
+    <span>Score: <b id="score">0</b></span>
+    <span>Question: <b id="progress">0/0</b></span>
+  </div>
+  <div class="card" id="panel"></div>
+</main>
+<script>
+async function load() {
+  const res = await fetch('./content.json');
+  const data = await res.json();
+  document.getElementById('title').textContent = data.title || 'Quiz';
+  document.getElementById('desc').textContent = data.description || '';
+  const questions = data.questions || [];
+  let i = 0, score = 0;
+  const panel = document.getElementById('panel');
+  const scoreEl = document.getElementById('score');
+  const prog = document.getElementById('progress');
+
+  function render() {
+    prog.textContent = `${Math.min(i+1, questions.length)}/${questions.length}`;
+    if (i >= questions.length) {
+      panel.innerHTML = `<p>Done! Final score: <b>${score}</b></p>`;
+      if (window.LearnPlay) LearnPlay.complete({ score });
+      return;
+    }
+    const q = questions[i];
+    if (window.LearnPlay) LearnPlay.taskStart(q.id);
+    panel.innerHTML = `<p><b>${q.prompt}</b></p>` + (q.options||[]).map((o, idx) =>
+      `<button class="opt" data-idx="${idx}">${o.text}</button>`
+    ).join('');
+    panel.querySelectorAll('.opt').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const opt = q.options[Number(btn.dataset.idx)];
+        const correct = !!opt.correct;
+        panel.querySelectorAll('.opt').forEach(b => b.disabled = true);
+        btn.classList.add(correct ? 'good' : 'bad');
+        if (window.LearnPlay) {
+          LearnPlay.taskEnd(q.id);
+          LearnPlay.answer({ correct, taskId: q.id, points: q.points || 10 });
+          if (correct) LearnPlay.score(q.points || 10);
+        }
+        if (correct) { score += (q.points || 10); scoreEl.textContent = score; }
+        setTimeout(() => { i += 1; render(); }, 550);
+      });
+    });
+  }
+  render();
+}
+load().catch(err => { document.getElementById('panel').textContent = String(err); });
+</script>
+</body>
+</html>

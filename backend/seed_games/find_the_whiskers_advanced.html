@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Find the Whiskers — Liucian CNN Game</title>
+<style>
+:root{--bg:#f7f7f8;--card:#fff;--text:#1f2937;--muted:#6b7280;--border:#d1d5db;--accent:#6b7280;--good:#237a4b}
+*{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,sans-serif;color:var(--text);background:#fff}
+main{max-width:1100px;margin:auto;padding:22px}h1{margin:0 0 6px}.sub,.tiny{color:var(--muted)}.sub{margin-bottom:18px}
+.grid{display:grid;gap:14px}.metrics{grid-template-columns:repeat(4,1fr)}.two{grid-template-columns:1.08fr .92fr}
+.card,.metric{border:1px solid var(--border);border-radius:16px;padding:14px;background:var(--card)}
+.label{font-size:13px;color:var(--muted)}.value{font-size:22px;font-weight:700}.box{padding:12px;border-radius:12px;background:var(--bg);border:1px solid var(--border);margin-top:12px}
+button{padding:10px 14px;border:1px solid var(--border);border-radius:12px;background:white;font-size:15px;cursor:pointer;margin:4px}button.primary{background:var(--accent);color:white}
+.image-grid{display:grid;grid-template-columns:repeat(16,1fr);gap:1px;background:#d1d5db;border:1px solid var(--border);border-radius:12px;overflow:hidden;aspect-ratio:1}
+.pixel{aspect-ratio:1;position:relative}.pixel.window{box-shadow:inset 0 0 0 3px #555;z-index:3}.pixel.hit::after{content:"✦";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px}
+.feature-grid{display:grid;grid-template-columns:repeat(14,1fr);gap:1px;background:#d1d5db;border-radius:10px;overflow:hidden;aspect-ratio:1}.feature{aspect-ratio:1;position:relative}.feature.hit::after{content:"★";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:10px}
+.kernel{display:grid;grid-template-columns:repeat(3,44px);gap:2px;margin-top:8px}.kc{width:44px;height:44px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;background:white;font-family:monospace}
+.math{font-family:ui-monospace,monospace;background:white;padding:9px;border-radius:9px;margin-top:8px}.mathPanel{display:none}.mathPanel.show{display:block}
+.progress{height:9px;background:#e5e7eb;border-radius:999px;overflow:hidden;margin-top:8px}.fill{height:100%;background:var(--accent);width:0}.good{color:var(--good)}
+input[type=range]{width:100%}@media(max-width:820px){.metrics{grid-template-columns:repeat(2,1fr)}.two{grid-template-columns:1fr}}
+</style></head>
+<body><main>
+<h1>🐱 Find the Whiskers</h1>
+<div class="sub">Teach a CNN to find Liucian’s whiskers by searching for <strong>thin horizontal line features</strong>.</div>
+
+<div class="grid metrics">
+<div class="metric"><div class="label">Image</div><div class="value">16 × 16</div></div>
+<div class="metric"><div class="label">Filter</div><div class="value">3 × 3</div></div>
+<div class="metric"><div class="label">Scan</div><div id="scanMetric" class="value">1 / 196</div></div>
+<div class="metric"><div class="label">Whisker hits</div><div id="hitMetric" class="value">0</div></div>
+</div>
+
+<div class="grid two" style="margin-top:15px">
+<section class="card">
+<h2>1. Slide the whisker detector</h2>
+<div class="tiny">The 3×3 window scans Liucian’s face. The filter responds strongly when the middle row looks like a thin dark line surrounded by lighter pixels.</div>
+<div id="image" class="image-grid" style="margin-top:12px"></div>
+
+<div class="box">
+<label>Window position: <b><span id="scanOut">1</span> / 196</b></label>
+<input id="scan" type="range" min="0" max="195" value="0">
+<div class="progress"><div id="fill" class="fill"></div></div>
+<div style="margin-top:8px"><button id="step">▶ Next</button><button id="play" class="primary">⏩ Play convolution</button><button id="reset">Reset</button></div>
+</div>
+
+<div class="box">
+<strong>Current calculation</strong>
+<div id="eq" class="math">—</div>
+<div>Activation: <b id="activation">—</b></div>
+<div>Whisker feature: <b id="detected">—</b></div>
+</div>
+</section>
+
+<section class="card">
+<h2>2. Whisker filter</h2>
+<div class="tiny">This hand-designed teaching filter rewards a dark horizontal center line with lighter pixels above and below.</div>
+<div class="box">
+<strong>Horizontal-line kernel</strong>
+<div class="kernel">
+<div class="kc">−1</div><div class="kc">−1</div><div class="kc">−1</div>
+<div class="kc">2</div><div class="kc">2</div><div class="kc">2</div>
+<div class="kc">−1</div><div class="kc">−1</div><div class="kc">−1</div>
+</div>
+</div>
+<div class="box"><label>Detection threshold: <b><span id="thOut">420</span></b></label><input id="threshold" type="range" min="100" max="1000" step="20" value="420"></div>
+
+<h2>3. Detected feature map</h2>
+<div class="tiny">Each square stores the whisker-filter activation at one location.</div>
+<div id="featureMap" class="feature-grid" style="margin-top:10px"></div>
+
+<button id="mathBtn" style="margin-top:12px">📐 Mathematical concept</button>
+<div id="mathPanel" class="box mathPanel">
+<strong>How convolution finds whiskers</strong>
+<div class="math">Y[i,j] = ΣₘΣₙ I[i+m,j+n]K[m,n]</div>
+<div class="tiny">The filter multiplies nine nearby pixels by nine kernel weights and adds the results.</div>
+<div class="math">A[i,j] = ReLU(Y[i,j]) = max(0,Y[i,j])</div>
+<div class="tiny">Only positive evidence remains.</div>
+<div class="math">whisker(i,j) = 1 if A[i,j] ≥ τ</div>
+<div class="tiny">τ is the threshold. High activations mark locations that resemble the horizontal whisker feature.</div>
+<div class="math">16×16 → 14×14 feature map</div>
+<div class="tiny">With a 3×3 kernel, stride 1, and no padding, there are 14×14 = 196 possible window positions.</div>
+</div>
+</section>
+</div>
+
+<section class="card" style="margin-top:15px">
+<h2>🎯 Challenge: Separate true whiskers from false positives</h2>
+<div>
+Run the convolution scan, then use the feature map to decide which strong horizontal responses are most likely to be <strong>real whiskers</strong>.
+A horizontal-line filter can also react to other dark horizontal structures, so position and context matter.
+</div>
+
+<div class="box">
+  <strong>Which evidence should the CNN trust most?</strong>
+  <div class="tiny" style="margin-top:6px">
+    Choose the best rule for turning Layer 1 line detections into a higher-level whisker feature.
+  </div>
+  <div style="margin-top:9px">
+    <button data-rule="max">Use the single strongest horizontal line anywhere</button>
+    <button data-rule="cheeks">Look for several strong horizontal lines on both sides of the cheeks</button>
+    <button data-rule="all">Treat every horizontal response as a whisker</button>
+  </div>
+  <button id="checkRule" class="primary">Check reasoning</button>
+  <div id="ruleFeedback" class="feedback"></div>
+</div>
+
+<div class="box">
+  <strong>Bonus</strong>
+  <div class="tiny" style="margin-top:6px">
+    Increase the detection threshold. What happens to weak false positives? Then lower it again. What happens to sensitivity?
+  </div>
+</div>
+</section>
+
+<section class="card" style="margin-top:15px">
+<h2>What this teaches</h2>
+<div>
+A single convolution filter usually detects a <strong>simple local feature</strong>, not a complete object part.
+Here, the first layer finds thin horizontal lines. Some of those lines are whiskers, but others can be unrelated edges or markings.
+</div>
+
+<div class="box">
+  <strong>Why multiple convolution layers matter</strong>
+  <div class="math">Layer 1: pixels → simple lines and edges</div>
+  <div class="math">Layer 2: line patterns → whisker-like structures</div>
+  <div class="math">Layer 3+: whiskers + ears + eyes + fur → cat features</div>
+  <div class="tiny" style="margin-top:7px">
+    Deeper CNNs repeatedly convolve earlier feature maps. Each layer combines simpler patterns into more meaningful ones.
+    So a later layer can learn that several horizontal line activations, positioned symmetrically around a face, are stronger evidence for whiskers than one isolated line somewhere else.
+  </div>
+</div>
+
+<div class="box">
+  <strong>Main idea</strong>
+  <div>
+    Convolution is not just about finding one edge. A CNN builds a <strong>hierarchy of features</strong>:
+    local pixel patterns become lines, lines become shapes, and shapes become recognizable object parts.
+  </div>
+</div>
+</section>
+</main>
+
+<script>
+(()=>{
+const $=id=>document.getElementById(id),W=16,H=16;
+const img=Array(W*H).fill(235);
+function set(r,c,v){if(r>=0&&r<H&&c>=0&&c<W)img[r*W+c]=v}
+// fluffy cat head
+for(let r=4;r<=13;r++)for(let c=4;c<=11;c++)set(r,c,100);
+[[3,4],[2,5],[3,5],[3,10],[2,11],[3,11]].forEach(([r,c])=>set(r,c,55));
+set(7,6,30);set(7,9,30);set(9,7,45);set(9,8,45);
+// whiskers: thin horizontal strokes extending from cheeks
+for(let c=1;c<=5;c++){set(9,c,45);set(11,c,55)}
+for(let c=10;c<=14;c++){set(9,c,45);set(11,c,55)}
+// small gaps make the picture less trivial
+set(9,4,70);set(11,12,70);
+
+const kernel=[[-1,-1,-1],[2,2,2],[-1,-1,-1]];
+const holder=$('image');
+img.forEach(v=>{const d=document.createElement('div');d.className='pixel';d.style.background=`rgb(${v},${v},${v})`;holder.appendChild(d)});
+
+function conv(index){
+ const row=Math.floor(index/14),col=index%14;let sum=0,terms=[],touch=[];
+ for(let r=0;r<3;r++)for(let c=0;c<3;c++){const ii=(row+r)*W+col+c,v=img[ii],w=kernel[r][c];sum+=v*w;terms.push(`${v}×${w}`);touch.push(ii)}
+ return {sum,relu:Math.max(0,sum),row,col,terms,touch};
+}
+const responses=Array.from({length:196},(_,i)=>conv(i).relu);
+const maxR=Math.max(...responses,1);
+responses.forEach(v=>{const d=document.createElement('div');d.className='feature';const shade=Math.round(245-(v/maxR)*205);d.style.background=`rgb(${shade},${shade},${shade})`;$('featureMap').appendChild(d)});
+
+let pos=0,timer=null,hits=new Set(),choice=null;
+function render(){
+ const info=conv(pos),th=+$('threshold').value;
+ document.querySelectorAll('.pixel').forEach(x=>x.classList.remove('window','hit'));
+ info.touch.forEach(i=>holder.children[i].classList.add('window'));
+ if(info.relu>=th)hits.add(pos);
+ hits.forEach(h=>{const q=conv(h);holder.children[(q.row+1)*W+q.col+1].classList.add('hit')});
+ document.querySelectorAll('.feature').forEach(x=>x.classList.remove('hit'));
+ hits.forEach(i=>$('featureMap').children[i].classList.add('hit'));
+ $('scan').value=pos;$('scanOut').textContent=pos+1;$('scanMetric').textContent=`${pos+1} / 196`;
+ $('fill').style.width=((pos+1)/196*100)+'%';$('hitMetric').textContent=hits.size;
+ $('eq').textContent=info.terms.join(' + ')+' = '+info.sum;$('activation').textContent=info.relu;$('detected').textContent=info.relu>=th?'YES ✦':'No';
+}
+$('scan').oninput=e=>{pos=+e.target.value;render()};
+$('step').onclick=()=>{render();pos=(pos+1)%196};
+$('play').onclick=()=>{
+ if(timer){clearInterval(timer);timer=null;$('play').textContent='⏩ Play convolution';return}
+ $('play').textContent='⏸ Pause';
+ timer=setInterval(()=>{render();if(pos>=195){clearInterval(timer);timer=null;$('play').textContent='⏩ Play convolution';return}pos++},70);
+};
+$('reset').onclick=()=>{if(timer)clearInterval(timer);timer=null;pos=0;hits.clear();$('play').textContent='⏩ Play convolution';render()};
+$('threshold').oninput=()=>{$('thOut').textContent=$('threshold').value;hits.clear();render()};
+$('mathBtn').onclick=()=>{$('mathPanel').classList.toggle('show');$('mathBtn').textContent=$('mathPanel').classList.contains('show')?'📐 Hide mathematical concept':'📐 Mathematical concept'};
+let ruleChoice=null;
+document.querySelectorAll('[data-rule]').forEach(b=>b.addEventListener('click',()=>{
+  ruleChoice=b.dataset.rule;
+  document.querySelectorAll('[data-rule]').forEach(x=>x.classList.remove('primary'));
+  b.classList.add('primary');
+}));
+
+$('checkRule').addEventListener('click',()=>{
+  if(!ruleChoice){
+    $('ruleFeedback').textContent='Choose a rule first.';
+    return;
+  }
+  if(ruleChoice==='cheeks'){
+    $('ruleFeedback').innerHTML='<span class="good">⭐ Correct. Multiple strong horizontal features on both sides of the cheeks provide much better whisker evidence than one isolated line.</span>';
+  }else if(ruleChoice==='max'){
+    $('ruleFeedback').textContent='Not quite. The strongest line could be an unrelated edge. A higher layer should also use position and repeated pattern evidence.';
+  }else{
+    $('ruleFeedback').textContent='Not quite. Treating every horizontal response as a whisker creates many false positives.';
+  }
+});
+render();
+})();
+</script></body></html>

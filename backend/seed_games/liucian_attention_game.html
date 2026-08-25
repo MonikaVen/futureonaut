@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>What Should Liucian Pay Attention To?</title>
+<style>
+:root{
+  --bg:#f7f7f8;--card:#fff;--text:#1f2937;--muted:#6b7280;--border:#d1d5db;
+  --accent:#666;--good:#2f855a;--bad:#b91c1c
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--text);background:#fff}
+main{max-width:1100px;margin:auto;padding:22px}
+h1{margin:0 0 6px;font-size:30px}h2{margin-top:0}
+.sub{color:var(--muted);margin-bottom:18px}
+.grid{display:grid;gap:14px}.metrics{grid-template-columns:repeat(4,minmax(0,1fr))}.two{grid-template-columns:1.1fr .9fr}
+.metric,.card{border:1px solid var(--border);border-radius:16px;background:var(--card);padding:14px}
+.label,.tiny{font-size:13px;color:var(--muted)}.value{font-size:23px;font-weight:700;margin-top:3px}
+button{border:1px solid var(--border);border-radius:12px;padding:9px 13px;font-size:15px;background:#fff;cursor:pointer}
+button.primary{background:var(--accent);color:#fff}
+.token-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.token{border:1px solid var(--border);border-radius:10px;padding:8px 10px;background:#fff;cursor:pointer}
+.token.active{outline:3px solid #a1a1aa}
+.attn-row{display:grid;grid-template-columns:100px 1fr 60px;gap:10px;align-items:center;margin-top:9px}
+input[type=range]{width:100%}
+.challenge,.formula,.callout{margin-top:12px;padding:12px;border-radius:12px;background:var(--bg)}
+.formula{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.feedback{margin-top:10px}.good{color:var(--good);font-weight:700}.bad{color:var(--bad)}
+svg{display:block;width:100%;height:auto}
+.math-panel{display:none;margin-top:12px;padding:12px;border:1px solid var(--border);border-radius:12px}.math-panel.show{display:block}
+.math-step{margin-top:10px;padding:10px;border-radius:10px;background:var(--bg)}
+.reward{display:none;margin-top:12px;border:1px solid var(--border);border-radius:14px;padding:12px}.reward.show{display:block}
+@media(max-width:820px){.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.two{grid-template-columns:1fr}.attn-row{grid-template-columns:80px 1fr 50px}main{padding:14px}}
+</style>
+</head>
+<body>
+<main>
+<h1>👁️ What Should Liucian Pay Attention To?</h1>
+<div class="sub">Learn <strong>attention</strong>: each token looks at the other tokens and decides which ones matter most for understanding context.</div>
+
+<div class="grid metrics">
+  <div class="metric"><div class="label">Query token</div><div id="queryMetric" class="value">hungry</div></div>
+  <div class="metric"><div class="label">Strongest attention</div><div id="strongMetric" class="value">—</div></div>
+  <div class="metric"><div class="label">Weight sum</div><div id="sumMetric" class="value">1.00</div></div>
+  <div class="metric"><div class="label">Context score</div><div id="contextMetric" class="value">0.00</div></div>
+</div>
+
+<div class="grid two" style="margin-top:16px">
+<section class="card">
+  <h2>1. Choose the token that is looking</h2>
+  <div class="tiny">The selected token is the <strong>query</strong>. It will decide how much attention to give the other tokens.</div>
+
+  <div id="tokens" class="token-row"></div>
+
+  <svg id="attnSvg" viewBox="0 0 720 360" role="img" aria-label="Attention connections between sentence tokens">
+    <rect width="720" height="360" rx="16" fill="#f9fafb"/>
+    <g id="lines"></g>
+    <g id="nodes"></g>
+  </svg>
+
+  <div id="queryInfo" class="formula"></div>
+</section>
+
+<section class="card">
+  <h2>2. Set the attention weights</h2>
+  <div class="tiny">Move the sliders. The game automatically normalizes the weights so they add up to 1.</div>
+  <div id="sliders"></div>
+
+  <div class="challenge">
+    <strong>Weighted context</strong>
+    <div id="contextMath" class="formula"></div>
+    <div class="tiny" style="margin-top:5px">High-attention words contribute more strongly to the new context representation.</div>
+  </div>
+
+  <button id="mathBtn" type="button" style="margin-top:12px">∑ Mathematical Explanation</button>
+
+  <div id="mathPanel" class="math-panel">
+    <strong>Scaled dot-product attention</strong>
+
+    <div class="math-step">
+      <strong>1. Create Query, Key, and Value vectors</strong>
+      <div class="formula">Q = XWQ &nbsp;&nbsp; K = XWK &nbsp;&nbsp; V = XWV</div>
+      <div class="tiny">Each token embedding is transformed into a query, key, and value vector.</div>
+    </div>
+
+    <div class="math-step">
+      <strong>2. Compare query with keys</strong>
+      <div class="formula">scoreᵢ = Q · Kᵢ</div>
+      <div class="tiny">A larger dot product means the key is more relevant to the query.</div>
+    </div>
+
+    <div class="math-step">
+      <strong>3. Scale the scores</strong>
+      <div class="formula">scaled scoreᵢ = (Q · Kᵢ) / √dₖ</div>
+    </div>
+
+    <div class="math-step">
+      <strong>4. Turn scores into attention weights</strong>
+      <div class="formula">αᵢ = softmax(scaled scoreᵢ)</div>
+      <div class="tiny">Softmax makes every weight positive and makes all weights sum to 1.</div>
+    </div>
+
+    <div class="math-step">
+      <strong>5. Build the context vector</strong>
+      <div class="formula">context = Σ αᵢVᵢ</div>
+      <div class="tiny">The final context is a weighted combination of the value vectors.</div>
+    </div>
+  </div>
+</section>
+</div>
+
+<section class="card">
+  <h2>3. Attention challenge</h2>
+  <div>
+    For the query token <strong>hungry</strong>, make the model pay most attention to the words that best explain
+    <em>why</em> Liucian is hungry.
+  </div>
+  <div class="callout">
+    Sentence: <strong>Liucian wants salmon because he is hungry</strong>
+  </div>
+
+  <button id="checkChallenge" class="primary" type="button">Check attention</button>
+  <button id="resetChallenge" type="button">Reset weights</button>
+  <div id="challengeFeedback" class="feedback"></div>
+
+  <div id="reward" class="reward">
+    <strong>🎁 Attention learned!</strong>
+    <div style="font-size:46px;text-align:center;margin-top:8px">🐈 👁️ 🐟</div>
+    <div class="good" style="text-align:center">Liucian correctly focuses on “salmon” and “wants”.</div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>Concept transition → Self-attention</h2>
+  <div>
+    In this game, one token looks at the rest of the sentence. In a Transformer, <strong>every token does this</strong>.
+    Each token builds its own context-sensitive representation using self-attention.
+  </div>
+</section>
+</main>
+
+<script>
+(() => {
+  const sentence = ['Liucian','wants','salmon','because','he','is','hungry'];
+  const semanticValues = {
+    Liucian:0.35,
+    wants:0.85,
+    salmon:1.00,
+    because:0.45,
+    he:0.30,
+    is:0.20,
+    hungry:0.55
+  };
+
+  let query = 'hungry';
+  let rawWeights = {
+    Liucian:0.2,
+    wants:0.8,
+    salmon:1.0,
+    because:0.3,
+    he:0.2,
+    is:0.1,
+    hungry:0.25
+  };
+
+  function normalizedWeights(){
+    const vals=sentence.map(w=>Math.max(0.001,rawWeights[w]));
+    const sum=vals.reduce((a,b)=>a+b,0);
+    const obj={};
+    sentence.forEach((w,i)=>obj[w]=vals[i]/sum);
+    return obj;
+  }
+
+  function renderTokens(){
+    const box=document.getElementById('tokens');
+    box.innerHTML='';
+    sentence.forEach(w=>{
+      const b=document.createElement('button');
+      b.type='button';
+      b.className='token'+(w===query?' active':'');
+      b.textContent=w;
+      b.addEventListener('click',()=>{
+        query=w;
+        renderAll();
+      });
+      box.appendChild(b);
+    });
+  }
+
+  function renderSliders(){
+    const box=document.getElementById('sliders');
+    box.innerHTML='';
+    const weights=normalizedWeights();
+
+    sentence.forEach(w=>{
+      const row=document.createElement('div');
+      row.className='attn-row';
+
+      const label=document.createElement('div');
+      label.textContent=w;
+
+      const slider=document.createElement('input');
+      slider.type='range';
+      slider.min='0.01';
+      slider.max='1.5';
+      slider.step='0.01';
+      slider.value=rawWeights[w];
+
+      const out=document.createElement('div');
+      out.textContent=weights[w].toFixed(2);
+
+      slider.addEventListener('input',()=>{
+        rawWeights[w]=Number(slider.value);
+        renderAll(false);
+      });
+
+      row.append(label,slider,out);
+      box.appendChild(row);
+    });
+  }
+
+  function renderSvg(){
+    const lines=document.getElementById('lines');
+    const nodes=document.getElementById('nodes');
+    lines.innerHTML='';nodes.innerHTML='';
+
+    const weights=normalizedWeights();
+    const positions={};
+    sentence.forEach((w,i)=>{
+      positions[w]={x:70+i*95,y:260};
+    });
+
+    const qpos={x:positions[query].x,y:85};
+
+    sentence.forEach(w=>{
+      const p=positions[w];
+      const line=document.createElementNS('http://www.w3.org/2000/svg','line');
+      line.setAttribute('x1',qpos.x);line.setAttribute('y1',qpos.y+25);
+      line.setAttribute('x2',p.x);line.setAttribute('y2',p.y-22);
+      line.setAttribute('stroke','#6b7280');
+      line.setAttribute('stroke-width',String(1+weights[w]*15));
+      line.setAttribute('opacity',String(0.2+weights[w]*0.8));
+      lines.appendChild(line);
+
+      const g=document.createElementNS('http://www.w3.org/2000/svg','g');
+      const rect=document.createElementNS('http://www.w3.org/2000/svg','rect');
+      rect.setAttribute('x',p.x-40);rect.setAttribute('y',p.y-20);
+      rect.setAttribute('width','80');rect.setAttribute('height','40');rect.setAttribute('rx','10');
+      rect.setAttribute('fill','#fff');rect.setAttribute('stroke','#9ca3af');
+      g.appendChild(rect);
+
+      const text=document.createElementNS('http://www.w3.org/2000/svg','text');
+      text.setAttribute('x',p.x);text.setAttribute('y',p.y+5);
+      text.setAttribute('text-anchor','middle');text.setAttribute('font-size','13');
+      text.textContent=w;
+      g.appendChild(text);
+      nodes.appendChild(g);
+    });
+
+    const qrect=document.createElementNS('http://www.w3.org/2000/svg','rect');
+    qrect.setAttribute('x',qpos.x-48);qrect.setAttribute('y',qpos.y-22);
+    qrect.setAttribute('width','96');qrect.setAttribute('height','44');qrect.setAttribute('rx','11');
+    qrect.setAttribute('fill','#555');nodes.appendChild(qrect);
+
+    const qt=document.createElementNS('http://www.w3.org/2000/svg','text');
+    qt.setAttribute('x',qpos.x);qt.setAttribute('y',qpos.y+5);qt.setAttribute('text-anchor','middle');
+    qt.setAttribute('font-size','14');qt.setAttribute('fill','#fff');qt.textContent='Query: '+query;
+    nodes.appendChild(qt);
+  }
+
+  function renderMetrics(){
+    const weights=normalizedWeights();
+    const strongest=sentence.map(w=>({w,v:weights[w]})).sort((a,b)=>b.v-a.v)[0];
+    const context=sentence.reduce((sum,w)=>sum+weights[w]*semanticValues[w],0);
+    const sum=sentence.reduce((s,w)=>s+weights[w],0);
+
+    document.getElementById('queryMetric').textContent=query;
+    document.getElementById('strongMetric').textContent=strongest.w;
+    document.getElementById('sumMetric').textContent=sum.toFixed(2);
+    document.getElementById('contextMetric').textContent=context.toFixed(2);
+    document.getElementById('queryInfo').textContent=`Query token = "${query}"`;
+    document.getElementById('contextMath').textContent=
+      sentence.map(w=>`${weights[w].toFixed(2)}×${semanticValues[w].toFixed(2)}`).join(' + ')
+      + ` = ${context.toFixed(2)}`;
+  }
+
+  function renderAll(rebuildSliders=true){
+    renderTokens();
+    if(rebuildSliders) renderSliders();
+    else {
+      const weights=normalizedWeights();
+      document.querySelectorAll('.attn-row').forEach((row,i)=>{
+        row.children[2].textContent=weights[sentence[i]].toFixed(2);
+      });
+    }
+    renderSvg();
+    renderMetrics();
+  }
+
+  document.getElementById('mathBtn').addEventListener('click',()=>{
+    const panel=document.getElementById('mathPanel');
+    const open=panel.classList.toggle('show');
+    document.getElementById('mathBtn').textContent=
+      open?'∑ Hide Mathematical Explanation':'∑ Mathematical Explanation';
+  });
+
+  document.getElementById('checkChallenge').addEventListener('click',()=>{
+    query='hungry';
+    const w=normalizedWeights();
+    const ranked=sentence.map(x=>({w:x,v:w[x]})).sort((a,b)=>b.v-a.v);
+    const top2=ranked.slice(0,2).map(x=>x.w);
+    const ok=top2.includes('salmon') && top2.includes('wants') && w.salmon>0.22 && w.wants>0.18;
+
+    document.getElementById('challengeFeedback').innerHTML=ok
+      ? '<span class="good">🏆 Correct! “salmon” and “wants” receive the strongest attention.</span>'
+      : '<span class="bad">Try making “salmon” and “wants” the two strongest attention targets.</span>';
+    document.getElementById('reward').classList.toggle('show',ok);
+    renderAll();
+  });
+
+  document.getElementById('resetChallenge').addEventListener('click',()=>{
+    query='hungry';
+    rawWeights={Liucian:0.2,wants:0.5,salmon:0.5,because:0.4,he:0.3,is:0.3,hungry:0.3};
+    document.getElementById('challengeFeedback').textContent='';
+    document.getElementById('reward').classList.remove('show');
+    renderAll();
+  });
+
+  renderAll();
+})();
+</script>
+</body>
+</html>

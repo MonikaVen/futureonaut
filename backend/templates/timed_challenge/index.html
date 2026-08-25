@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Timed Challenge</title>
+  <style>
+    :root { --ink:#111827; --accent:#b45309; --muted:#6b7280; --card:#fff7ed; }
+    body { margin:0; font-family: "Gill Sans", "Segoe UI", sans-serif; color:var(--ink);
+      background: radial-gradient(circle at 20% 20%, #fdba74aa, transparent 40%), linear-gradient(135deg,#fff7ed,#ffedd5); min-height:100vh; }
+    main { max-width:680px; margin:0 auto; padding:28px 16px; }
+    .card { background:var(--card); border:1px solid #fdba74; border-radius:16px; padding:18px; margin-top:14px; }
+    input { width:100%; padding:12px; border-radius:10px; border:1px solid #d1d5db; font:inherit; }
+    button { margin-top:10px; background:var(--accent); color:#fff; border:0; border-radius:10px; padding:10px 14px; font:inherit; cursor:pointer; }
+    .muted { color:var(--muted); }
+  </style>
+</head>
+<body>
+<main>
+  <h1 id="title">Timed Challenge</h1>
+  <p class="muted" id="desc"></p>
+  <div class="muted">Score: <b id="score">0</b> · Time left: <b id="timer">-</b>s</div>
+  <div class="card" id="panel"></div>
+</main>
+<script>
+async function load() {
+  const data = await (await fetch('./content.json')).json();
+  document.getElementById('title').textContent = data.title || 'Timed Challenge';
+  document.getElementById('desc').textContent = data.description || '';
+  const items = data.items || [];
+  let i = 0, score = 0, timer = null;
+  const panel = document.getElementById('panel');
+  const scoreEl = document.getElementById('score');
+  const timerEl = document.getElementById('timer');
+
+  function clearTimer() { if (timer) { clearInterval(timer); timer = null; } }
+
+  function next() {
+    clearTimer();
+    if (i >= items.length) {
+      panel.innerHTML = `<p>Finished! Score: <b>${score}</b></p>`;
+      if (window.LearnPlay) LearnPlay.complete({ score });
+      return;
+    }
+    const item = items[i];
+    let left = Math.round((item.time_limit_ms || 30000) / 1000);
+    timerEl.textContent = left;
+    if (window.LearnPlay) LearnPlay.taskStart(item.id);
+    panel.innerHTML = `<p><b>${item.prompt}</b></p><input id="ans" placeholder="Your answer" /><button id="go">Submit</button>`;
+    const input = document.getElementById('ans');
+    input.focus();
+    timer = setInterval(() => {
+      left -= 1;
+      timerEl.textContent = left;
+      if (left <= 0) {
+        clearTimer();
+        if (window.LearnPlay) {
+          LearnPlay.taskEnd(item.id);
+          LearnPlay.answer({ correct: false, taskId: item.id, points: item.points || 10 });
+        }
+        i += 1; next();
+      }
+    }, 1000);
+    function submit() {
+      const val = (input.value || '').trim().toLowerCase();
+      const correct = val === String(item.answer || '').trim().toLowerCase();
+      clearTimer();
+      if (window.LearnPlay) {
+        LearnPlay.taskEnd(item.id);
+        LearnPlay.answer({ correct, taskId: item.id, points: item.points || 10 });
+        if (correct) LearnPlay.score(item.points || 10);
+      }
+      if (correct) { score += item.points || 10; scoreEl.textContent = score; }
+      i += 1; next();
+    }
+    document.getElementById('go').onclick = submit;
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
+  }
+  next();
+}
+load();
+</script>
+</body>
+</html>

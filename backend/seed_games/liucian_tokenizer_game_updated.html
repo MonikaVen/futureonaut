@@ -1,0 +1,449 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Liucian Tokenizer Game</title>
+<style>
+:root{
+  --bg:#f7f7f8;--card:#ffffff;--text:#1f2937;--muted:#6b7280;
+  --border:#d1d5db;--accent:#666;--good:#2f855a;--bad:#b91c1c;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  color:var(--text);background:#fff;
+}
+main{max-width:1080px;margin:0 auto;padding:22px}
+h1{margin:0 0 6px;font-size:30px}
+h2{margin-top:0}
+.sub{color:var(--muted);margin-bottom:18px}
+.grid{display:grid;gap:14px}
+.metrics{grid-template-columns:repeat(4,minmax(0,1fr))}
+.two{grid-template-columns:1fr 1fr}
+.metric,.card{border:1px solid var(--border);border-radius:16px;background:var(--card);padding:14px}
+.label,.tiny{font-size:13px;color:var(--muted)}
+.value{font-size:24px;font-weight:700;margin-top:3px}
+textarea,input,select{
+  width:100%;border:1px solid var(--border);border-radius:10px;padding:10px;font:inherit
+}
+input[type=range]{padding:0}
+button{
+  border:1px solid var(--border);border-radius:12px;padding:10px 14px;font-size:15px;
+  background:#fff;cursor:pointer
+}
+button.primary{background:var(--accent);color:#fff}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.challenge,.callout,.formula{
+  margin-top:12px;padding:12px;border-radius:12px;background:var(--bg)
+}
+.formula{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.tokens{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.token{
+  border:1px solid var(--border);border-radius:10px;padding:8px 10px;background:#fff;cursor:pointer
+}
+.token.active{outline:3px solid #9ca3af}
+.pipeline-item{
+  border:1px solid var(--border);border-radius:10px;padding:9px;margin-top:8px;
+  opacity:.28;transition:opacity .25s ease, transform .25s ease;
+}
+.pipeline-item.visible{opacity:1;transform:translateX(0)}
+.vocab-row{
+  display:flex;justify-content:space-between;gap:10px;border:1px solid var(--border);
+  border-radius:10px;padding:8px;margin-top:8px;opacity:.25;transition:opacity .25s ease;
+}
+.vocab-row.visible{opacity:1}
+.progress{height:10px;background:#e5e7eb;border-radius:999px;overflow:hidden;margin-top:8px}
+.fill{height:100%;background:var(--accent);width:0%}
+.feedback{margin-top:10px}
+.good{color:var(--good);font-weight:700}
+.bad{color:var(--bad)}
+.reward{display:none;margin-top:12px;border:1px solid var(--border);border-radius:14px;padding:12px}
+.reward.show{display:block}
+@media(max-width:820px){
+  .metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .two{grid-template-columns:1fr}
+  main{padding:14px}
+}
+</style>
+</head>
+<body>
+<main>
+  <h1>🔤 Liucian Tokenizer</h1>
+  <div class="sub">Build a vocabulary, split Liucian's sentence into tokens, assign IDs, and prepare the sequence for an AI model.</div>
+
+  <div class="grid metrics">
+    <div class="metric"><div class="label">Characters</div><div id="chars" class="value">0</div></div>
+    <div class="metric"><div class="label">Words</div><div id="words" class="value">0</div></div>
+    <div class="metric"><div class="label">Vocabulary</div><div id="vocabSize" class="value">0</div></div>
+    <div class="metric"><div class="label">Tokens</div><div id="tokenCount" class="value">0</div></div>
+  </div>
+
+  <section class="card" style="margin-top:16px">
+    <h2>1. Give Liucian a sentence</h2>
+    <label for="textInput">Sentence</label>
+    <textarea id="textInput" rows="3">Liucian wants fresh salmon, clean water, a soft blanket, his red ball, and quiet music before sleep.</textarea>
+  </section>
+
+  <section class="card">
+    <h2>2. Build the tokenizer step by step</h2>
+    <div class="tiny">Move the slider or press Play to watch the vocabulary and token sequence appear.</div>
+
+    <div style="margin-top:12px">
+      <label for="stepSlider">Tokenizer step: <strong id="stepLabel">0 — Raw sentence</strong></label>
+      <input id="stepSlider" type="range" min="0" max="6" value="0" step="1">
+      <div class="progress"><div id="progressFill" class="fill"></div></div>
+    </div>
+
+    <div class="row" style="margin-top:12px">
+      <button id="playBtn" class="primary" type="button">▶ Play animation</button>
+      <button id="resetBtn" type="button">↺ Reset</button>
+    </div>
+
+    <div class="grid two" style="margin-top:14px">
+      <div>
+        <h3>Sentence pipeline</h3>
+        <div id="pipeline"></div>
+      </div>
+      <div>
+        <h3>Vocabulary being built</h3>
+        <div class="tiny">New words and subwords from the training sentence are added here as unique vocabulary entries.</div>
+        <div id="vocabGrowth" class="callout">Vocabulary starts empty.</div>
+        <div id="vocab"></div>
+      </div>
+    </div>
+
+    <div id="animationExplanation" class="callout">Start with the raw sentence.</div>
+  </section>
+
+  <div class="grid two">
+    <section class="card">
+      <h2>3. Final token pieces</h2>
+      <div id="tokens" class="tokens"></div>
+      <div id="tokenInfo" class="formula">Click a token to inspect its vocabulary ID.</div>
+    </section>
+
+    <section class="card">
+      <h2>4. Model input</h2>
+      <div id="idSequence" class="formula">[]</div>
+      <div class="tiny" style="margin-top:8px">The model receives token IDs rather than the original sentence.</div>
+    </section>
+  </div>
+
+  <section class="card">
+    <h2>🎯 Challenge: Tokenize a new sentence</h2>
+    <div class="tiny">
+      Use only the vocabulary learned from the first sentence. The new sentence contains no unseen token pieces.
+      Enter the correct learned vocabulary ID for each token in order.
+    </div>
+
+    <div class="challenge">
+      <strong>New sentence</strong>
+      <div id="challengeSentence" style="margin-top:6px;font-size:20px">Liucian wants salmon</div><div id="encodableStatus" class="tiny" style="margin-top:6px"></div>
+    </div>
+
+    <div style="margin-top:12px">
+      <strong>Token pieces</strong>
+      <div id="challengeTokens" class="tokens"></div>
+    </div>
+
+    <div id="challengeInputs" style="margin-top:12px"></div>
+
+    <div class="row" style="margin-top:12px">
+      <button id="checkChallenge" class="primary" type="button">Check token IDs</button>
+      <button id="newChallenge" type="button">New sentence</button>
+    </div>
+
+    <div id="challengeFeedback" class="feedback"></div>
+
+    <div id="reward" class="reward">
+      <strong>🎁 Correct sequence!</strong>
+      <div style="font-size:46px;text-align:center;margin-top:8px">🐈 🔤 → 🔢 → 🧠</div>
+      <div class="good" style="text-align:center">Liucian's new sentence is ready for the model.</div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Concept transition → Embeddings</h2>
+    <div>
+      Token IDs are only labels. The next step is to turn each ID into a learned numerical vector called an
+      <strong>embedding</strong>, so the model can represent relationships between words and concepts.
+    </div>
+  </section>
+</main>
+
+<script>
+(() => {
+  const textInput = document.getElementById('textInput');
+  const stepSlider = document.getElementById('stepSlider');
+  let timer = null;
+
+  function splitBase(text) {
+    return text.match(/[A-Za-zÀ-ž0-9]+|[^\sA-Za-zÀ-ž0-9]/g) || [];
+  }
+
+  function subwordize(token) {
+    if (!/[A-Za-zÀ-ž0-9]/.test(token) || token.length <= 5) return [token];
+    const pieces = [token.slice(0, 4)];
+    let rest = token.slice(4);
+    while (rest.length) {
+      pieces.push('##' + rest.slice(0, 3));
+      rest = rest.slice(3);
+    }
+    return pieces;
+  }
+
+  function getState() {
+    const base = splitBase(textInput.value);
+    const tokens = base.flatMap(subwordize);
+    const unique = [];
+    tokens.forEach(t => {
+      if (!unique.includes(t)) unique.push(t);
+    });
+    const vocab = unique.map((token, i) => ({
+      token,
+      id: 1000 + i
+    }));
+    return { base, tokens, vocab };
+  }
+
+  const challengeSentences = [
+    'Liucian wants salmon'
+  ];
+  let challengeIndex = 0;
+
+  function challengeState() {
+    const sentence = challengeSentences[challengeIndex];
+    const base = splitBase(sentence);
+    const tokens = base.flatMap(subwordize);
+    const learned = getState().vocab;
+    const vocabMap = new Map(learned.map(v => [v.token, v.id]));
+    const unknown = tokens.filter(t => !vocabMap.has(t));
+    return { sentence, tokens, vocabMap, unknown };
+  }
+
+  function renderChallenge() {
+    const c = challengeState();
+    document.getElementById('challengeSentence').textContent = c.sentence;
+    const status = document.getElementById('encodableStatus');
+    status.innerHTML = c.unknown.length === 0
+      ? '<span class="good">✓ Every token already exists in the learned dictionary.</span>'
+      : '<span class="bad">Unknown tokens: ' + c.unknown.join(', ') + '</span>';
+
+    const tokenBox = document.getElementById('challengeTokens');
+    tokenBox.innerHTML = '';
+    c.tokens.forEach(tok => {
+      const span = document.createElement('span');
+      span.className = 'token';
+      span.textContent = tok;
+      tokenBox.appendChild(span);
+    });
+
+    const inputs = document.getElementById('challengeInputs');
+    inputs.innerHTML = '';
+    c.tokens.forEach((tok, i) => {
+      const wrap = document.createElement('div');
+      wrap.style.marginTop = '8px';
+      wrap.innerHTML = `
+        <label>Token ${i + 1}: <strong>${tok}</strong>
+          <input class="challenge-id" data-index="${i}" type="number" placeholder="Enter token ID">
+        </label>`;
+      inputs.appendChild(wrap);
+    });
+
+    document.getElementById('challengeFeedback').textContent = '';
+    document.getElementById('reward').classList.remove('show');
+  }
+
+  const stepNames = [
+    '0 — Raw sentence',
+    '1 — Split into word-like chunks',
+    '2 — Find long words',
+    '3 — Break into subwords',
+    '4 — Build unique vocabulary',
+    '5 — Assign vocabulary IDs',
+    '6 — Produce model sequence'
+  ];
+
+  const explanations = [
+    'We start with human-readable text.',
+    'The sentence is separated into word-like chunks and punctuation.',
+    'The tokenizer checks which longer chunks may need smaller reusable pieces.',
+    'Longer words are split into subword pieces.',
+    'Every new unique token piece from the training sentence is added to the vocabulary.',
+    'Each vocabulary entry receives a numeric ID.',
+    'The sentence becomes an ordered list of token IDs for the neural network.'
+  ];
+
+  function render() {
+    const s = getState();
+    const step = Number(stepSlider.value);
+
+    document.getElementById('chars').textContent = textInput.value.length;
+    document.getElementById('words').textContent =
+      s.base.filter(x => /[A-Za-zÀ-ž0-9]/.test(x)).length;
+    document.getElementById('vocabSize').textContent = step >= 4 ? s.vocab.length : 0;
+    document.getElementById('tokenCount').textContent = step >= 3 ? s.tokens.length : 0;
+    document.getElementById('stepLabel').textContent = stepNames[step];
+    document.getElementById('progressFill').style.width = ((step / 6) * 100) + '%';
+
+    const pipelineData = [
+      ['Raw text', textInput.value],
+      ['Word chunks', s.base.join(' | ')],
+      ['Long words', s.base.filter(x => x.length > 5).join(', ') || 'None'],
+      ['Subword pieces', s.tokens.join(' | ')],
+      ['Unique vocabulary', s.vocab.map(v => v.token).join(', ')],
+      ['Vocabulary IDs', s.vocab.map(v => `${v.token} → ${v.id}`).join(' · ')],
+      ['Model input', '[' + s.tokens.map(t => s.vocab.find(v => v.token === t).id).join(', ') + ']']
+    ];
+
+    const pipeline = document.getElementById('pipeline');
+    pipeline.innerHTML = '';
+    pipelineData.forEach((item, i) => {
+      const div = document.createElement('div');
+      div.className = 'pipeline-item' + (i <= step ? ' visible' : '');
+      div.innerHTML = `<strong>${item[0]}</strong><div class="tiny" style="margin-top:4px">${item[1]}</div>`;
+      pipeline.appendChild(div);
+    });
+
+    const vocab = document.getElementById('vocab');
+    vocab.innerHTML = '';
+    document.getElementById('vocabGrowth').textContent =
+      step < 4
+        ? 'Vocabulary starts empty. Move to step 4 to add unique token pieces.'
+        : `Added ${s.vocab.length} unique vocabulary entries from the training sentence.`;
+    s.vocab.forEach(entry => {
+      const row = document.createElement('div');
+      row.className = 'vocab-row' + (step >= 4 ? ' visible' : '');
+      row.innerHTML = `<span>${entry.token}</span><span>${step >= 5 ? 'ID ' + entry.id : 'waiting for ID'}</span>`;
+      vocab.appendChild(row);
+    });
+
+    document.getElementById('animationExplanation').textContent = explanations[step];
+
+    const tokensBox = document.getElementById('tokens');
+    tokensBox.innerHTML = '';
+    if (step >= 3) {
+      s.tokens.forEach((tok, i) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'token';
+        btn.textContent = tok;
+        btn.addEventListener('click', () => {
+          tokensBox.querySelectorAll('.token').forEach(x => x.classList.remove('active'));
+          btn.classList.add('active');
+          const entry = s.vocab.find(v => v.token === tok);
+          document.getElementById('tokenInfo').textContent =
+            `token[${i}] = "${tok}" → vocabulary ID ${entry.id}`;
+        });
+        tokensBox.appendChild(btn);
+      });
+    }
+
+    document.getElementById('idSequence').textContent =
+      step >= 6
+        ? '[' + s.tokens.map(t => s.vocab.find(v => v.token === t).id).join(', ') + ']'
+        : '[waiting for final tokenization]';
+
+    const select = document.getElementById('tokenSelect');
+    select.innerHTML = '';
+    s.vocab.forEach((v, i) => {
+      const option = document.createElement('option');
+      option.value = String(i);
+      option.textContent = v.token;
+      select.appendChild(option);
+    });
+
+  }
+
+
+  stepSlider.addEventListener('input', render);
+
+  textInput.addEventListener('input', () => {
+    stepSlider.value = '0';
+    render();
+    renderChallenge();
+  });
+
+  document.getElementById('playBtn').addEventListener('click', () => {
+    if (timer) {
+      clearInterval(timer);
+      timer = null;
+      document.getElementById('playBtn').textContent = '▶ Play animation';
+      return;
+    }
+
+    stepSlider.value = '0';
+    render();
+    document.getElementById('playBtn').textContent = '⏸ Pause';
+
+    timer = setInterval(() => {
+      const next = Number(stepSlider.value) + 1;
+      if (next > 6) {
+        clearInterval(timer);
+        timer = null;
+        document.getElementById('playBtn').textContent = '▶ Play animation';
+        return;
+      }
+      stepSlider.value = String(next);
+      render();
+    }, 900);
+  });
+
+  document.getElementById('resetBtn').addEventListener('click', () => {
+    if (timer) clearInterval(timer);
+    timer = null;
+    stepSlider.value = '0';
+    document.getElementById('playBtn').textContent = '▶ Play animation';
+    render();
+  });
+
+
+
+
+
+
+  document.getElementById('checkChallenge').addEventListener('click', () => {
+    const c = challengeState();
+    const fields = [...document.querySelectorAll('.challenge-id')];
+    if (c.unknown.length) {
+      document.getElementById('challengeFeedback').innerHTML =
+        '<span class="bad">This sentence cannot be fully encoded because the training dictionary is missing: ' +
+        c.unknown.join(', ') + '.</span>';
+      document.getElementById('reward').classList.remove('show');
+      return;
+    }
+    let correct = 0;
+
+    fields.forEach((field, i) => {
+      const expected = c.vocabMap.get(c.tokens[i]);
+      const answer = Number(field.value);
+      if (answer === expected) {
+        correct++;
+        field.style.outline = '2px solid var(--good)';
+      } else {
+        field.style.outline = '2px solid var(--bad)';
+      }
+    });
+
+    const feedback = document.getElementById('challengeFeedback');
+    if (correct === c.tokens.length) {
+      feedback.innerHTML = `<span class="good">🏆 Correct! You identified all ${correct} token IDs in the new sentence.</span>`;
+      document.getElementById('reward').classList.add('show');
+    } else {
+      feedback.innerHTML = `<span class="bad">${correct}/${c.tokens.length} correct. Check the vocabulary from step 5 and try again.</span>`;
+      document.getElementById('reward').classList.remove('show');
+    }
+  });
+
+  document.getElementById('newChallenge').addEventListener('click', () => {
+    challengeIndex = (challengeIndex + 1) % challengeSentences.length;
+    renderChallenge();
+  });
+
+  renderChallenge();
+  render();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Catch the Red Dot — Liucian's Loss Game</title>
+  <style>
+    :root{
+      --bg:#f7f7f8; --card:#fff; --text:#1f2937; --muted:#6b7280;
+      --border:#d1d5db; --accent:#6b7280; --good:#2f855a; --warn:#b45309; --bad:#b91c1c;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--text);background:#fff}
+    main{max-width:1000px;margin:0 auto;padding:22px}
+    h1{margin:0 0 6px;font-size:30px}
+    .sub{color:var(--muted);margin-bottom:18px}
+    .grid{display:grid;gap:14px}
+    .metrics{grid-template-columns:repeat(4,minmax(0,1fr))}
+    .two{grid-template-columns:1.15fr .85fr}
+    .metric,.card{border:1px solid var(--border);border-radius:16px;background:var(--card);padding:14px}
+    .label{font-size:13px;color:var(--muted)}
+    .value{font-size:24px;font-weight:700;margin-top:3px}
+    button{border:1px solid var(--border);border-radius:12px;padding:10px 14px;font-size:16px;background:#fff;cursor:pointer}
+    button.primary{background:var(--accent);color:#fff}
+    .feedback{margin-top:10px}
+    .formula{margin-top:12px;padding:12px;border-radius:12px;background:var(--bg);font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+    .challenge{margin-top:14px;padding:12px;border-radius:12px;background:var(--bg)}
+    .tiny{font-size:13px;color:var(--muted)}
+    .stage{border:1px solid var(--border);border-radius:18px;overflow:hidden;background:#fafafa}
+    svg{display:block;width:100%;height:auto;touch-action:none}
+    .bar{height:10px;background:#e5e7eb;border-radius:999px;overflow:hidden;margin-top:8px}
+    .fill{height:100%;background:var(--accent);width:0%}
+    @media(max-width:800px){
+      .metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .two{grid-template-columns:1fr}
+      main{padding:14px}
+    }
+  </style>
+</head>
+<body>
+<main>
+  <h1>🔴 Catch the Red Dot</h1>
+  <div class="sub">Teach Liucian about <strong>prediction error</strong> and <strong>squared loss</strong>.</div>
+
+  <div class="grid metrics">
+    <div class="metric"><div class="label">Prediction</div><div id="predMetric" class="value">—</div></div>
+    <div class="metric"><div class="label">Actual dot</div><div id="actualMetric" class="value">Hidden</div></div>
+    <div class="metric"><div class="label">Distance error</div><div id="errorMetric" class="value">—</div></div>
+    <div class="metric"><div class="label">Squared loss</div><div id="lossMetric" class="value">—</div></div>
+  </div>
+
+  <div class="grid two" style="margin-top:16px">
+    <section class="card">
+      <h2 style="margin-top:0">1. Predict where the dot will land</h2>
+      <div class="tiny">Click anywhere on the floor to place your prediction marker.</div>
+
+      <div class="stage" style="margin-top:12px">
+        <svg id="stage" viewBox="0 0 700 420" role="img" aria-label="Play area for predicting where a red laser dot will land">
+          <rect x="0" y="0" width="700" height="420" fill="#f9fafb"></rect>
+          <line x1="50" y1="350" x2="650" y2="350" stroke="#9ca3af" stroke-width="3"></line>
+          <g id="ticks"></g>
+
+          <g id="cat" transform="translate(110 300)">
+            <ellipse cx="0" cy="20" rx="42" ry="28" fill="#777" stroke="#4b4b4b" stroke-width="3"></ellipse>
+            <circle cx="38" cy="0" r="22" fill="#808080" stroke="#4b4b4b" stroke-width="3"></circle>
+            <path d="M24 -16 L29 -40 L40 -18 Z" fill="#777" stroke="#4b4b4b" stroke-width="3"></path>
+            <path d="M39 -18 L54 -39 L57 -8 Z" fill="#777" stroke="#4b4b4b" stroke-width="3"></path>
+            <path d="M-38 22 Q-70 -7 -80 25 Q-85 48 -60 55" fill="none" stroke="#707070" stroke-width="13" stroke-linecap="round"></path>
+            <path d="M-32 5 Q-8 23 20 5 M-28 20 Q-6 35 21 18" fill="none" stroke="#4f4f4f" stroke-width="5"></path>
+            <circle cx="33" cy="-2" r="3" fill="#222"></circle>
+            <circle cx="44" cy="-2" r="3" fill="#222"></circle>
+            <text x="0" y="72" text-anchor="middle" font-size="14">Liucian</text>
+          </g>
+
+          <g id="predictionMarker" style="display:none">
+            <circle cx="0" cy="0" r="12" fill="none" stroke="#6b7280" stroke-width="4"></circle>
+            <line x1="-16" y1="0" x2="16" y2="0" stroke="#6b7280" stroke-width="3"></line>
+            <line x1="0" y1="-16" x2="0" y2="16" stroke="#6b7280" stroke-width="3"></line>
+          </g>
+
+          <circle id="redDot" cx="500" cy="350" r="10" fill="#dc2626" style="display:none"></circle>
+          <line id="errorLine" x1="0" y1="0" x2="0" y2="0" stroke="#b91c1c" stroke-width="3" stroke-dasharray="6 5" style="display:none"></line>
+        </svg>
+      </div>
+
+      <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+        <button id="revealBtn" type="button" class="primary">Reveal the dot</button>
+        <button id="nextBtn" type="button">Next round</button>
+      </div>
+
+      <div id="feedback" class="feedback" aria-live="polite"></div>
+    </section>
+
+    <section class="card">
+      <h2 style="margin-top:0">2. Understand the loss</h2>
+
+      <div class="formula" id="distanceFormula">Distance error = |prediction − actual|</div>
+      <div class="formula" id="lossFormula">Squared loss = error²</div>
+
+      <div class="challenge">
+        <strong>Why square the error?</strong>
+        <div class="tiny" style="margin-top:6px">
+          Squaring makes big mistakes count much more than small mistakes.
+        </div>
+        <div style="margin-top:10px">
+          <div class="label">Loss size</div>
+          <div class="bar"><div id="lossBar" class="fill"></div></div>
+        </div>
+      </div>
+
+      <div class="challenge">
+        <strong>🎯 5-round challenge</strong>
+        <div style="margin-top:6px">Get an average squared loss below <strong>4.0</strong>.</div>
+        <div style="margin-top:8px">Rounds: <strong id="roundCount">0 / 5</strong></div>
+        <div>Average loss: <strong id="avgLoss">—</strong></div>
+        <div id="challengeFeedback" class="feedback" aria-live="polite"></div>
+      </div>
+
+      <div class="challenge">
+        <strong>Hint</strong>
+        <div class="tiny" style="margin-top:6px">
+          Liucian tends to chase the dot toward the right side, but not always. Use what you learned from previous rounds.
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <section class="card" style="margin-top:16px">
+    <h2 style="margin-top:0">What is this teaching?</h2>
+    <div>
+      A model makes a prediction. Then we compare that prediction with the real answer.
+      The difference is the <strong>error</strong>. A common loss function is <strong>squared error</strong>:
+      <strong>(prediction − actual)²</strong>. Training tries to make this loss smaller.
+    </div>
+  </section>
+</main>
+
+<script>
+(() => {
+  const stage = document.getElementById('stage');
+  const predMarker = document.getElementById('predictionMarker');
+  const redDot = document.getElementById('redDot');
+  const errorLine = document.getElementById('errorLine');
+  const ticks = document.getElementById('ticks');
+
+  const left=50, right=650, y=350;
+  let prediction=null;
+  let actual=null;
+  let revealed=false;
+  let round=0;
+  let losses=[];
+
+  for(let i=0;i<=10;i++){
+    const x=left+(right-left)*(i/10);
+    const tick=document.createElementNS('http://www.w3.org/2000/svg','line');
+    tick.setAttribute('x1',x); tick.setAttribute('x2',x);
+    tick.setAttribute('y1',345); tick.setAttribute('y2',355);
+    tick.setAttribute('stroke','#6b7280');
+    ticks.appendChild(tick);
+
+    const text=document.createElementNS('http://www.w3.org/2000/svg','text');
+    text.setAttribute('x',x); text.setAttribute('y',380);
+    text.setAttribute('text-anchor','middle');
+    text.setAttribute('font-size','12');
+    text.setAttribute('fill','#6b7280');
+    text.textContent=i;
+    ticks.appendChild(text);
+  }
+
+  function unitFromX(x){
+    return (x-left)/(right-left)*10;
+  }
+
+  function xFromUnit(u){
+    return left+(u/10)*(right-left);
+  }
+
+  function newActual(){
+    const base = 6 + (Math.random()*2.8 - 1.4);
+    actual = Math.max(0.5, Math.min(9.5, base));
+  }
+
+  function resetRound(){
+    prediction=null;
+    revealed=false;
+    predMarker.style.display='none';
+    redDot.style.display='none';
+    errorLine.style.display='none';
+    document.getElementById('predMetric').textContent='—';
+    document.getElementById('actualMetric').textContent='Hidden';
+    document.getElementById('errorMetric').textContent='—';
+    document.getElementById('lossMetric').textContent='—';
+    document.getElementById('distanceFormula').textContent='Distance error = |prediction − actual|';
+    document.getElementById('lossFormula').textContent='Squared loss = error²';
+    document.getElementById('lossBar').style.width='0%';
+    document.getElementById('feedback').textContent='Click on the floor to place your prediction.';
+    newActual();
+  }
+
+  stage.addEventListener('pointerdown', e=>{
+    if(revealed) return;
+    const rect=stage.getBoundingClientRect();
+    const svgX=(e.clientX-rect.left)*700/rect.width;
+    const clamped=Math.max(left,Math.min(right,svgX));
+    prediction=unitFromX(clamped);
+    predMarker.setAttribute('transform',`translate(${clamped} ${y})`);
+    predMarker.style.display='block';
+    document.getElementById('predMetric').textContent=prediction.toFixed(1);
+    document.getElementById('feedback').textContent='Prediction placed. Now reveal the red dot.';
+  });
+
+  document.getElementById('revealBtn').addEventListener('click',()=>{
+    if(prediction===null){
+      document.getElementById('feedback').textContent='Place your prediction first.';
+      return;
+    }
+    if(revealed) return;
+    revealed=true;
+
+    const actualX=xFromUnit(actual);
+    const predX=xFromUnit(prediction);
+    redDot.setAttribute('cx',actualX);
+    redDot.setAttribute('cy',y);
+    redDot.style.display='block';
+
+    errorLine.setAttribute('x1',predX);
+    errorLine.setAttribute('y1',y);
+    errorLine.setAttribute('x2',actualX);
+    errorLine.setAttribute('y2',y);
+    errorLine.style.display='block';
+
+    const error=Math.abs(prediction-actual);
+    const loss=error*error;
+    losses.push(loss);
+    round++;
+
+    document.getElementById('actualMetric').textContent=actual.toFixed(1);
+    document.getElementById('errorMetric').textContent=error.toFixed(2);
+    document.getElementById('lossMetric').textContent=loss.toFixed(2);
+    document.getElementById('distanceFormula').textContent=
+      `Distance error = |${prediction.toFixed(1)} − ${actual.toFixed(1)}| = ${error.toFixed(2)}`;
+    document.getElementById('lossFormula').textContent=
+      `Squared loss = ${error.toFixed(2)}² = ${loss.toFixed(2)}`;
+
+    const barPct=Math.min(100,(loss/25)*100);
+    document.getElementById('lossBar').style.width=`${barPct}%`;
+
+    const avg=losses.reduce((a,b)=>a+b,0)/losses.length;
+    document.getElementById('roundCount').textContent=`${round} / 5`;
+    document.getElementById('avgLoss').textContent=avg.toFixed(2);
+
+    if(error<=0.5){
+      document.getElementById('feedback').textContent=`🎉 Great prediction! Liucian nearly caught the red dot.`;
+    } else if(error<=1.5){
+      document.getElementById('feedback').textContent=`🐾 Close! A small error gives a small loss.`;
+    } else {
+      document.getElementById('feedback').textContent=`🙀 Big miss! Notice how squaring makes the loss grow quickly.`;
+    }
+
+    if(round===5){
+      const c=document.getElementById('challengeFeedback');
+      if(avg<4){
+        c.textContent=`⭐ Challenge complete! Average squared loss = ${avg.toFixed(2)}.`;
+      } else {
+        c.textContent=`Average squared loss = ${avg.toFixed(2)}. Try another 5 rounds and make your predictions closer.`;
+      }
+    }
+  });
+
+  document.getElementById('nextBtn').addEventListener('click',()=>{
+    if(round>=5){
+      round=0;
+      losses=[];
+      document.getElementById('roundCount').textContent='0 / 5';
+      document.getElementById('avgLoss').textContent='—';
+      document.getElementById('challengeFeedback').textContent='';
+    }
+    resetRound();
+  });
+
+  resetRound();
+})();
+</script>
+</body>
+</html>

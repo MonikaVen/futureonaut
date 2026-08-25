@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Liucian's Neuron</title>
+  <style>
+    :root{
+      --bg:#f7f7f8; --card:#ffffff; --text:#1f2937; --muted:#6b7280;
+      --border:#d1d5db; --accent:#6b7280; --good:#2f855a; --bad:#b45309;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0; font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+      color:var(--text); background:#fff;
+    }
+    main{max-width:1050px;margin:0 auto;padding:22px}
+    h1{margin:0 0 6px;font-size:30px}
+    .sub{color:var(--muted);margin-bottom:18px}
+    .grid{display:grid;gap:14px}
+    .metrics{grid-template-columns:repeat(4,minmax(0,1fr))}
+    .two{grid-template-columns:1.1fr .9fr}
+    .card{
+      border:1px solid var(--border); border-radius:16px; background:var(--card); padding:16px;
+    }
+    .metric{border:1px solid var(--border);border-radius:14px;padding:12px;background:#fff}
+    .label{font-size:13px;color:var(--muted)}
+    .value{font-size:24px;font-weight:700;margin-top:3px}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:end}
+    .control{margin-top:12px}
+    input[type=range]{width:100%}
+    input[type=number]{
+      width:100%;border:1px solid var(--border);border-radius:10px;padding:9px 10px;font-size:16px;
+    }
+    button{
+      border:1px solid var(--border);border-radius:12px;padding:10px 14px;font-size:16px;background:#fff;cursor:pointer;
+    }
+    button.primary{background:var(--accent);color:#fff}
+    .formula{
+      margin-top:12px;padding:12px;border-radius:12px;background:var(--bg);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+      overflow-wrap:anywhere;
+    }
+    .decision{
+      margin-top:12px;padding:14px;border-radius:14px;text-align:center;font-weight:700;font-size:24px;border:1px solid var(--border);
+    }
+    .decision.play{background:#ecfdf5;color:var(--good)}
+    .decision.nap{background:#fff7ed;color:var(--bad)}
+    .challenge{margin-top:14px;padding:12px;border-radius:12px;background:var(--bg)}
+    .feedback{margin-top:10px}
+    svg{display:block;width:100%;height:auto}
+    .tiny{font-size:13px;color:var(--muted)}
+    .scoreline{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+    .pill{border:1px solid var(--border);border-radius:999px;padding:6px 10px;font-size:14px}
+    @media(max-width:800px){
+      .metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .two{grid-template-columns:1fr}
+      .row{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+<body>
+<main>
+  <h1>🐈 Liucian's Neuron</h1>
+  <div class="sub">Teach one artificial neuron how to decide whether Liucian should <strong>PLAY</strong> or <strong>NAP</strong>.</div>
+
+  <div class="grid metrics">
+    <div class="metric"><div class="label">Hunger</div><div id="mHunger" class="value">6</div></div>
+    <div class="metric"><div class="label">Energy</div><div id="mEnergy" class="value">7</div></div>
+    <div class="metric"><div class="label">Toy nearby</div><div id="mToy" class="value">1</div></div>
+    <div class="metric"><div class="label">Neuron output</div><div id="mOutput" class="value">?</div></div>
+  </div>
+
+  <div class="grid two" style="margin-top:16px">
+    <section class="card">
+      <h2 style="margin-top:0">1. Inputs</h2>
+      <div class="tiny">Inputs are facts the neuron receives about Liucian.</div>
+
+      <div class="control">
+        <label for="hunger">Hunger: <strong><span id="hungerOut">6</span></strong></label>
+        <input id="hunger" type="range" min="0" max="10" value="6" step="1">
+      </div>
+      <div class="control">
+        <label for="energy">Energy: <strong><span id="energyOut">7</span></strong></label>
+        <input id="energy" type="range" min="0" max="10" value="7" step="1">
+      </div>
+      <div class="control">
+        <label for="toy">Toy nearby: <strong><span id="toyOut">1</span></strong></label>
+        <input id="toy" type="range" min="0" max="1" value="1" step="1">
+        <div class="tiny">0 = no toy, 1 = toy nearby</div>
+      </div>
+
+      <h2>2. Weights</h2>
+      <div class="tiny">Weights tell the neuron how important each input is.</div>
+
+      <div class="row">
+        <label>Hunger weight
+          <input id="wHunger" type="number" value="-0.7" step="0.1">
+        </label>
+        <label>Energy weight
+          <input id="wEnergy" type="number" value="0.9" step="0.1">
+        </label>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <label>Toy weight
+          <input id="wToy" type="number" value="2.5" step="0.1">
+        </label>
+        <label>Bias
+          <input id="bias" type="number" value="-1.0" step="0.1">
+        </label>
+      </div>
+
+      <div id="formula" class="formula"></div>
+
+      <div id="decision" class="decision">?</div>
+    </section>
+
+    <section class="card">
+      <h2 style="margin-top:0">Neuron map</h2>
+      <svg viewBox="0 0 520 350" role="img" aria-label="Diagram of Liucian's neuron with three inputs, weighted connections, and an output">
+        <g font-family="system-ui">
+          <rect x="20" y="50" width="110" height="48" rx="12" fill="#fff" stroke="#d1d5db"/>
+          <rect x="20" y="145" width="110" height="48" rx="12" fill="#fff" stroke="#d1d5db"/>
+          <rect x="20" y="240" width="110" height="48" rx="12" fill="#fff" stroke="#d1d5db"/>
+          <text x="75" y="78" text-anchor="middle" font-size="16">Hunger</text>
+          <text x="75" y="173" text-anchor="middle" font-size="16">Energy</text>
+          <text x="75" y="268" text-anchor="middle" font-size="16">Toy</text>
+
+          <line x1="130" y1="74" x2="300" y2="160" stroke="#6b7280" stroke-width="4"/>
+          <line x1="130" y1="169" x2="300" y2="169" stroke="#6b7280" stroke-width="4"/>
+          <line x1="130" y1="264" x2="300" y2="178" stroke="#6b7280" stroke-width="4"/>
+
+          <text id="svgWH" x="190" y="95" font-size="13">w = -0.7</text>
+          <text id="svgWE" x="190" y="158" font-size="13">w = 0.9</text>
+          <text id="svgWT" x="190" y="244" font-size="13">w = 2.5</text>
+
+          <circle cx="340" cy="169" r="52" fill="#f3f4f6" stroke="#6b7280" stroke-width="4"/>
+          <text x="340" y="160" text-anchor="middle" font-size="15">NEURON</text>
+          <text x="340" y="181" text-anchor="middle" font-size="13">Σ + bias</text>
+
+          <line x1="392" y1="169" x2="475" y2="169" stroke="#6b7280" stroke-width="4"/>
+          <polygon points="475,169 462,161 462,177" fill="#6b7280"/>
+          <text id="svgDecision" x="440" y="145" text-anchor="middle" font-size="18">?</text>
+
+          <g transform="translate(395 245)">
+            <ellipse cx="0" cy="20" rx="42" ry="28" fill="#777" stroke="#4b4b4b" stroke-width="3"/>
+            <circle cx="38" cy="0" r="22" fill="#808080" stroke="#4b4b4b" stroke-width="3"/>
+            <path d="M24 -16 L29 -40 L40 -18 Z" fill="#777" stroke="#4b4b4b" stroke-width="3"/>
+            <path d="M39 -18 L54 -39 L57 -8 Z" fill="#777" stroke="#4b4b4b" stroke-width="3"/>
+            <path d="M-38 22 Q-70 -7 -80 25 Q-85 48 -60 55" fill="none" stroke="#707070" stroke-width="13" stroke-linecap="round"/>
+            <path d="M-32 5 Q-8 23 20 5 M-28 20 Q-6 35 21 18" fill="none" stroke="#4f4f4f" stroke-width="5"/>
+            <circle cx="33" cy="-2" r="3" fill="#222"/><circle cx="44" cy="-2" r="3" fill="#222"/>
+            <text x="0" y="75" text-anchor="middle" font-size="14">Liucian</text>
+          </g>
+        </g>
+      </svg>
+
+      <div class="challenge">
+        <strong>Challenge</strong>
+        <div id="challengeText" style="margin-top:6px">Make the neuron decide PLAY when energy is high and a toy is nearby.</div>
+        <div class="scoreline">
+          <span class="pill">⭐ Correct challenge: <span id="score">0</span></span>
+          <span class="pill">Threshold: 0</span>
+        </div>
+        <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+          <button id="checkBtn" class="primary" type="button">Check challenge</button>
+          <button id="newBtn" type="button">New challenge</button>
+        </div>
+        <div id="feedback" class="feedback" aria-live="polite"></div>
+      </div>
+    </section>
+  </div>
+
+  <section class="card" style="margin-top:16px">
+    <h2 style="margin-top:0">What is happening?</h2>
+    <div>
+      The neuron multiplies each input by its weight, adds the results, then adds a bias.
+      If the final number is <strong>0 or higher</strong>, Liucian chooses <strong>PLAY</strong>.
+      If it is below 0, he chooses <strong>NAP</strong>.
+    </div>
+  </section>
+</main>
+
+<script>
+(() => {
+  const els = {
+    hunger: document.getElementById('hunger'),
+    energy: document.getElementById('energy'),
+    toy: document.getElementById('toy'),
+    wHunger: document.getElementById('wHunger'),
+    wEnergy: document.getElementById('wEnergy'),
+    wToy: document.getElementById('wToy'),
+    bias: document.getElementById('bias')
+  };
+
+  const challenges = [
+    {text:'Make the neuron decide PLAY when energy is high and a toy is nearby.', setup:{hunger:3,energy:9,toy:1}, target:'PLAY'},
+    {text:'Make the neuron decide NAP when energy is low.', setup:{hunger:4,energy:1,toy:0}, target:'NAP'},
+    {text:'Make hunger strongly push Liucian toward NAP.', setup:{hunger:9,energy:5,toy:1}, target:'NAP'},
+    {text:'Make the toy strongly push Liucian toward PLAY.', setup:{hunger:5,energy:4,toy:1}, target:'PLAY'}
+  ];
+  let challengeIndex = 0;
+  let score = 0;
+
+  function num(el){ return Number(el.value); }
+
+  function update(){
+    const h=num(els.hunger), e=num(els.energy), t=num(els.toy);
+    const wh=num(els.wHunger), we=num(els.wEnergy), wt=num(els.wToy), b=num(els.bias);
+    const zh=h*wh, ze=e*we, zt=t*wt;
+    const z=zh+ze+zt+b;
+    const decision=z>=0?'PLAY':'NAP';
+
+    document.getElementById('hungerOut').textContent=h;
+    document.getElementById('energyOut').textContent=e;
+    document.getElementById('toyOut').textContent=t;
+    document.getElementById('mHunger').textContent=h;
+    document.getElementById('mEnergy').textContent=e;
+    document.getElementById('mToy').textContent=t;
+    document.getElementById('mOutput').textContent=z.toFixed(2);
+
+    document.getElementById('formula').textContent =
+      `${h}×(${wh}) + ${e}×(${we}) + ${t}×(${wt}) + (${b}) = ${z.toFixed(2)}`;
+
+    const d=document.getElementById('decision');
+    d.textContent=`Liucian chooses ${decision}`;
+    d.className='decision '+(decision==='PLAY'?'play':'nap');
+
+    document.getElementById('svgWH').textContent=`w = ${wh}`;
+    document.getElementById('svgWE').textContent=`w = ${we}`;
+    document.getElementById('svgWT').textContent=`w = ${wt}`;
+    document.getElementById('svgDecision').textContent=decision;
+  }
+
+  Object.values(els).forEach(el=>{
+    el.addEventListener(el.type==='range'?'input':'input',update);
+  });
+
+  function loadChallenge(){
+    const c=challenges[challengeIndex];
+    document.getElementById('challengeText').textContent=c.text;
+    els.hunger.value=c.setup.hunger;
+    els.energy.value=c.setup.energy;
+    els.toy.value=c.setup.toy;
+    document.getElementById('feedback').textContent='';
+    update();
+  }
+
+  document.getElementById('checkBtn').addEventListener('click',()=>{
+    const h=num(els.hunger), e=num(els.energy), t=num(els.toy);
+    const z=h*num(els.wHunger)+e*num(els.wEnergy)+t*num(els.wToy)+num(els.bias);
+    const decision=z>=0?'PLAY':'NAP';
+    const target=challenges[challengeIndex].target;
+    if(decision===target){
+      score++;
+      document.getElementById('score').textContent=score;
+      document.getElementById('feedback').textContent=`⭐ Correct! The neuron output is ${z.toFixed(2)}, so Liucian chooses ${decision}.`;
+    }else{
+      document.getElementById('feedback').textContent=`Not yet. The neuron output is ${z.toFixed(2)}, so Liucian chooses ${decision}. Adjust the weights or bias.`;
+    }
+  });
+
+  document.getElementById('newBtn').addEventListener('click',()=>{
+    challengeIndex=(challengeIndex+1)%challenges.length;
+    loadChallenge();
+  });
+
+  loadChallenge();
+})();
+</script>
+</body>
+</html>

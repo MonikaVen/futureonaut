@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Find Liucian's Friends — KNN Game</title>
+<style>
+:root{--bg:#f7f7f8;--card:#fff;--text:#1f2937;--muted:#6b7280;--border:#d1d5db;--accent:#6b7280;--good:#237a4b;--bad:#b42318}
+*{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,sans-serif;color:var(--text);background:#fff}
+main{max-width:1080px;margin:auto;padding:22px}h1{margin:0 0 6px}.sub,.tiny{color:var(--muted)}.sub{margin-bottom:18px}
+.grid{display:grid;gap:14px}.metrics{grid-template-columns:repeat(4,1fr)}.two{grid-template-columns:1.15fr .85fr}
+.card,.metric{border:1px solid var(--border);border-radius:16px;padding:14px;background:var(--card)}
+.label{font-size:13px;color:var(--muted)}.value{font-size:23px;font-weight:700}.box{padding:11px;border-radius:12px;background:var(--bg);border:1px solid var(--border);margin-top:12px}
+button{padding:10px 14px;border:1px solid var(--border);border-radius:12px;background:white;font-size:15px;cursor:pointer;margin:4px}
+button.primary{background:var(--accent);color:white}input[type=range]{width:100%}.feedback{margin-top:10px}.good{color:var(--good)}.bad{color:var(--bad)}
+svg{display:block;width:100%;height:auto}.legend{display:flex;gap:10px;flex-wrap:wrap}.pill{border:1px solid var(--border);border-radius:999px;padding:6px 10px;font-size:13px}
+.math{font-family:ui-monospace,monospace;background:#fff;padding:8px;border-radius:9px;margin-top:8px}.mathPanel{display:none}.mathPanel.show{display:block}
+@media(max-width:800px){.metrics{grid-template-columns:repeat(2,1fr)}.two{grid-template-columns:1fr}}
+</style></head>
+<body><main>
+<h1>🐈🐈‍⬛ Find Liucian’s Friends</h1>
+<div class="sub">Learn <strong>K-nearest neighbors (KNN)</strong> by finding which cat group is most similar to Liucian.</div>
+
+<div class="grid metrics">
+<div class="metric"><div class="label">Liucian fluffiness</div><div id="mFluff" class="value">7</div></div>
+<div class="metric"><div class="label">Liucian activity</div><div id="mAct" class="value">6</div></div>
+<div class="metric"><div class="label">k neighbors</div><div id="mK" class="value">3</div></div>
+<div class="metric"><div class="label">Prediction</div><div id="mPred" class="value">?</div></div>
+</div>
+
+<div class="grid two" style="margin-top:15px">
+<section class="card">
+<h2>1. Explore the cat map</h2>
+<div class="tiny">Each cat is a point. Cats close together have similar features.</div>
+
+<div class="legend" style="margin:10px 0">
+<span class="pill">● Cozy Cats</span><span class="pill">▲ Explorer Cats</span><span class="pill">■ Play Cats</span>
+</div>
+
+<svg id="plot" viewBox="0 0 680 480" role="img" aria-label="Scatter plot of cats by fluffiness and activity">
+<rect x="70" y="35" width="540" height="360" rx="14" fill="#f8f8f8" stroke="#d1d5db"/>
+<g id="grid"></g><g id="links"></g><g id="cats"></g><g id="liucian"></g>
+<text x="340" y="455" text-anchor="middle">Fluffiness →</text>
+<text x="22" y="215" text-anchor="middle" transform="rotate(-90 22 215)">Activity →</text>
+</svg>
+
+<div class="box">
+<label for="fluff">Liucian fluffiness: <b><span id="fluffOut">7</span>/10</b></label>
+<input id="fluff" type="range" min="1" max="10" value="7" step="1">
+<label for="act">Liucian activity: <b><span id="actOut">6</span>/10</b></label>
+<input id="act" type="range" min="1" max="10" value="6" step="1">
+</div>
+</section>
+
+<section class="card">
+<h2>2. Choose k</h2>
+<div class="tiny">KNN asks the nearest cats to vote.</div>
+<div class="box">
+<label for="k">Number of neighbors: <b><span id="kOut">3</span></b></label>
+<input id="k" type="range" min="1" max="7" value="3" step="2">
+</div>
+
+<div class="box">
+<b>Nearest-neighbor votes</b>
+<div id="votes" style="margin-top:8px">—</div>
+</div>
+
+<button id="predictBtn" class="primary">🤖 Predict friend group</button>
+<button id="newBtn">🎲 New Liucian position</button>
+<div id="feedback" class="feedback"></div>
+
+<div class="box">
+<b>🎯 Challenge</b>
+<div style="margin-top:6px">Try k = 1, 3, 5, and 7. Does the predicted group ever change?</div>
+<div id="challengeText" class="feedback"></div>
+</div>
+
+<button id="mathBtn" style="margin-top:12px">📐 Mathematical concept</button>
+<div id="mathPanel" class="box mathPanel">
+<b>K-nearest neighbors</b>
+<div class="math">d = √((x₂−x₁)² + (y₂−y₁)²)</div>
+<div class="tiny">The algorithm measures the distance from Liucian to every labeled cat, selects the closest k cats, and predicts the class with the most votes.</div>
+<div class="math">prediction = majority(nearest k labels)</div>
+</div>
+</section>
+</div>
+
+<section class="card" style="margin-top:15px">
+<h2>What is this teaching?</h2>
+<div>KNN is a simple machine-learning algorithm that learns from nearby examples. It does not create a complicated formula first—it compares a new point with known examples and lets the closest neighbors vote.</div>
+</section>
+</main>
+
+<script>
+(()=>{
+const groups={
+'Cozy Cats':'circle',
+'Explorer Cats':'triangle',
+'Play Cats':'square'
+};
+const data=[
+{x:8,y:3,g:'Cozy Cats'},{x:9,y:2,g:'Cozy Cats'},{x:7,y:4,g:'Cozy Cats'},{x:8,y:4,g:'Cozy Cats'},
+{x:3,y:8,g:'Explorer Cats'},{x:4,y:9,g:'Explorer Cats'},{x:2,y:7,g:'Explorer Cats'},{x:5,y:8,g:'Explorer Cats'},
+{x:5,y:5,g:'Play Cats'},{x:6,y:7,g:'Play Cats'},{x:4,y:6,g:'Play Cats'},{x:6,y:6,g:'Play Cats'}
+];
+const $=id=>document.getElementById(id);
+const fluff=$('fluff'),act=$('act'),k=$('k');
+const left=70,top=35,w=540,h=360;
+const sx=v=>left+(v-1)/9*w, sy=v=>top+h-(v-1)/9*h;
+
+function addSvg(tag,attrs,parent){
+ const e=document.createElementNS('http://www.w3.org/2000/svg',tag);
+ Object.entries(attrs).forEach(([a,v])=>e.setAttribute(a,v));parent.appendChild(e);return e;
+}
+for(let i=1;i<=10;i++){
+ addSvg('line',{x1:sx(i),y1:top,x2:sx(i),y2:top+h,stroke:'#e5e7eb'},$('grid'));
+ addSvg('line',{x1:left,y1:sy(i),x2:left+w,y2:sy(i),stroke:'#e5e7eb'},$('grid'));
+}
+function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y)}
+function nearest(){
+ const q={x:+fluff.value,y:+act.value};
+ return data.map((p,i)=>({...p,i,d:dist(q,p)})).sort((a,b)=>a.d-b.d);
+}
+function drawPoint(p,parent,highlight=false){
+ const x=sx(p.x),y=sy(p.y),shape=groups[p.g];
+ if(shape==='circle') addSvg('circle',{cx:x,cy:y,r:highlight?10:8,fill:'#777',stroke:highlight?'#111827':'#555','stroke-width':highlight?4:2},parent);
+ if(shape==='triangle') addSvg('polygon',{points:`${x},${y-10} ${x-9},${y+8} ${x+9},${y+8}`,fill:'#999',stroke:highlight?'#111827':'#555','stroke-width':highlight?4:2},parent);
+ if(shape==='square') addSvg('rect',{x:x-8,y:y-8,width:16,height:16,fill:'#bbb',stroke:highlight?'#111827':'#555','stroke-width':highlight?4:2},parent);
+}
+function render(){
+ $('cats').innerHTML='';$('links').innerHTML='';$('liucian').innerHTML='';
+ const n=nearest(), kk=+k.value, chosen=n.slice(0,kk);
+ data.forEach((p,i)=>drawPoint(p,$('cats'),chosen.some(c=>c.i===i)));
+ const q={x:+fluff.value,y:+act.value};
+ chosen.forEach(p=>addSvg('line',{x1:sx(q.x),y1:sy(q.y),x2:sx(p.x),y2:sy(p.y),stroke:'#9ca3af','stroke-width':2,'stroke-dasharray':'5 4'},$('links')));
+ // fluffy Liucian marker
+ const g=$('liucian');
+ addSvg('circle',{cx:sx(q.x),cy:sy(q.y),r:15,fill:'#666',stroke:'#111827','stroke-width':4},g);
+ addSvg('path',{d:`M ${sx(q.x)-12} ${sy(q.y)+2} q -18 -14 -20 7 q 0 15 14 15`,fill:'none',stroke:'#666','stroke-width':8,'stroke-linecap':'round'},g);
+ const label=addSvg('text',{x:sx(q.x),y:sy(q.y)-22,'text-anchor':'middle','font-size':13,fill:'#111827'},g);label.textContent='Liucian';
+
+ const votes={};chosen.forEach(p=>votes[p.g]=(votes[p.g]||0)+1);
+ $('votes').textContent=Object.entries(votes).map(([g,c])=>`${g}: ${c}`).join(' · ');
+ const pred=Object.entries(votes).sort((a,b)=>b[1]-a[1])[0][0];
+ $('mPred').textContent=pred;$('mFluff').textContent=q.x;$('mAct').textContent=q.y;$('mK').textContent=kk;
+ $('fluffOut').textContent=q.x;$('actOut').textContent=q.y;$('kOut').textContent=kk;
+ return pred;
+}
+[fluff,act,k].forEach(el=>el.oninput=render);
+$('predictBtn').onclick=()=>{
+ const pred=render();
+ $('feedback').innerHTML=`🐈 Liucian's closest friends vote for <b>${pred}</b>.`;
+};
+$('newBtn').onclick=()=>{
+ fluff.value=Math.floor(Math.random()*10)+1;act.value=Math.floor(Math.random()*10)+1;$('feedback').textContent='';render();
+};
+$('mathBtn').onclick=()=>{$('mathPanel').classList.toggle('show');$('mathBtn').textContent=$('mathPanel').classList.contains('show')?'📐 Hide mathematical concept':'📐 Mathematical concept'};
+render();
+})();
+</script>
+</body></html>

@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>How Much Food? — Liucian's Regression Game</title>
+  <style>
+    :root{
+      --bg:#f7f7f8; --card:#fff; --text:#1f2937; --muted:#6b7280;
+      --border:#d1d5db; --accent:#6b7280; --good:#2f855a; --warn:#b45309;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--text);background:#fff}
+    main{max-width:1050px;margin:0 auto;padding:22px}
+    h1{margin:0 0 6px;font-size:30px}
+    .sub{color:var(--muted);margin-bottom:18px}
+    .grid{display:grid;gap:14px}
+    .metrics{grid-template-columns:repeat(4,minmax(0,1fr))}
+    .two{grid-template-columns:1.05fr .95fr}
+    .metric,.card{border:1px solid var(--border);border-radius:16px;background:var(--card);padding:14px}
+    .label{font-size:13px;color:var(--muted)}
+    .value{font-size:24px;font-weight:700;margin-top:3px}
+    .control{margin-top:12px}
+    input[type=range]{width:100%}
+    input[type=number]{
+      width:100%;border:1px solid var(--border);border-radius:10px;padding:9px 10px;font-size:16px
+    }
+    button{border:1px solid var(--border);border-radius:12px;padding:10px 14px;font-size:16px;background:#fff;cursor:pointer}
+    button.primary{background:var(--accent);color:#fff}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .formula{margin-top:12px;padding:12px;border-radius:12px;background:var(--bg);font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+    .feedback{margin-top:10px}
+    .challenge{margin-top:14px;padding:12px;border-radius:12px;background:var(--bg)}
+    svg{display:block;width:100%;height:auto}
+    .tiny{font-size:13px;color:var(--muted)}
+    .reward{display:none;margin-top:12px;border:1px solid var(--border);border-radius:14px;padding:12px;background:#f9fafb}
+    .reward.show{display:block}
+    .bowl{transform-origin:center bottom}
+    .bowl.feed{animation:bowlPop .7s ease}
+    @keyframes bowlPop{
+      0%{transform:scale(1)}
+      40%{transform:scale(1.18)}
+      100%{transform:scale(1)}
+    }
+    @media(max-width:800px){
+      .metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .two,.row{grid-template-columns:1fr}
+      main{padding:14px}
+    }
+  </style>
+</head>
+<body>
+<main>
+  <h1>🥣 How Much Food?</h1>
+  <div class="sub">Help Liucian predict how much food he needs using <strong>weight</strong> and <strong>activity</strong>.</div>
+
+  <div class="grid metrics">
+    <div class="metric"><div class="label">Weight</div><div id="weightMetric" class="value">5 kg</div></div>
+    <div class="metric"><div class="label">Activity</div><div id="activityMetric" class="value">6 / 10</div></div>
+    <div class="metric"><div class="label">Predicted food</div><div id="foodMetric" class="value">?</div></div>
+    <div class="metric"><div class="label">Prediction error</div><div id="errorMetric" class="value">—</div></div>
+  </div>
+
+  <div class="grid two" style="margin-top:16px">
+    <section class="card">
+      <h2 style="margin-top:0">1. Build the food model</h2>
+      <div class="tiny">The model uses two features: Liucian's weight and activity level.</div>
+
+      <div class="control">
+        <label for="weight">Weight: <strong><span id="weightOut">5</span> kg</strong></label>
+        <input id="weight" type="range" min="3" max="8" value="5" step="1">
+      </div>
+
+      <div class="control">
+        <label for="activity">Activity: <strong><span id="activityOut">6</span> / 10</strong></label>
+        <input id="activity" type="range" min="1" max="10" value="6" step="1">
+      </div>
+
+      <h3>Model weights</h3>
+      <div class="row">
+        <label>Weight coefficient
+          <input id="wWeight" type="number" value="18" step="1">
+        </label>
+        <label>Activity coefficient
+          <input id="wActivity" type="number" value="6" step="1">
+        </label>
+      </div>
+      <div style="margin-top:10px">
+        <label>Bias
+          <input id="bias" type="number" value="20" step="1">
+        </label>
+      </div>
+
+      <div id="formula" class="formula"></div>
+
+      <button id="predictBtn" type="button" class="primary" style="margin-top:12px">Predict food</button>
+      <div id="feedback" class="feedback" aria-live="polite"></div>
+
+      <div id="reward" class="reward">
+        <strong>🎁 Correct prediction — feeding reward!</strong>
+        <svg viewBox="0 0 520 220" role="img" aria-label="Liucian eating from a food bowl">
+          <g transform="translate(250 105)">
+            <ellipse cx="0" cy="22" rx="63" ry="38" fill="#777" stroke="#4b4b4b" stroke-width="3"></ellipse>
+            <circle cx="57" cy="-2" r="29" fill="#808080" stroke="#4b4b4b" stroke-width="3"></circle>
+            <path d="M38 -22 L45 -53 L58 -26 Z" fill="#777" stroke="#4b4b4b" stroke-width="3"></path>
+            <path d="M58 -25 L77 -52 L81 -12 Z" fill="#777" stroke="#4b4b4b" stroke-width="3"></path>
+            <path d="M-54 24 Q-96 -10 -109 28 Q-113 62 -78 68" fill="none" stroke="#707070" stroke-width="17" stroke-linecap="round"></path>
+            <path d="M-46 4 Q-13 25 28 3 M-43 20 Q-10 40 30 18 M-36 34 Q-6 52 28 32" fill="none" stroke="#4f4f4f" stroke-width="6"></path>
+            <circle cx="51" cy="-2" r="4" fill="#222"></circle>
+            <circle cx="66" cy="-2" r="4" fill="#222"></circle>
+          </g>
+          <g id="bowl" class="bowl" transform="translate(385 154)">
+            <path d="M-42 0 Q0 35 42 0 L33 28 Q0 45 -33 28 Z" fill="#d1d5db" stroke="#6b7280" stroke-width="3"></path>
+            <ellipse cx="0" cy="0" rx="42" ry="12" fill="#9ca3af"></ellipse>
+            <circle cx="-16" cy="-2" r="4" fill="#7c2d12"></circle>
+            <circle cx="-4" cy="1" r="4" fill="#7c2d12"></circle>
+            <circle cx="11" cy="-3" r="4" fill="#7c2d12"></circle>
+            <circle cx="22" cy="1" r="4" fill="#7c2d12"></circle>
+          </g>
+          <text x="260" y="205" text-anchor="middle" font-size="15" fill="#374151">Liucian gets the right amount of food!</text>
+        </svg>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2 style="margin-top:0">2. Training examples</h2>
+      <div class="tiny">These examples show how much food Liucian needed on different days.</div>
+
+      <svg id="chart" viewBox="0 0 560 390" role="img" aria-label="Scatter plot of activity and food amount">
+        <rect x="60" y="30" width="450" height="300" rx="14" fill="#f7f7f8" stroke="#d1d5db"></rect>
+        <g id="grid"></g>
+        <g id="points"></g>
+        <g id="predPoint"></g>
+        <text x="285" y="375" text-anchor="middle" font-size="15">Activity level</text>
+        <text x="18" y="180" text-anchor="middle" font-size="15" transform="rotate(-90 18 180)">Food amount (g)</text>
+      </svg>
+
+      <div class="challenge">
+        <strong>Challenge</strong>
+        <div style="margin-top:6px">Tune the coefficients so the total squared error is below <strong>500</strong>.</div>
+        <div style="margin-top:8px">Current total error: <strong id="trainError">—</strong></div>
+        <button id="checkChallengeBtn" type="button" style="margin-top:10px">Check challenge</button>
+        <button id="trainBtn" type="button" style="margin-top:10px">🤖 Train model</button>
+        <div id="challengeFeedback" class="feedback" aria-live="polite"></div>
+      </div>
+
+      <div class="challenge">
+        <strong>New scenario</strong>
+        <div class="tiny" style="margin-top:6px">Change weight and activity, then predict the food amount again.</div>
+      </div>
+    </section>
+  </div>
+
+  <section class="card" style="margin-top:16px">
+    <h2 style="margin-top:0">What is this teaching?</h2>
+    <div>
+      This is <strong>multiple linear regression</strong>. Instead of using one input, the model combines several features:
+      <strong>food = weight × coefficient + activity × coefficient + bias</strong>.
+      Training means adjusting those coefficients so prediction errors become smaller.
+    </div>
+  </section>
+</main>
+
+<script>
+(() => {
+  const data = [
+    {weight:3, activity:2, food:88},
+    {weight:4, activity:3, food:111},
+    {weight:4, activity:7, food:137},
+    {weight:5, activity:4, food:134},
+    {weight:5, activity:8, food:159},
+    {weight:6, activity:5, food:159},
+    {weight:7, activity:7, food:188},
+    {weight:8, activity:9, food:218}
+  ];
+
+  const actualFood = (weight,activity) => 18*weight + 6*activity + 20;
+
+  const weight=document.getElementById('weight');
+  const activity=document.getElementById('activity');
+  const wWeight=document.getElementById('wWeight');
+  const wActivity=document.getElementById('wActivity');
+  const bias=document.getElementById('bias');
+
+  const chart=document.getElementById('chart');
+  const gridG=document.getElementById('grid');
+  const pointsG=document.getElementById('points');
+  const predPointG=document.getElementById('predPoint');
+
+  const left=60, top=30, widthPx=450, heightPx=300;
+  const xMax=10, yMin=60, yMax=240;
+
+  function sx(x){ return left+(x/xMax)*widthPx; }
+  function sy(y){ return top+heightPx-((y-yMin)/(yMax-yMin))*heightPx; }
+
+  function addSvg(tag,attrs,parent){
+    const el=document.createElementNS('http://www.w3.org/2000/svg',tag);
+    Object.entries(attrs).forEach(([k,v])=>el.setAttribute(k,v));
+    parent.appendChild(el);
+    return el;
+  }
+
+  for(let x=0;x<=10;x+=2){
+    addSvg('line',{x1:sx(x),y1:top,x2:sx(x),y2:top+heightPx,stroke:'#e5e7eb','stroke-width':'1'},gridG);
+    const t=addSvg('text',{x:sx(x),y:350,'text-anchor':'middle','font-size':'11',fill:'#6b7280'},gridG); t.textContent=x;
+  }
+
+  for(let y=60;y<=240;y+=30){
+    addSvg('line',{x1:left,y1:sy(y),x2:left+widthPx,y2:sy(y),stroke:'#e5e7eb','stroke-width':'1'},gridG);
+    const t=addSvg('text',{x:50,y:sy(y)+4,'text-anchor':'end','font-size':'11',fill:'#6b7280'},gridG); t.textContent=y;
+  }
+
+  data.forEach(p=>{
+    addSvg('circle',{cx:sx(p.activity),cy:sy(p.food),r:'6',fill:'#4b5563'},pointsG);
+  });
+
+  function predict(w,a){
+    return w*Number(wWeight.value)+a*Number(wActivity.value)+Number(bias.value);
+  }
+
+  function totalError(){
+    return data.reduce((sum,p)=>{
+      const e=predict(p.weight,p.activity)-p.food;
+      return sum+e*e;
+    },0);
+  }
+
+  function update(){
+    const w=Number(weight.value), a=Number(activity.value);
+    const p=predict(w,a);
+    const err=totalError();
+
+    document.getElementById('weightOut').textContent=w;
+    document.getElementById('activityOut').textContent=a;
+    document.getElementById('weightMetric').textContent=`${w} kg`;
+    document.getElementById('activityMetric').textContent=`${a} / 10`;
+    document.getElementById('foodMetric').textContent=`${p.toFixed(0)} g`;
+    document.getElementById('trainError').textContent=err.toFixed(0);
+    document.getElementById('formula').textContent=
+      `food = ${w}×${Number(wWeight.value)} + ${a}×${Number(wActivity.value)} + ${Number(bias.value)} = ${p.toFixed(0)} g`;
+
+    predPointG.innerHTML='';
+    addSvg('circle',{cx:sx(a),cy:sy(Math.max(yMin,Math.min(yMax,p))),r:'9',fill:'#6b7280',stroke:'#fff','stroke-width':'3'},predPointG);
+  }
+
+  [weight,activity,wWeight,wActivity,bias].forEach(el=>el.addEventListener('input',update));
+
+  document.getElementById('predictBtn').addEventListener('click',()=>{
+    const w=Number(weight.value), a=Number(activity.value);
+    const p=predict(w,a);
+    const actual=actualFood(w,a);
+    const diff=Math.abs(p-actual);
+    document.getElementById('errorMetric').textContent=`${diff.toFixed(0)} g`;
+
+    const feedback=document.getElementById('feedback');
+    const reward=document.getElementById('reward');
+    const bowl=document.getElementById('bowl');
+
+    if(diff<=8){
+      feedback.textContent=`⭐ Great prediction! You predicted ${p.toFixed(0)} g. Liucian needs about ${actual.toFixed(0)} g.`;
+      reward.classList.add('show');
+      bowl.classList.remove('feed');
+      void bowl.getBoundingClientRect();
+      bowl.classList.add('feed');
+    } else {
+      feedback.textContent=`Almost. You predicted ${p.toFixed(0)} g, but Liucian needs about ${actual.toFixed(0)} g. Get within 8 g to earn the feeding reward.`;
+      reward.classList.remove('show');
+    }
+  });
+
+  document.getElementById('checkChallengeBtn').addEventListener('click',()=>{
+    const e=totalError();
+    document.getElementById('challengeFeedback').textContent =
+      e<500
+      ? `🎉 Challenge complete! Total squared error = ${e.toFixed(0)}.`
+      : `Not yet. Error = ${e.toFixed(0)}. Adjust the coefficients and bias.`;
+  });
+
+  document.getElementById('trainBtn').addEventListener('click',()=>{
+    wWeight.value=18;
+    wActivity.value=6;
+    bias.value=20;
+    update();
+    document.getElementById('challengeFeedback').textContent =
+      '🤖 Trained model found: food = 18×weight + 6×activity + 20.';
+  });
+
+  update();
+})();
+</script>
+</body>
+</html>

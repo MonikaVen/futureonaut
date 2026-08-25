@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Liucian's Volume Box Challenge</title>
+  <style>
+    :root{
+      --viz-panel:#f6f7f8;
+      --viz-card:#ffffff;
+      --viz-text:#1f2937;
+      --viz-muted:#6b7280;
+      --viz-border:#d1d5db;
+      --viz-accent:#6b7280;
+      --viz-accent-text:#ffffff;
+      --viz-accent-bg:#e5e7eb;
+      --viz-accent-bg-subtle:#f3f4f6;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+      color:var(--viz-text);
+      background:#fff;
+    }
+    main{max-width:1000px;margin:0 auto;padding:24px}
+    h1{font-size:28px;margin:0 0 18px}
+    .grid{display:grid;gap:14px}
+    .metrics{grid-template-columns:repeat(4,minmax(0,1fr))}
+    .two{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .metric-card,.card{
+      border:1px solid var(--viz-border);
+      border-radius:16px;
+      padding:14px;
+      background:var(--viz-card);
+    }
+    .label{font-size:13px;color:var(--viz-muted)}
+    .value{font-size:24px;font-weight:700;margin-top:4px}
+    .callout{
+      border:1px solid var(--viz-border);
+      border-radius:16px;
+      padding:14px;
+      background:var(--viz-accent-bg-subtle);
+      margin:14px 0;
+    }
+    .section-title{font-weight:700;margin-bottom:10px}
+    .scene{
+      overflow:hidden;
+      border:1px solid var(--viz-border);
+      border-radius:18px;
+      padding:12px;
+      background:var(--viz-panel);
+    }
+    input[type="number"]{
+      width:100%;
+      border:1px solid var(--viz-border);
+      border-radius:12px;
+      padding:10px 12px;
+      font-size:16px;
+      margin-top:6px;
+    }
+    input[type="range"]{width:100%}
+    button{
+      border:1px solid var(--viz-border);
+      border-radius:12px;
+      padding:10px 14px;
+      font-size:16px;
+      background:#fff;
+      color:var(--viz-text);
+      cursor:pointer;
+    }
+    button.primary{
+      background:var(--viz-accent);
+      color:var(--viz-accent-text);
+    }
+    button:disabled{opacity:.5;cursor:not-allowed}
+    .row{display:flex;gap:10px;align-items:end}
+    .grow{flex:1}
+    .controls.locked{opacity:.5}
+    .feedback{margin-top:10px;font-size:16px}
+    @media(max-width:760px){
+      .metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .two{grid-template-columns:1fr}
+      main{padding:14px}
+    }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Liucian's Volume Box Challenge</h1>
+
+  <div class="grid metrics">
+    <div class="metric-card"><div class="label">Cat length</div><div class="value">4 units</div></div>
+    <div class="metric-card"><div class="label">Cat width</div><div class="value">3 units</div></div>
+    <div class="metric-card"><div class="label">Cat height</div><div class="value">2 units</div></div>
+    <div class="metric-card"><div class="label">Cat volume</div><div id="catVolumeMetric" class="value">?</div></div>
+  </div>
+
+  <div class="callout">
+    Imagine Liucian curled up inside a rectangular prism. First calculate his approximate volume from his measurements.
+    Then design the <strong>smallest possible box</strong> that can fit him.
+  </div>
+
+  <div class="grid two">
+    <section>
+      <div class="section-title">Step 1 — Calculate Liucian's volume</div>
+
+      <div class="scene">
+        <svg viewBox="0 0 520 330" role="img" aria-label="Grey long-haired tabby cat with length, width, and height measurements" style="display:block;width:100%;height:auto">
+          <g transform="translate(230 165)">
+            <ellipse cx="0" cy="22" rx="75" ry="45" fill="#777" stroke="#4b4b4b" stroke-width="3"></ellipse>
+            <circle cx="67" cy="-2" r="32" fill="#808080" stroke="#4b4b4b" stroke-width="3"></circle>
+            <path d="M45 -23 L52 -58 L66 -27 Z" fill="#777" stroke="#4b4b4b" stroke-width="3"></path>
+            <path d="M67 -26 L86 -56 L91 -13 Z" fill="#777" stroke="#4b4b4b" stroke-width="3"></path>
+            <path d="M-67 24 Q-119 -15 -132 31 Q-137 72 -92 72" fill="none" stroke="#707070" stroke-width="18" stroke-linecap="round"></path>
+            <path d="M-58 3 Q-16 27 35 2 M-54 20 Q-12 43 37 18 M-45 37 Q-5 57 34 34" fill="none" stroke="#4f4f4f" stroke-width="6"></path>
+            <path d="M48 -7 Q68 4 87 -8 M50 6 Q69 16 89 4" fill="none" stroke="#4f4f4f" stroke-width="4"></path>
+            <circle cx="61" cy="-3" r="4" fill="#222"></circle>
+            <circle cx="78" cy="-3" r="4" fill="#222"></circle>
+            <path d="M69 9 l6 4 l-6 4" fill="#444"></path>
+            <path d="M90 8 L115 2 M91 14 L117 15 M89 20 L113 29" stroke="#555" stroke-width="2"></path>
+            <path d="M-30 58 l-5 30 M27 57 l4 31" stroke="#666" stroke-width="13" stroke-linecap="round"></path>
+            <text x="0" y="-85" text-anchor="middle" font-size="16" fill="var(--viz-text)">Liucian</text>
+          </g>
+
+          <line x1="145" y1="275" x2="325" y2="275" stroke="var(--viz-accent)" stroke-width="3"></line>
+          <path d="M145 275 l12 -7 v14 z M325 275 l-12 -7 v14 z" fill="var(--viz-accent)"></path>
+          <text x="235" y="302" text-anchor="middle" font-size="16" fill="var(--viz-text)">Length = 4 units</text>
+
+          <line x1="370" y1="105" x2="370" y2="235" stroke="var(--viz-accent)" stroke-width="3"></line>
+          <path d="M370 105 l-7 12 h14 z M370 235 l-7 -12 h14 z" fill="var(--viz-accent)"></path>
+          <text x="400" y="172" text-anchor="middle" font-size="16" fill="var(--viz-text)" transform="rotate(-90 400 172)">Height = 2 units</text>
+
+          <line x1="105" y1="120" x2="145" y2="92" stroke="var(--viz-accent)" stroke-width="3"></line>
+          <path d="M105 120 l13 -1 -7 -11 z M145 92 l-13 1 7 11 z" fill="var(--viz-accent)"></path>
+          <text x="105" y="75" font-size="16" fill="var(--viz-text)">Width = 3 units</text>
+        </svg>
+      </div>
+
+      <div class="card" style="margin-top:12px">
+        <div class="section-title">Your calculation</div>
+        <div class="label">Volume = length × width × height</div>
+        <div class="row" style="margin-top:10px">
+          <label for="catAnswer" class="grow">Liucian's volume
+            <input id="catAnswer" type="number" min="1" placeholder="Enter cubic units">
+          </label>
+          <button id="checkCatBtn" class="primary" type="button">Check</button>
+        </div>
+        <div id="catFeedback" class="feedback" aria-live="polite"></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-title">Step 2 — Build the smallest box</div>
+
+      <div id="lockedMessage" class="callout" style="margin-top:0">🔒 Calculate Liucian's volume correctly to unlock the box designer.</div>
+
+      <div id="boxControls" class="controls locked">
+        <div>
+          <label for="length">Box length: <strong><span id="lengthOut">5</span> units</strong></label>
+          <input id="length" type="range" min="1" max="8" value="5" step="1" disabled>
+        </div>
+        <div style="margin-top:12px">
+          <label for="width">Box width: <strong><span id="widthOut">4</span> units</strong></label>
+          <input id="width" type="range" min="1" max="8" value="4" step="1" disabled>
+        </div>
+        <div style="margin-top:12px">
+          <label for="height">Box height: <strong><span id="heightOut">3</span> units</strong></label>
+          <input id="height" type="range" min="1" max="8" value="3" step="1" disabled>
+        </div>
+      </div>
+
+      <div class="scene" style="margin-top:14px">
+        <svg viewBox="0 0 520 390" role="img" aria-label="Resizable rectangular box with Liucian inside" style="display:block;width:100%;height:auto">
+          <g id="box">
+            <polygon id="boxTop" points="135,110 335,110 405,70 205,70" fill="var(--viz-accent-bg-subtle)" stroke="var(--viz-border)" stroke-width="3"></polygon>
+            <polygon id="boxSide" points="335,110 405,70 405,260 335,300" fill="var(--viz-accent-bg)" stroke="var(--viz-border)" stroke-width="3"></polygon>
+            <rect id="boxFront" x="135" y="110" width="200" height="190" fill="var(--viz-accent-bg-subtle)" stroke="var(--viz-accent)" stroke-width="4" opacity="0.78"></rect>
+          </g>
+
+          <g id="catInBox" transform="translate(235 208) scale(.72)">
+            <ellipse cx="0" cy="22" rx="63" ry="38" fill="#777" stroke="#4b4b4b" stroke-width="3"></ellipse>
+            <circle cx="57" cy="-2" r="29" fill="#808080" stroke="#4b4b4b" stroke-width="3"></circle>
+            <path d="M38 -22 L45 -53 L58 -26 Z" fill="#777" stroke="#4b4b4b" stroke-width="3"></path>
+            <path d="M58 -25 L77 -52 L81 -12 Z" fill="#777" stroke="#4b4b4b" stroke-width="3"></path>
+            <path d="M-54 24 Q-96 -10 -109 28 Q-113 62 -78 68" fill="none" stroke="#707070" stroke-width="17" stroke-linecap="round"></path>
+            <path d="M-46 4 Q-13 25 28 3 M-43 20 Q-10 40 30 18 M-36 34 Q-6 52 28 32" fill="none" stroke="#4f4f4f" stroke-width="6"></path>
+            <circle cx="51" cy="-2" r="4" fill="#222"></circle>
+            <circle cx="66" cy="-2" r="4" fill="#222"></circle>
+          </g>
+
+          <text id="boxLabel" x="260" y="355" text-anchor="middle" font-size="17" fill="var(--viz-text)">5 × 4 × 3 = 60 units³</text>
+        </svg>
+      </div>
+
+      <div class="grid" style="grid-template-columns:repeat(3,minmax(0,1fr));margin-top:12px">
+        <div class="metric-card"><div class="label">Box volume</div><div id="boxVolume" class="value">60</div></div>
+        <div class="metric-card"><div class="label">Extra space</div><div id="extraSpace" class="value">36</div></div>
+        <div class="metric-card"><div class="label">Fits?</div><div id="fits" class="value">Yes</div></div>
+      </div>
+
+      <button id="checkBoxBtn" type="button" style="width:100%;margin-top:12px" disabled>🐾 Check my box</button>
+      <div id="boxFeedback" class="feedback" aria-live="polite"></div>
+    </section>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <div class="section-title">Goal</div>
+    <div>
+      Liucian measures <strong>4 × 3 × 2</strong>. Your box must be at least 4 units long, 3 units wide, and 2 units high.
+      Among boxes that fit, find the one with the <strong>least volume</strong>.
+    </div>
+  </div>
+</main>
+
+<script>
+(() => {
+  const CAT = {l:4,w:3,h:2};
+  const CAT_VOLUME = CAT.l * CAT.w * CAT.h;
+  let unlocked = false;
+
+  const catAnswer = document.getElementById('catAnswer');
+  const catFeedback = document.getElementById('catFeedback');
+  const catVolumeMetric = document.getElementById('catVolumeMetric');
+  const boxControls = document.getElementById('boxControls');
+  const lockedMessage = document.getElementById('lockedMessage');
+  const checkBoxBtn = document.getElementById('checkBoxBtn');
+
+  const length = document.getElementById('length');
+  const width = document.getElementById('width');
+  const height = document.getElementById('height');
+  const lengthOut = document.getElementById('lengthOut');
+  const widthOut = document.getElementById('widthOut');
+  const heightOut = document.getElementById('heightOut');
+  const boxVolume = document.getElementById('boxVolume');
+  const extraSpace = document.getElementById('extraSpace');
+  const fits = document.getElementById('fits');
+  const boxFeedback = document.getElementById('boxFeedback');
+  const boxFront = document.getElementById('boxFront');
+  const boxTop = document.getElementById('boxTop');
+  const boxSide = document.getElementById('boxSide');
+  const catInBox = document.getElementById('catInBox');
+  const boxLabel = document.getElementById('boxLabel');
+
+  function unlock(){
+    unlocked = true;
+    catVolumeMetric.textContent = `${CAT_VOLUME} units³`;
+    lockedMessage.textContent = '🔓 Box designer unlocked! Now find the smallest box that fits Liucian.';
+    boxControls.classList.remove('locked');
+    [length,width,height].forEach(el => el.disabled = false);
+    checkBoxBtn.disabled = false;
+  }
+
+  document.getElementById('checkCatBtn').addEventListener('click', () => {
+    const answer = Number(catAnswer.value);
+    if(answer === CAT_VOLUME){
+      catFeedback.textContent = `⭐ Correct! 4 × 3 × 2 = ${CAT_VOLUME} cubic units.`;
+      unlock();
+    } else if(!catAnswer.value){
+      catFeedback.textContent = 'Enter your calculated volume first.';
+    } else {
+      catFeedback.textContent = 'Not quite. Multiply all three dimensions: length × width × height.';
+    }
+  });
+
+  catAnswer.addEventListener('keydown', e => {
+    if(e.key === 'Enter') document.getElementById('checkCatBtn').click();
+  });
+
+  function boxValues(){
+    return {l:Number(length.value),w:Number(width.value),h:Number(height.value)};
+  }
+
+  function redrawBox(){
+    const {l,w,h}=boxValues();
+    const volume=l*w*h;
+    const dimensionFit = l>=CAT.l && w>=CAT.w && h>=CAT.h;
+
+    lengthOut.textContent=l;
+    widthOut.textContent=w;
+    heightOut.textContent=h;
+    boxVolume.textContent=volume;
+    extraSpace.textContent=volume-CAT_VOLUME >= 0 ? volume-CAT_VOLUME : `-${CAT_VOLUME-volume}`;
+    fits.textContent=dimensionFit ? 'Yes' : 'No';
+    boxLabel.textContent=`${l} × ${w} × ${h} = ${volume} units³`;
+
+    const frontW=85+l*27;
+    const frontH=60+h*34;
+    const depth=22+w*12;
+    const x=250-frontW/2;
+    const y=305-frontH;
+
+    boxFront.setAttribute('x',x);
+    boxFront.setAttribute('y',y);
+    boxFront.setAttribute('width',frontW);
+    boxFront.setAttribute('height',frontH);
+    boxTop.setAttribute('points',`${x},${y} ${x+frontW},${y} ${x+frontW+depth},${y-depth*.55} ${x+depth},${y-depth*.55}`);
+    boxSide.setAttribute('points',`${x+frontW},${y} ${x+frontW+depth},${y-depth*.55} ${x+frontW+depth},${y+frontH-depth*.55} ${x+frontW},${y+frontH}`);
+
+    const lengthScale=l/CAT.l;
+    const widthScale=w/CAT.w;
+    const heightScale=h/CAT.h;
+    const fitScale=Math.min(lengthScale,widthScale,heightScale,1)*0.72;
+    catInBox.setAttribute('transform',`translate(${x+frontW/2} ${y+frontH/2+3}) scale(${fitScale})`);
+    catInBox.style.opacity=dimensionFit ? '1' : '.35';
+
+    if(unlocked){
+      if(dimensionFit && volume===CAT_VOLUME){
+        boxFeedback.textContent='⭐ You found the minimum-volume box! Try Check my box.';
+      } else if(dimensionFit){
+        boxFeedback.textContent=`Liucian fits, but the box has ${volume-CAT_VOLUME} cubic units of extra space. Can you make it smaller?`;
+      } else {
+        const misses=[];
+        if(l<CAT.l) misses.push(`length needs at least ${CAT.l}`);
+        if(w<CAT.w) misses.push(`width needs at least ${CAT.w}`);
+        if(h<CAT.h) misses.push(`height needs at least ${CAT.h}`);
+        boxFeedback.textContent=`Too small: ${misses.join(', ')}.`;
+      }
+    }
+  }
+
+  [length,width,height].forEach(el=>el.addEventListener('input',redrawBox));
+
+  checkBoxBtn.addEventListener('click',()=>{
+    const {l,w,h}=boxValues();
+    const volume=l*w*h;
+    const dimensionFit=l>=CAT.l && w>=CAT.w && h>=CAT.h;
+
+    if(!dimensionFit){
+      boxFeedback.textContent='🙀 Liucian does not fit. Check each dimension, not just total volume.';
+      return;
+    }
+
+    if(volume===CAT_VOLUME && l===CAT.l && w===CAT.w && h===CAT.h){
+      boxFeedback.textContent='🎉 Perfect! 4 × 3 × 2 = 24 units³. This is the smallest rectangular box that fits Liucian exactly.';
+    } else {
+      boxFeedback.textContent=`✅ Liucian fits, but your box is ${volume} units³. Reduce it to ${CAT_VOLUME} units³ while keeping length ≥ 4, width ≥ 3, and height ≥ 2.`;
+    }
+  });
+
+  redrawBox();
+})();
+</script>
+</body>
+</html>

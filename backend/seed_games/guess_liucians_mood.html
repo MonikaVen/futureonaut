@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Guess Liucian's Mood — AI Classification Game</title>
+<style>
+:root{--bg:#f7f7f8;--card:#fff;--text:#1f2937;--muted:#6b7280;--border:#d1d5db;--accent:#6b7280;--good:#2f855a;--bad:#b91c1c}
+*{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--text);background:#fff}
+main{max-width:1060px;margin:auto;padding:22px}h1{margin:0 0 6px;font-size:30px}.sub{color:var(--muted);margin-bottom:18px}
+.grid{display:grid;gap:14px}.metrics{grid-template-columns:repeat(4,1fr)}.two{grid-template-columns:1.08fr .92fr}
+.metric,.card{border:1px solid var(--border);border-radius:16px;padding:14px;background:var(--card)}
+.label,.tiny{font-size:13px;color:var(--muted)}.value{font-size:23px;font-weight:700;margin-top:3px}
+.feature-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:9px;margin-top:12px}.feature{padding:10px;border:1px solid var(--border);border-radius:12px;background:var(--bg)}
+button{border:1px solid var(--border);border-radius:12px;padding:10px 14px;font-size:15px;background:#fff;cursor:pointer;margin:4px 3px 0 0}
+button.primary{background:var(--accent);color:#fff}.formula,.challenge{margin-top:12px;padding:12px;border-radius:12px;background:var(--bg)}
+.formula{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}.feedback{margin-top:10px}.correct{color:var(--good)}.wrong{color:var(--bad)}
+.bar{height:11px;background:#e5e7eb;border-radius:999px;overflow:hidden;margin:5px 0 10px}.fill{height:100%;background:#6b7280}
+.reward{display:none;margin-top:12px;border:1px solid var(--border);border-radius:14px;padding:12px}.reward.show{display:block}
+svg{display:block;width:100%;height:auto}.cat-happy{transform-origin:center bottom}.cat-happy.play{animation:happy 1.2s ease-in-out}
+@keyframes happy{0%,100%{transform:translate(0,0)}25%{transform:translate(0,-18px) rotate(-4deg)}50%{transform:translate(0,0) rotate(4deg)}75%{transform:translate(0,-12px)}}
+@media(max-width:800px){.metrics{grid-template-columns:repeat(2,1fr)}.two,.feature-grid{grid-template-columns:1fr}main{padding:14px}}
+</style>
+</head>
+<body>
+<main>
+<h1>🌳 Guess Liucian's Mood</h1>
+<div class="sub">Learn <strong>multi-class classification</strong>: use clues to predict how Liucian feels.</div>
+
+<div class="grid metrics">
+<div class="metric"><div class="label">Energy</div><div id="energyM" class="value">—</div></div>
+<div class="metric"><div class="label">Food</div><div id="foodM" class="value">—</div></div>
+<div class="metric"><div class="label">Toy nearby</div><div id="toyM" class="value">—</div></div>
+<div class="metric"><div class="label">Your score</div><div id="scoreM" class="value">0 / 0</div></div>
+</div>
+
+<div class="grid two" style="margin-top:16px">
+<section class="card">
+<h2 style="margin-top:0">1. Observe Liucian</h2>
+<div class="tiny">An AI classifier uses features — clues about the situation — to choose a class.</div>
+
+<svg viewBox="0 0 600 330">
+<rect width="600" height="330" rx="16" fill="#f9fafb"/>
+<circle cx="500" cy="70" r="32" fill="#e5e7eb"/>
+<path d="M55 275 Q120 180 180 275 M125 275 Q205 145 275 275 M380 275 Q450 165 540 275" fill="#e5e7eb"/>
+<g id="cat" class="cat-happy" transform="translate(295 205)">
+<!-- fluffy long-haired body -->
+<ellipse cx="-3" cy="20" rx="80" ry="51" fill="#707070" stroke="#4b4b4b" stroke-width="3"/>
+<ellipse cx="-2" cy="18" rx="73" ry="45" fill="#858585"/>
+<path d="M-69 1 l-14 -9 l8 18 l-13 5 l16 9 l-11 11 l18 3 M-35 -23 l-7 -15 l17 10 M4 -27 l8 -14 l7 17 M35 -18 l14 -11 l-4 18 M-58 51 l-5 15 l16 -11 M-18 61 l5 15 l10 -15 M25 58 l11 13 l4 -18" fill="none" stroke="#707070" stroke-width="8" stroke-linecap="round"/>
+<circle cx="65" cy="-8" r="38" fill="#797979" stroke="#4b4b4b" stroke-width="3"/>
+<circle cx="65" cy="-8" r="32" fill="#8c8c8c"/>
+<path d="M37 -4 l-13 8 l16 5 M91 -2 l14 9 l-16 4 M42 15 l-9 13 l16 -7 M86 16 l8 14 l-16 -8" fill="none" stroke="#797979" stroke-width="8" stroke-linecap="round"/>
+<path d="M44 -30 L52 -66 L68 -33 Z" fill="#777" stroke="#4b4b4b" stroke-width="3"/>
+<path d="M67 -34 L90 -63 L95 -16 Z" fill="#777" stroke="#4b4b4b" stroke-width="3"/>
+<!-- fluffy tail -->
+<path d="M-62 27 Q-120 -25 -137 25 Q-145 78 -93 79" fill="none" stroke="#666" stroke-width="31" stroke-linecap="round"/>
+<path d="M-62 27 Q-120 -25 -137 25 Q-145 78 -93 79" fill="none" stroke="#898989" stroke-width="24" stroke-linecap="round"/>
+<path d="M-45 2 Q-8 27 31 3 M-43 21 Q-5 45 34 18" fill="none" stroke="#505050" stroke-width="6"/>
+<circle cx="57" cy="-9" r="4" fill="#222"/><circle cx="75" cy="-9" r="4" fill="#222"/>
+<path d="M65 6 l7 4 l-7 4" fill="#444"/>
+<path d="M90 4 L126 -4 M91 11 L130 13 M88 18 L122 29" stroke="#555" stroke-width="2"/>
+</g>
+<text id="sceneText" x="300" y="310" text-anchor="middle" font-size="16" fill="#374151">Look at the clues below</text>
+</svg>
+
+<div class="feature-grid">
+<div class="feature">⚡ Energy: <strong id="energy">?</strong></div>
+<div class="feature">🥣 Ate recently: <strong id="food">?</strong></div>
+<div class="feature">🧶 Toy nearby: <strong id="toy">?</strong></div>
+<div class="feature">👤 Human nearby: <strong id="human">?</strong></div>
+</div>
+
+<h3>How the AI scores each mood</h3>
+<div class="formula">Each clue adds points to possible moods.</div>
+<div>PLAYFUL <span id="playScore">0</span>%<div class="bar"><div id="playBar" class="fill"></div></div></div>
+<div>SLEEPY <span id="sleepScore">0</span>%<div class="bar"><div id="sleepBar" class="fill"></div></div></div>
+<div>HUNGRY <span id="hungryScore">0</span>%<div class="bar"><div id="hungryBar" class="fill"></div></div></div>
+<div>CURIOUS <span id="curiousScore">0</span>%<div class="bar"><div id="curiousBar" class="fill"></div></div></div>
+</section>
+
+<section class="card">
+<h2 style="margin-top:0">2. Guess the mood</h2>
+<div class="tiny">Choose the class that best matches the features.</div>
+<div style="margin-top:10px">
+<button class="mood primary" data-mood="PLAYFUL">🧶 Playful</button>
+<button class="mood" data-mood="SLEEPY">💤 Sleepy</button>
+<button class="mood" data-mood="HUNGRY">🥣 Hungry</button>
+<button class="mood" data-mood="CURIOUS">👀 Curious</button>
+</div>
+<button id="reveal" type="button" style="margin-top:12px">Reveal Liucian's mood</button>
+<button id="next" type="button">Next situation</button>
+<div id="feedback" class="feedback"></div>
+
+<div class="challenge">
+<strong>🤖 What does the model predict?</strong>
+<div class="tiny" style="margin-top:6px">The model chooses whichever mood has the highest score.</div>
+<div style="margin-top:8px">Prediction: <strong id="modelPrediction">?</strong></div>
+<button id="modelBtn" type="button">Run classifier</button>
+</div>
+
+<div class="challenge">
+<strong>🎯 Challenge</strong>
+<div style="margin-top:6px">Correctly classify <strong>4 of 5</strong> situations.</div>
+<div id="challengeFeedback" class="feedback"></div>
+</div>
+
+<div id="reward" class="reward">
+<strong>🎁 Correct! Liucian acts out his mood.</strong>
+<div id="rewardText" style="margin-top:6px"></div>
+<div style="font-size:52px;text-align:center;margin-top:8px" id="rewardEmoji">🐈</div>
+</div>
+</section>
+</div>
+
+<section class="card" style="margin-top:16px">
+<h2 style="margin-top:0">What is this teaching?</h2>
+<div>Unlike <strong>Cat or Not Cat?</strong>, which has two classes, this model chooses among several classes. This is called <strong>multi-class classification</strong>. AI compares the evidence for PLAYFUL, SLEEPY, HUNGRY, and CURIOUS, then selects the strongest prediction.</div>
+</section>
+</main>
+
+<script>
+(()=>{
+const situations=[
+ {energy:9,food:1,toy:1,human:1,mood:'PLAYFUL'},
+ {energy:2,food:1,toy:0,human:0,mood:'SLEEPY'},
+ {energy:6,food:0,toy:0,human:1,mood:'HUNGRY'},
+ {energy:7,food:1,toy:0,human:1,mood:'CURIOUS'},
+ {energy:8,food:1,toy:1,human:0,mood:'PLAYFUL'}
+];
+let i=Math.floor(Math.random()*situations.length),choice=null,revealed=false,correct=0,played=0;
+
+function scores(s){
+ let p=15+s.energy*6+s.toy*30;
+ let sl=75-s.energy*7+(s.food?15:0);
+ let h=10+(s.food?0:65)+(10-s.energy)*2;
+ let c=15+s.energy*3+s.human*25+(s.toy?5:20);
+ let vals={PLAYFUL:p,SLEEPY:sl,HUNGRY:h,CURIOUS:c};
+ let max=Math.max(...Object.values(vals));
+ Object.keys(vals).forEach(k=>vals[k]=Math.round(vals[k]/max*100));
+ return vals;
+}
+function render(){
+ const s=situations[i],sc=scores(s);
+ document.getElementById('energy').textContent=s.energy+'/10';
+ document.getElementById('food').textContent=s.food?'Yes':'No';
+ document.getElementById('toy').textContent=s.toy?'Yes':'No';
+ document.getElementById('human').textContent=s.human?'Yes':'No';
+ document.getElementById('energyM').textContent=s.energy+'/10';
+ document.getElementById('foodM').textContent=s.food?'Yes':'No';
+ document.getElementById('toyM').textContent=s.toy?'Yes':'No';
+ document.getElementById('scoreM').textContent=correct+' / '+played;
+ ['PLAYFUL','SLEEPY','HUNGRY','CURIOUS'].forEach(m=>{
+   const low=m.toLowerCase();
+   document.getElementById(low==='playful'?'playScore':low==='sleepy'?'sleepScore':low+'Score').textContent=sc[m];
+   document.getElementById(low==='playful'?'playBar':low==='sleepy'?'sleepBar':low+'Bar').style.width=sc[m]+'%';
+ });
+}
+document.querySelectorAll('.mood').forEach(b=>b.addEventListener('click',()=>{
+ if(revealed)return; choice=b.dataset.mood;
+ document.querySelectorAll('.mood').forEach(x=>x.classList.remove('primary'));b.classList.add('primary');
+ document.getElementById('feedback').textContent='You chose '+choice+'. Now reveal the answer.';
+}));
+document.getElementById('modelBtn').onclick=()=>{
+ const sc=scores(situations[i]);
+ const pred=Object.keys(sc).sort((a,b)=>sc[b]-sc[a])[0];
+ document.getElementById('modelPrediction').textContent=pred+' ('+sc[pred]+'%)';
+};
+document.getElementById('reveal').onclick=()=>{
+ if(!choice){document.getElementById('feedback').textContent='Choose a mood first.';return}
+ if(revealed)return;revealed=true;played++;
+ const actual=situations[i].mood;
+ if(choice===actual)correct++;
+ document.getElementById('scoreM').textContent=correct+' / '+played;
+ document.getElementById('feedback').innerHTML=choice===actual
+ ?'<span class="correct">⭐ Correct! Liucian is '+actual.toLowerCase()+'.</span>'
+ :'<span class="wrong">Not quite. Liucian is '+actual.toLowerCase()+'.</span>';
+ if(choice===actual){
+   const r=document.getElementById('reward');r.classList.add('show');
+   const text={PLAYFUL:'Liucian runs after his toy!',SLEEPY:'Liucian curls up for a nap.',HUNGRY:'Liucian heads for his food bowl.',CURIOUS:'Liucian investigates something new.'};
+   const em={PLAYFUL:'🐈🧶',SLEEPY:'🐈💤',HUNGRY:'🐈🥣',CURIOUS:'🐈👀'};
+   document.getElementById('rewardText').textContent=text[actual];
+   document.getElementById('rewardEmoji').textContent=em[actual];
+   const cat=document.getElementById('cat');cat.classList.remove('play');void cat.getBoundingClientRect();cat.classList.add('play');
+ }
+ if(played===5)document.getElementById('challengeFeedback').textContent=correct>=4?'🏆 Challenge complete! '+correct+'/5 correct.':'You got '+correct+'/5. Try another round.';
+};
+document.getElementById('next').onclick=()=>{
+ if(played>=5){played=0;correct=0;document.getElementById('challengeFeedback').textContent=''}
+ let next=i; while(next===i && situations.length>1) next=Math.floor(Math.random()*situations.length); i=next;choice=null;revealed=false;
+ document.getElementById('feedback').textContent='';document.getElementById('reward').classList.remove('show');
+ document.getElementById('modelPrediction').textContent='?';
+ document.querySelectorAll('.mood').forEach(x=>x.classList.remove('primary'));
+ render();
+};
+render();
+})();
+</script>
+</body>
+</html>

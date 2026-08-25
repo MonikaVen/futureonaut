@@ -1,0 +1,14 @@
+.env
+azure-deploy-out.env
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+node_modules/
+dist/
+*.egg-info/
+.DS_Store
+backend/data/games/
+*.log
+.idea/
+.vscode/

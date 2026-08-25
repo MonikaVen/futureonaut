@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>World Model Lab</title>
+<style>
+  :root{
+    --bg:#0b1020;
+    --panel:#121a31;
+    --panel2:#18233f;
+    --text:#eef3ff;
+    --muted:#a9b7d7;
+    --accent:#7aa2ff;
+    --good:#73e6a5;
+    --warn:#ffd166;
+    --bad:#ff7b7b;
+    --line:#2a385e;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    font-family:Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    background:linear-gradient(180deg,#0a0f1d,#0c1328 45%,#0a1020);
+    color:var(--text);
+  }
+  .wrap{max-width:1180px;margin:0 auto;padding:24px}
+  h1{margin:0 0 6px;font-size:clamp(26px,4vw,44px)}
+  .sub{color:var(--muted);margin-bottom:18px}
+  .grid{display:grid;grid-template-columns:1.2fr .8fr;gap:16px}
+  .card{
+    background:rgba(18,26,49,.96);
+    border:1px solid var(--line);
+    border-radius:18px;
+    padding:18px;
+    box-shadow:0 12px 35px rgba(0,0,0,.18);
+  }
+  .stage-title{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}
+  .tag{font-size:12px;border:1px solid var(--line);border-radius:999px;padding:4px 8px;color:var(--muted)}
+  canvas{width:100%;height:auto;display:block;background:#0a1122;border:1px solid var(--line);border-radius:14px}
+  .controls{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+  button{
+    border:1px solid var(--line);
+    background:#1a2748;color:var(--text);
+    border-radius:12px;padding:10px 12px;
+    font-weight:700;cursor:pointer;
+    transition:.15s transform,.15s background;
+  }
+  button:hover{transform:translateY(-1px);background:#22335e}
+  button.primary{background:#2f5bc7;border-color:#4b74da}
+  button.math{background:#26304b}
+  button.active{outline:2px solid var(--accent)}
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px}
+  .stat{background:#0d1529;border:1px solid var(--line);padding:10px;border-radius:12px}
+  .stat b{display:block;font-size:18px}
+  .small{font-size:12px;color:var(--muted)}
+  .pipeline{display:grid;gap:8px}
+  .node{
+    background:#0d1529;border:1px solid var(--line);border-radius:14px;padding:12px;
+    display:grid;grid-template-columns:40px 1fr auto;gap:10px;align-items:center;
+  }
+  .icon{font-size:24px;text-align:center}
+  .node h3{margin:0;font-size:15px}
+  .node p{margin:3px 0 0;color:var(--muted);font-size:13px}
+  .mathpanel{
+    display:none;margin-top:10px;background:#08101f;border:1px dashed #45629a;
+    border-radius:12px;padding:12px;color:#dbe7ff;line-height:1.6;
+  }
+  .mathpanel.show{display:block}
+  .rollouts{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+  .rollout{border:1px solid var(--line);background:#0d1529;border-radius:12px;padding:10px}
+  .rollout.best{border-color:#4fbd7a;box-shadow:inset 0 0 0 1px #4fbd7a}
+  .bar{height:8px;background:#202d4b;border-radius:99px;overflow:hidden;margin-top:6px}
+  .fill{height:100%;background:#7aa2ff}
+  .legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;color:var(--muted);font-size:12px}
+  .dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:5px}
+  .msg{margin-top:12px;padding:10px 12px;border-radius:12px;background:#0d1529;color:#dfe7ff}
+  .score{font-size:14px;color:var(--muted)}
+  .footer{margin-top:18px;color:var(--muted);font-size:13px}
+  input[type=range]{width:100%}
+  label{font-size:13px;color:var(--muted)}
+  @media(max-width:900px){.grid{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>World Model Lab</h1>
+  <div class="sub">A small game about <b>observation → latent state → dynamics → imagined futures → planning → action</b>.</div>
+
+  <div class="grid">
+    <section class="card">
+      <div class="stage-title">
+        <div>
+          <b>Mission: reach the green goal without hitting the red obstacle</b>
+          <div class="score">The world model predicts consequences before you commit.</div>
+        </div>
+        <span class="tag">Interactive</span>
+      </div>
+
+      <canvas id="world" width="720" height="450"></canvas>
+
+      <div class="controls">
+        <button onclick="setAction(-1)">↖ Turn Left</button>
+        <button class="primary" onclick="setAction(0)">↑ Go Straight</button>
+        <button onclick="setAction(1)">↗ Turn Right</button>
+      </div>
+
+      <div style="margin-top:12px">
+        <label>Prediction horizon: <b id="horizonVal">5</b> steps</label>
+        <input id="horizon" type="range" min="2" max="10" value="5" />
+      </div>
+
+      <div class="controls">
+        <button onclick="imagine()">Imagine Futures</button>
+        <button onclick="commit()">Commit Chosen Action</button>
+        <button onclick="resetGame()">Reset</button>
+      </div>
+
+      <div class="stats">
+        <div class="stat"><span class="small">Reward</span><b id="reward">0.00</b></div>
+        <div class="stat"><span class="small">Distance</span><b id="distance">—</b></div>
+        <div class="stat"><span class="small">Risk</span><b id="risk">—</b></div>
+        <div class="stat"><span class="small">Latent z</span><b id="latent">—</b></div>
+      </div>
+
+      <div class="msg" id="message">
+        Choose an action, then click <b>Imagine Futures</b>. The model will roll the world forward without moving the real agent.
+      </div>
+
+      <div class="legend">
+        <span><span class="dot" style="background:#7aa2ff"></span>Agent</span>
+        <span><span class="dot" style="background:#73e6a5"></span>Goal</span>
+        <span><span class="dot" style="background:#ff7b7b"></span>Obstacle</span>
+        <span><span class="dot" style="background:#ffd166"></span>Predicted trajectory</span>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="stage-title">
+        <b>What the world model is doing</b>
+        <span class="tag">Concept pipeline</span>
+      </div>
+
+      <div class="pipeline">
+        <div class="node">
+          <div class="icon">👁️</div>
+          <div><h3>1. Observation</h3><p>Position, heading, goal, obstacle.</p></div>
+          <button class="math" onclick="toggleMath('m1')">Math Concept</button>
+        </div>
+        <div id="m1" class="mathpanel">
+          Observation vector:<br>
+          <b>oₜ = [x, y, θ, x_goal, y_goal, x_obs, y_obs]</b>
+        </div>
+
+        <div class="node">
+          <div class="icon">🧩</div>
+          <div><h3>2. Encoder</h3><p>Compresses raw observation into a useful latent state.</p></div>
+          <button class="math" onclick="toggleMath('m2')">Math Concept</button>
+        </div>
+        <div id="m2" class="mathpanel">
+          <b>zₜ = f<sub>enc</sub>(oₜ)</b><br>
+          Here, z is a compact feature vector: distance-to-goal, obstacle proximity, heading error.
+        </div>
+
+        <div class="node">
+          <div class="icon">⚙️</div>
+          <div><h3>3. Dynamics Model</h3><p>Predicts what state comes next after an action.</p></div>
+          <button class="math" onclick="toggleMath('m3')">Math Concept</button>
+        </div>
+        <div id="m3" class="mathpanel">
+          <b>ẑₜ₊₁ = f<sub>θ</sub>(zₜ, aₜ)</b><br>
+          The model estimates how position and heading evolve under a chosen action.
+        </div>
+
+        <div class="node">
+          <div class="icon">🔮</div>
+          <div><h3>4. Imagination</h3><p>Rolls the learned dynamics forward several steps.</p></div>
+          <button class="math" onclick="toggleMath('m4')">Math Concept</button>
+        </div>
+        <div id="m4" class="mathpanel">
+          <b>zₜ → ẑₜ₊₁ → ẑₜ₊₂ → … → ẑₜ₊ᴴ</b><br>
+          H is the prediction horizon. Longer horizons provide more foresight but accumulate model error.
+        </div>
+
+        <div class="node">
+          <div class="icon">🧠</div>
+          <div><h3>5. Planner</h3><p>Scores possible futures and prefers safer, more useful ones.</p></div>
+          <button class="math" onclick="toggleMath('m5')">Math Concept</button>
+        </div>
+        <div id="m5" class="mathpanel">
+          Example objective:<br>
+          <b>J = −d(goal) − λ·risk + β·progress</b><br>
+          The planner chooses the action with the highest predicted J.
+        </div>
+      </div>
+
+      <div style="margin-top:14px">
+        <b>Imagined futures</b>
+        <div id="rollouts" class="rollouts">
+          <div class="rollout">Left<br><span class="small">not simulated yet</span></div>
+          <div class="rollout">Straight<br><span class="small">not simulated yet</span></div>
+          <div class="rollout">Right<br><span class="small">not simulated yet</span></div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <section class="card" style="margin-top:16px">
+    <div class="stage-title">
+      <div>
+        <b>Learning challenge</b>
+        <div class="small">Try changing the prediction horizon. Does a longer imagination make the planner safer?</div>
+      </div>
+      <button class="math" onclick="toggleMath('m6')">Math Concept</button>
+    </div>
+    <div id="m6" class="mathpanel">
+      A useful way to think about model-based control is:<br><br>
+      <b>Choose a* = argmaxₐ E[ Σ γᵏ rₜ₊ₖ ]</b><br><br>
+      The agent selects the action expected to produce the best cumulative future reward.
+      In real systems, the expectation may be estimated using a stochastic latent dynamics model.
+    </div>
+  </section>
+
+  <div class="footer">
+    Tip: the yellow paths are imagined rollouts. They are not the real trajectory until you click <b>Commit Chosen Action</b>.
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('world');
+const ctx = canvas.getContext('2d');
+
+const goal = {x:650,y:80,r:22};
+const obstacle = {x:390,y:240,r:58};
+let agent, selectedAction=0, rollouts=[], totalReward=0, gameOver=false;
+
+function resetGame(){
+  agent={x:80,y:370,theta:-0.55};
+  selectedAction=0; rollouts=[]; totalReward=0; gameOver=false;
+  document.getElementById('reward').textContent='0.00';
+  document.getElementById('message').innerHTML='Choose an action, then click <b>Imagine Futures</b>.';
+  updateStats(); renderRollouts(); draw();
+}
+function setAction(a){
+  selectedAction=a;
+  document.querySelectorAll('.controls button').forEach(b=>b.classList.remove('active'));
+  const labels={[-1]:'left',[0]:'straight',[1]:'right'};
+  document.getElementById('message').textContent='Selected '+labels[a]+'. Now imagine futures before committing.';
+  draw();
+}
+function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y)}
+function step(s,a){
+  const turn = a*0.22;
+  const speed = 30;
+  const theta=s.theta+turn;
+  return {x:s.x+Math.cos(theta)*speed, y:s.y+Math.sin(theta)*speed, theta};
+}
+function latent(s){
+  const dg=dist(s,goal);
+  const dobs=dist(s,obstacle)-obstacle.r;
+  const desired=Math.atan2(goal.y-s.y,goal.x-s.x);
+  let err=desired-s.theta;
+  while(err>Math.PI)err-=2*Math.PI;
+  while(err<-Math.PI)err+=2*Math.PI;
+  return [dg/720, Math.max(-1,Math.min(1,dobs/300)), err/Math.PI];
+}
+function riskOf(s){
+  const d=dist(s,obstacle)-obstacle.r;
+  return Math.max(0,Math.min(1,1-d/120));
+}
+function scoreTrajectory(path){
+  const end=path[path.length-1];
+  const progress=dist(agent,goal)-dist(end,goal);
+  const maxRisk=Math.max(...path.map(riskOf));
+  const collision=path.some(p=>dist(p,obstacle)<obstacle.r+12);
+  const out=path.some(p=>p.x<10||p.x>710||p.y<10||p.y>440);
+  let score=progress*0.06-maxRisk*6;
+  if(collision)score-=10;
+  if(out)score-=6;
+  return {score,maxRisk,collision,out,end};
+}
+function simulate(a,H){
+  let s={...agent}; const path=[];
+  for(let i=0;i<H;i++){s=step(s,a);path.push({...s})}
+  return {a,path,...scoreTrajectory(path)};
+}
+function imagine(){
+  if(gameOver)return;
+  const H=+document.getElementById('horizon').value;
+  rollouts=[simulate(-1,H),simulate(0,H),simulate(1,H)];
+  const best=rollouts.reduce((x,y)=>y.score>x.score?y:x);
+  selectedAction=best.a;
+  document.getElementById('message').innerHTML=
+    'Planner prefers <b>'+({[-1]:'LEFT',[0]:'STRAIGHT',[1]:'RIGHT'}[best.a])+
+    '</b> because it has the best predicted reward/risk trade-off.';
+  renderRollouts(); draw();
+}
+function commit(){
+  if(gameOver)return;
+  if(!rollouts.length) imagine();
+  const before=dist(agent,goal);
+  agent=step(agent,selectedAction);
+  const after=dist(agent,goal);
+  const risk=riskOf(agent);
+  const collision=dist(agent,obstacle)<obstacle.r+12;
+  let r=(before-after)*0.05-risk*2;
+  if(collision){r-=8;gameOver=true;document.getElementById('message').innerHTML='<b>Collision.</b> Reset and use imagined futures to avoid it.'}
+  if(after<goal.r+14){r+=12;gameOver=true;document.getElementById('message').innerHTML='<b>Goal reached!</b> You used a world model to plan before acting.'}
+  totalReward+=r;
+  rollouts=[];
+  document.getElementById('reward').textContent=totalReward.toFixed(2);
+  updateStats(); renderRollouts(); draw();
+}
+function updateStats(){
+  const z=latent(agent), d=dist(agent,goal), risk=riskOf(agent);
+  document.getElementById('distance').textContent=Math.round(d)+' px';
+  document.getElementById('risk').textContent=(risk*100).toFixed(0)+'%';
+  document.getElementById('latent').textContent='['+z.map(v=>v.toFixed(2)).join(', ')+']';
+}
+function renderRollouts(){
+  const el=document.getElementById('rollouts');
+  const names={[-1]:'Left',[0]:'Straight',[1]:'Right'};
+  if(!rollouts.length){
+    el.innerHTML=['Left','Straight','Right'].map(n=>`<div class="rollout">${n}<br><span class="small">not simulated yet</span></div>`).join('');
+    return;
+  }
+  const best=Math.max(...rollouts.map(r=>r.score));
+  el.innerHTML=rollouts.map(r=>{
+    const pct=Math.max(4,Math.min(100,(r.score+12)*4.5));
+    return `<div class="rollout ${r.score===best?'best':''}">
+      <b>${names[r.a]}</b><br>
+      <span class="small">Score ${r.score.toFixed(2)} · Risk ${(r.maxRisk*100).toFixed(0)}%</span>
+      <div class="bar"><div class="fill" style="width:${pct}%"></div></div>
+    </div>`
+  }).join('');
+}
+function draw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  // grid
+  ctx.strokeStyle='#17233e'; ctx.lineWidth=1;
+  for(let x=0;x<canvas.width;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,canvas.height);ctx.stroke()}
+  for(let y=0;y<canvas.height;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(canvas.width,y);ctx.stroke()}
+
+  // imagined trajectories
+  rollouts.forEach(r=>{
+    ctx.save();
+    ctx.strokeStyle = r.a===selectedAction ? '#ffd166' : '#6c7897';
+    ctx.lineWidth = r.a===selectedAction ? 4 : 2;
+    ctx.setLineDash(r.a===selectedAction ? [] : [7,7]);
+    ctx.beginPath(); ctx.moveTo(agent.x,agent.y);
+    r.path.forEach(p=>ctx.lineTo(p.x,p.y));
+    ctx.stroke(); ctx.restore();
+  });
+
+  // obstacle
+  ctx.fillStyle='#ff7b7b';
+  ctx.beginPath();ctx.arc(obstacle.x,obstacle.y,obstacle.r,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#301a23';ctx.font='bold 14px sans-serif';ctx.textAlign='center';
+  ctx.fillText('OBSTACLE',obstacle.x,obstacle.y+5);
+
+  // goal
+  ctx.fillStyle='#73e6a5';
+  ctx.beginPath();ctx.arc(goal.x,goal.y,goal.r,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#173322';ctx.fillText('GOAL',goal.x,goal.y+5);
+
+  // agent
+  ctx.save();ctx.translate(agent.x,agent.y);ctx.rotate(agent.theta);
+  ctx.fillStyle='#7aa2ff';
+  ctx.beginPath();ctx.moveTo(18,0);ctx.lineTo(-12,-10);ctx.lineTo(-7,0);ctx.lineTo(-12,10);ctx.closePath();ctx.fill();
+  ctx.restore();
+
+  updateStats();
+}
+function toggleMath(id){document.getElementById(id).classList.toggle('show')}
+document.getElementById('horizon').addEventListener('input',e=>{
+  document.getElementById('horizonVal').textContent=e.target.value;
+  if(rollouts.length) imagine();
+});
+resetGame();
+</script>
+</body>
+</html>

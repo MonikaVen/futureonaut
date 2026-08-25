@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cat or Not Cat? — Liucian's Classification Game</title>
+<style>
+:root{--bg:#f7f7f8;--card:#fff;--text:#1f2937;--muted:#6b7280;--border:#d1d5db;--accent:#6b7280;--good:#2f855a;--bad:#b91c1c}
+*{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--text);background:#fff}
+main{max-width:1050px;margin:0 auto;padding:22px}h1{margin:0 0 6px;font-size:30px}.sub{color:var(--muted);margin-bottom:18px}
+.grid{display:grid;gap:14px}.metrics{grid-template-columns:repeat(4,minmax(0,1fr))}.two{grid-template-columns:1.05fr .95fr}
+.metric,.card{border:1px solid var(--border);border-radius:16px;background:var(--card);padding:14px}.label{font-size:13px;color:var(--muted)}
+.value{font-size:24px;font-weight:700;margin-top:3px}.tiny{font-size:13px;color:var(--muted)}.control{margin-top:12px}
+input[type=range]{width:100%}button{border:1px solid var(--border);border-radius:12px;padding:10px 14px;font-size:16px;background:#fff;cursor:pointer}
+button.primary{background:var(--accent);color:#fff}.feature-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px}
+.feature{border:1px solid var(--border);border-radius:12px;padding:10px;background:var(--bg)}
+.formula{margin-top:12px;padding:12px;border-radius:12px;background:var(--bg);font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.feedback{margin-top:10px}.challenge{margin-top:14px;padding:12px;border-radius:12px;background:var(--bg)}
+.choice-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.bar{height:12px;background:#e5e7eb;border-radius:999px;overflow:hidden;margin-top:8px}
+.fill{height:100%;background:var(--accent);width:50%}.correct{color:var(--good)}.wrong{color:var(--bad)}svg{display:block;width:100%;height:auto}
+@media(max-width:800px){.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.two{grid-template-columns:1fr}.feature-grid{grid-template-columns:1fr}main{padding:14px}}
+</style>
+</head>
+<body>
+<main>
+<h1>📦 Cat or Not Cat?</h1>
+<div class="sub">Learn <strong>classification</strong> by deciding whether a mystery creature is a cat.</div>
+
+<div class="grid metrics">
+<div class="metric"><div class="label">Cat score</div><div id="scoreMetric" class="value">0%</div></div>
+<div class="metric"><div class="label">Threshold</div><div id="thresholdMetric" class="value">50%</div></div>
+<div class="metric"><div class="label">Model says</div><div id="modelMetric" class="value">?</div></div>
+<div class="metric"><div class="label">Round score</div><div id="roundMetric" class="value">0 / 0</div></div>
+</div>
+
+<div class="grid two" style="margin-top:16px">
+<section class="card">
+<h2 style="margin-top:0">1. Inspect the mystery creature</h2>
+<div class="tiny">The classifier looks at features and combines them into a cat score.</div>
+
+<svg id="creatureSvg" viewBox="0 0 520 300" role="img" aria-label="Mystery creature used for a cat classification game">
+<rect x="0" y="0" width="520" height="300" rx="16" fill="#f9fafb"></rect>
+<g id="creature" transform="translate(250 150)">
+<ellipse id="body" cx="0" cy="20" rx="72" ry="44" fill="#8a8a8a" stroke="#4b4b4b" stroke-width="3"></ellipse>
+<circle id="head" cx="66" cy="-5" r="34" fill="#929292" stroke="#4b4b4b" stroke-width="3"></circle>
+<path id="ear1" d="M45 -28 L53 -62 L67 -31 Z" fill="#888" stroke="#4b4b4b" stroke-width="3"></path>
+<path id="ear2" d="M68 -31 L89 -60 L94 -14 Z" fill="#888" stroke="#4b4b4b" stroke-width="3"></path>
+<g id="tail">
+  <path d="M-63 27 Q-116 -14 -129 31 Q-134 72 -90 75" fill="none" stroke="#666" stroke-width="29" stroke-linecap="round"></path>
+  <path d="M-63 27 Q-116 -14 -129 31 Q-134 72 -90 75" fill="none" stroke="#858585" stroke-width="23" stroke-linecap="round"></path>
+  <path d="M-66 21 Q-105 -3 -121 25" fill="none" stroke="#a0a0a0" stroke-width="4" stroke-linecap="round"></path>
+  <path d="M-70 31 Q-113 10 -125 39" fill="none" stroke="#555" stroke-width="4" stroke-linecap="round"></path>
+  <path d="M-78 44 Q-119 31 -119 58" fill="none" stroke="#a0a0a0" stroke-width="4" stroke-linecap="round"></path>
+  <path d="M-89 57 Q-112 51 -105 70" fill="none" stroke="#555" stroke-width="4" stroke-linecap="round"></path>
+</g>
+<g id="whiskers"><path d="M91 -2 L126 -8 M92 5 L130 6 M90 12 L124 21" stroke="#555" stroke-width="2"></path></g>
+<circle cx="58" cy="-6" r="4" fill="#222"></circle><circle cx="76" cy="-6" r="4" fill="#222"></circle>
+<path d="M67 7 l6 4 l-6 4" fill="#444"></path>
+</g>
+<text id="mysteryLabel" x="260" y="275" text-anchor="middle" font-size="16" fill="#374151">Mystery creature</text>
+</svg>
+
+<div class="feature-grid">
+<div class="feature">Pointy ears: <strong id="earsVal">?</strong></div>
+<div class="feature">Whiskers: <strong id="whiskersVal">?</strong></div>
+<div class="feature">Long tail: <strong id="tailVal">?</strong></div>
+<div class="feature">Fluffy body: <strong id="fluffyVal">?</strong></div>
+</div>
+
+<div class="formula" id="scoreFormula"></div>
+<div class="control">
+<label for="threshold">Decision threshold: <strong><span id="thresholdOut">50</span>%</strong></label>
+<input id="threshold" type="range" min="20" max="80" value="50" step="5">
+</div>
+<div class="bar"><div id="scoreBar" class="fill"></div></div>
+<div class="tiny" style="margin-top:6px">If cat score ≥ threshold → CAT. Otherwise → NOT CAT.</div>
+</section>
+
+<section class="card">
+<h2 style="margin-top:0">2. Make the classification</h2>
+<div class="tiny">Choose your answer before revealing the true label.</div>
+<div class="choice-row">
+<button id="catBtn" class="primary" type="button">🐈 CAT</button>
+<button id="notCatBtn" type="button">❌ NOT CAT</button>
+</div>
+<button id="revealBtn" type="button" style="margin-top:10px">Reveal answer</button>
+<button id="nextBtn" type="button" style="margin-top:10px">Next creature</button>
+<div id="feedback" class="feedback" aria-live="polite"></div>
+
+<div class="challenge">
+<strong>Threshold challenge</strong>
+<div style="margin-top:6px">Find a threshold that gets at least <strong>4 out of 5</strong> creatures correct.</div>
+<div style="margin-top:8px">Model accuracy this round set: <strong id="modelAccuracy">—</strong></div>
+<button id="checkThresholdBtn" type="button" style="margin-top:10px">Check threshold</button>
+<div id="thresholdFeedback" class="feedback" aria-live="polite"></div>
+</div>
+
+<div class="challenge">
+<strong>False positives & false negatives</strong>
+<div class="tiny" style="margin-top:6px">False positive: says CAT when it is not. False negative: misses a real cat.</div>
+</div>
+</section>
+</div>
+
+<section class="card" style="margin-top:16px">
+<h2 style="margin-top:0">What is this teaching?</h2>
+<div>Classification turns features into a score, then compares that score with a <strong>decision threshold</strong>. Changing the threshold changes which examples are labeled CAT or NOT CAT.</div>
+</section>
+</main>
+
+<script>
+(() => {
+const creatures=[
+{name:'Liucian',ears:1,whiskers:1,tail:1,fluffy:1,label:1},
+{name:'Fox',ears:1,whiskers:0,tail:1,fluffy:1,label:0},
+{name:'Rabbit',ears:1,whiskers:1,tail:0,fluffy:1,label:0},
+{name:'Short-haired cat',ears:1,whiskers:1,tail:1,fluffy:0,label:1},
+{name:'Small dog',ears:0,whiskers:0,tail:1,fluffy:1,label:0}
+];
+let idx=0,chosen=null,revealed=false,correct=0,played=0;
+const threshold=document.getElementById('threshold');
+
+function scoreFor(c){return c.ears*30+c.whiskers*35+c.tail*20+c.fluffy*15}
+function modelPrediction(c){return scoreFor(c)>=Number(threshold.value)?1:0}
+
+function setVisual(c){
+document.getElementById('earsVal').textContent=c.ears?'Yes':'No';
+document.getElementById('whiskersVal').textContent=c.whiskers?'Yes':'No';
+document.getElementById('tailVal').textContent=c.tail?'Yes':'No';
+document.getElementById('fluffyVal').textContent=c.fluffy?'Yes':'No';
+document.getElementById('ear1').style.display=c.ears?'block':'none';
+document.getElementById('ear2').style.display=c.ears?'block':'none';
+document.getElementById('whiskers').style.display=c.whiskers?'block':'none';
+document.getElementById('tail').style.display=c.tail?'block':'none';
+document.getElementById('body').setAttribute('rx',c.fluffy?'72':'60');
+document.getElementById('body').setAttribute('ry',c.fluffy?'44':'36');
+}
+
+function render(){
+const c=creatures[idx],score=scoreFor(c),th=Number(threshold.value),pred=modelPrediction(c);
+setVisual(c);
+document.getElementById('thresholdOut').textContent=th;
+document.getElementById('thresholdMetric').textContent=`${th}%`;
+document.getElementById('scoreMetric').textContent=`${score}%`;
+document.getElementById('scoreBar').style.width=`${score}%`;
+document.getElementById('modelMetric').textContent=pred?'CAT':'NOT CAT';
+document.getElementById('scoreFormula').textContent=`score = ears×30 + whiskers×35 + tail×20 + fluffy×15 = ${score}`;
+document.getElementById('roundMetric').textContent=`${correct} / ${played}`;
+document.getElementById('mysteryLabel').textContent=revealed?c.name:'Mystery creature';
+}
+
+function choose(v){
+if(revealed)return;
+chosen=v;
+document.getElementById('feedback').textContent=`You chose ${v?'CAT':'NOT CAT'}. Now reveal the answer.`;
+}
+document.getElementById('catBtn').addEventListener('click',()=>choose(1));
+document.getElementById('notCatBtn').addEventListener('click',()=>choose(0));
+
+document.getElementById('revealBtn').addEventListener('click',()=>{
+if(chosen===null){document.getElementById('feedback').textContent='Choose CAT or NOT CAT first.';return}
+if(revealed)return;
+revealed=true;
+const c=creatures[idx];
+played++;
+if(chosen===c.label)correct++;
+document.getElementById('feedback').innerHTML=chosen===c.label
+?`<span class="correct">⭐ Correct! ${c.name} is ${c.label?'a cat':'not a cat'}.</span>`
+:`<span class="wrong">Not quite. ${c.name} is ${c.label?'a cat':'not a cat'}.</span>`;
+render();
+});
+
+document.getElementById('nextBtn').addEventListener('click',()=>{
+idx=(idx+1)%creatures.length;chosen=null;revealed=false;document.getElementById('feedback').textContent='';render();
+});
+threshold.addEventListener('input',render);
+
+document.getElementById('checkThresholdBtn').addEventListener('click',()=>{
+const correctModel=creatures.filter(c=>modelPrediction(c)===c.label).length;
+document.getElementById('modelAccuracy').textContent=`${correctModel} / ${creatures.length}`;
+document.getElementById('thresholdFeedback').textContent=correctModel>=4
+?`🎉 Good threshold! The classifier gets ${correctModel}/5 examples correct.`
+:`The classifier gets ${correctModel}/5 correct. Try moving the threshold.`;
+});
+render();
+})();
+</script>
+</body>
+</html>

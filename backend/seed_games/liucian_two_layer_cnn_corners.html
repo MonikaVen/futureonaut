@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Liucian's Two-Layer CNN</title>
+<style>
+:root{
+  --bg:#f7f7f8;--card:#fff;--text:#1f2937;--muted:#6b7280;
+  --border:#d1d5db;--accent:#6b7280;--good:#237a4b;--bad:#b42318;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:Inter,system-ui,sans-serif;color:var(--text);background:#fff}
+main{max-width:1120px;margin:auto;padding:22px}
+h1{margin:0 0 6px}.sub,.tiny{color:var(--muted)}.sub{margin-bottom:18px}
+.grid{display:grid;gap:14px}.metrics{grid-template-columns:repeat(4,1fr)}.two{grid-template-columns:1.08fr .92fr}
+.card,.metric{border:1px solid var(--border);border-radius:16px;padding:14px;background:var(--card)}
+.label{font-size:13px;color:var(--muted)}.value{font-size:23px;font-weight:700}
+.box{padding:12px;border-radius:12px;background:var(--bg);border:1px solid var(--border);margin-top:12px}
+button{padding:10px 14px;border:1px solid var(--border);border-radius:12px;background:white;font-size:15px;cursor:pointer;margin:4px}
+button.primary{background:var(--accent);color:#fff}
+input[type=range]{width:100%}
+.image-grid{display:grid;grid-template-columns:repeat(14,1fr);gap:1px;background:#d1d5db;border:1px solid var(--border);border-radius:12px;overflow:hidden;aspect-ratio:1/1}
+.edge-grid{display:grid;grid-template-columns:repeat(12,1fr);gap:1px;background:#d1d5db;border:1px solid var(--border);border-radius:10px;overflow:hidden;aspect-ratio:1/1}
+.ear-grid{display:grid;grid-template-columns:repeat(10,1fr);gap:1px;background:#d1d5db;border:1px solid var(--border);border-radius:10px;overflow:hidden;aspect-ratio:1/1}
+.pixel,.edge-cell,.ear-cell{aspect-ratio:1/1;position:relative}
+.pixel.window,.edge-cell.window{box-shadow:inset 0 0 0 3px var(--accent);z-index:2}
+.ear-cell.hit::after{content:"★";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--text)}
+.kernel-grid{display:grid;grid-template-columns:repeat(3,44px);gap:2px;margin-top:8px}
+.kernel-cell{width:44px;height:44px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;background:#fff;font-family:ui-monospace,monospace}
+.math{font-family:ui-monospace,monospace;background:#fff;padding:9px;border-radius:10px;margin-top:8px}
+.mathPanel{display:none}.mathPanel.show{display:block}
+.progress{height:10px;background:#e5e7eb;border-radius:999px;overflow:hidden;margin-top:8px}.fill{height:100%;background:var(--accent);width:0%}
+.good{color:var(--good)}.bad{color:var(--bad)}.feedback{margin-top:10px}
+.stepbadge{display:inline-block;border:1px solid var(--border);border-radius:999px;padding:5px 9px;font-size:13px;margin-bottom:8px}
+@media(max-width:850px){.metrics{grid-template-columns:repeat(2,1fr)}.two{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<main>
+<h1>🧠 Liucian’s Two-Layer CNN</h1>
+<div class="sub">See how a CNN builds features hierarchically: <strong>pixels → corners → cat ears</strong>.</div>
+
+<div class="grid metrics">
+  <div class="metric"><div class="label">Layer 1</div><div class="value">Corner detection</div></div>
+  <div class="metric"><div class="label">Layer 2</div><div class="value">Ear detection</div></div>
+  <div class="metric"><div class="label">Current stage</div><div id="mStage" class="value">Layer 1</div></div>
+  <div class="metric"><div class="label">Ear hits</div><div id="mHits" class="value">0</div></div>
+</div>
+
+<div class="grid two" style="margin-top:16px">
+<section class="card">
+<span class="stepbadge">Layer 1</span>
+<h2 style="margin-top:0">1. Detect corners</h2>
+<div class="tiny">A 3×3 filter slides over Liucian’s pixels. Strong brightness changes become an corner feature map.</div>
+
+<div id="imageGrid" class="image-grid" style="margin-top:12px"></div>
+
+<div class="box">
+  <label for="edgePos">Corner scan position: <b><span id="edgePosOut">1</span> / 144</b></label>
+  <input id="edgePos" type="range" min="0" max="143" value="0" step="1">
+  <div class="progress"><div id="edgeFill" class="fill"></div></div>
+  <div style="margin-top:8px">
+    <button id="edgeStep">▶ Next corner window</button>
+    <button id="edgePlay" class="primary">⏩ Play Layer 1</button>
+    <button id="edgeReset">Reset</button>
+  </div>
+</div>
+
+<div class="box">
+  <strong>Corner kernel</strong>
+  <div class="kernel-grid">
+    <div class="kernel-cell">1</div><div class="kernel-cell">−1</div><div class="kernel-cell">0</div>
+    <div class="kernel-cell">−1</div><div class="kernel-cell">1</div><div class="kernel-cell">0</div>
+    <div class="kernel-cell">0</div><div class="kernel-cell">0</div><div class="kernel-cell">0</div>
+  </div>
+  <div id="edgeEquation" class="math">—</div>
+  <div>Corner activation: <b id="edgeActivation">—</b></div>
+</div>
+</section>
+
+<section class="card">
+<span class="stepbadge">Feature map</span>
+<h2 style="margin-top:0">Layer 1 output</h2>
+<div class="tiny">This 12×12 map no longer contains raw pixels. It contains corner strengths.</div>
+<div id="edgeMap" class="edge-grid" style="margin-top:12px"></div>
+
+<div class="box">
+  <strong>What changed?</strong>
+  <div class="tiny">Sharp two-direction changes are emphasized. Flat regions and simple straight edges become weaker. These corner responses become the input to Layer 2.</div>
+</div>
+</section>
+</div>
+
+<div class="grid two" style="margin-top:16px">
+<section class="card">
+<span class="stepbadge">Layer 2</span>
+<h2 style="margin-top:0">2. Detect cat ears from edges</h2>
+<div class="tiny">Now a second 3×3 filter slides over the edge map, looking for a pointed-ear pattern made from strong neighboring corner activations.</div>
+
+<div id="edgeMapLarge" class="edge-grid" style="margin-top:12px"></div>
+
+<div class="box">
+  <label for="earPos">Ear scan position: <b><span id="earPosOut">1</span> / 100</b></label>
+  <input id="earPos" type="range" min="0" max="99" value="0" step="1">
+  <div class="progress"><div id="earFill" class="fill"></div></div>
+  <div style="margin-top:8px">
+    <button id="earStep">▶ Next ear window</button>
+    <button id="earPlay" class="primary">⏩ Play Layer 2</button>
+    <button id="earReset">Reset</button>
+  </div>
+</div>
+
+<div class="box">
+  <strong>Pointed-ear kernel</strong>
+  <div class="kernel-grid">
+    <div class="kernel-cell">0</div><div class="kernel-cell">1</div><div class="kernel-cell">0</div>
+    <div class="kernel-cell">1</div><div class="kernel-cell">2</div><div class="kernel-cell">1</div>
+    <div class="kernel-cell">−1</div><div class="kernel-cell">0</div><div class="kernel-cell">−1</div>
+  </div>
+  <div id="earEquation" class="math">—</div>
+  <div>Ear activation: <b id="earActivation">—</b></div>
+  <div>Ear detected here: <b id="earDetected">—</b></div>
+</div>
+</section>
+
+<section class="card">
+<span class="stepbadge">Feature map</span>
+<h2 style="margin-top:0">Layer 2 output: ear map</h2>
+<div class="tiny">Strong ear-like patterns appear as high activations in this 10×10 map.</div>
+<div id="earMap" class="ear-grid" style="margin-top:12px"></div>
+
+<div class="box">
+  <label for="threshold">Ear threshold: <b><span id="thresholdOut">500</span></b></label>
+  <input id="threshold" type="range" min="100" max="1500" value="500" step="50">
+</div>
+
+<div class="box">
+  <strong>Final decision</strong>
+  <div id="finalDecision" style="font-size:22px;font-weight:700;margin-top:6px">No ear detected yet</div>
+  <div class="tiny">If at least one Layer 2 activation exceeds the threshold, the model has evidence for a sharp cat ear.</div>
+</div>
+
+<button id="mathBtn" style="margin-top:12px">📐 Mathematical concept</button>
+<div id="mathPanel" class="box mathPanel">
+  <strong>Two convolution layers</strong>
+  <div class="math">C = ReLU(I * K₁)</div>
+  <div class="tiny">Layer 1 convolves the image I with corner kernel K₁, producing corner map C.</div>
+
+  <div class="math">A = ReLU(C * K₂)</div>
+  <div class="tiny">Layer 2 convolves the corner map C with ear kernel K₂, producing ear activation map A.</div>
+
+  <div class="math">ear = 1 if max(A) ≥ τ</div>
+  <div class="tiny">The threshold τ turns the strongest high-level feature activation into a simple detection decision.</div>
+
+  <div class="math">14×14 → 12×12 → 10×10</div>
+  <div class="tiny">Each 3×3 valid convolution with stride 1 reduces width and height by 2.</div>
+
+  <div class="math">Y[i,j] = ΣₘΣₙ X[i+m,j+n]K[m,n] + b</div>
+  <div class="tiny">The same mathematical operation is used at both layers; what changes is the meaning of the input features.</div>
+</div>
+</section>
+</div>
+
+<section class="card" style="margin-top:16px">
+<h2>What is this teaching?</h2>
+<div>A CNN builds a <strong>feature hierarchy</strong>. Layer 1 does not need to understand “cat ear”—it only detects simple corners. Layer 2 combines those corner activations into a more meaningful shape. Deeper CNN layers can combine ears, eyes, whiskers, and fur into a full cat representation.</div>
+</section>
+</main>
+
+<script>
+(()=>{
+const $=id=>document.getElementById(id);
+const W=14,H=14;
+const img=Array(W*H).fill(238);
+function set(r,c,v){if(r>=0&&r<H&&c>=0&&c<W)img[r*W+c]=v}
+
+// Synthetic Liucian head with pointed ears.
+for(let r=5;r<=11;r++)for(let c=4;c<=10;c++)set(r,c,80);
+[[4,4],[3,5],[4,5],[2,6],[3,6],[4,6]].forEach(([r,c])=>set(r,c,38));
+[[4,8],[3,9],[4,9],[2,10],[3,10],[4,10]].forEach(([r,c])=>set(r,c,44));
+set(7,6,25);set(7,9,25);set(9,7,45);set(9,8,45);
+
+const edgeKernel=[[1,-1,0],[-1,1,0],[0,0,0]];
+const earKernel=[[0,1,0],[1,2,1],[-1,0,-1]];
+
+const imageGrid=$('imageGrid');
+img.forEach(v=>{
+  const p=document.createElement('div');p.className='pixel';
+  p.style.background=`rgb(${v},${v},${v})`;imageGrid.appendChild(p);
+});
+
+function convAt(arr,width,index,kernel,outWidth){
+  const row=Math.floor(index/outWidth),col=index%outWidth;
+  let sum=0,terms=[],touched=[];
+  for(let kr=0;kr<3;kr++){
+    for(let kc=0;kc<3;kc++){
+      const ii=(row+kr)*width+(col+kc);
+      const v=arr[ii],w=kernel[kr][kc];
+      sum+=v*w;terms.push(`${Math.round(v)}×${w}`);touched.push(ii);
+    }
+  }
+  return {row,col,sum,relu:Math.max(0,sum),terms,touched};
+}
+
+// Precompute Layer 1 edge map.
+const edgeMapVals=[];
+for(let i=0;i<144;i++)edgeMapVals.push(convAt(img,14,i,edgeKernel,12).relu);
+const edgeMax=Math.max(...edgeMapVals,1);
+
+function buildEdgeMap(holder){
+  holder.innerHTML='';
+  edgeMapVals.forEach(v=>{
+    const d=document.createElement('div');d.className='edge-cell';
+    const shade=Math.round(245-(v/edgeMax)*205);
+    d.style.background=`rgb(${shade},${shade},${shade})`;holder.appendChild(d);
+  });
+}
+buildEdgeMap($('edgeMap'));buildEdgeMap($('edgeMapLarge'));
+
+// Precompute Layer 2 ear map.
+function computeEarMap(){
+  const vals=[];
+  for(let i=0;i<100;i++)vals.push(convAt(edgeMapVals,12,i,earKernel,10).relu);
+  return vals;
+}
+let earMapVals=computeEarMap();
+let earMax=Math.max(...earMapVals,1);
+
+function buildEarMap(){
+  $('earMap').innerHTML='';
+  earMapVals.forEach(v=>{
+    const d=document.createElement('div');d.className='ear-cell';
+    const shade=Math.round(245-(v/earMax)*205);
+    d.style.background=`rgb(${shade},${shade},${shade})`;
+    $('earMap').appendChild(d);
+  });
+}
+buildEarMap();
+
+let edgePos=0,earPos=0,edgeTimer=null,earTimer=null;
+let earHits=new Set();
+
+function renderEdge(){
+  const info=convAt(img,14,edgePos,edgeKernel,12);
+  document.querySelectorAll('#imageGrid .pixel').forEach(p=>p.classList.remove('window'));
+  info.touched.forEach(i=>imageGrid.children[i].classList.add('window'));
+  $('edgePos').value=edgePos;$('edgePosOut').textContent=edgePos+1;
+  $('edgeFill').style.width=((edgePos+1)/144*100)+'%';
+  $('edgeEquation').textContent=info.terms.join(' + ')+' = '+info.sum;
+  $('edgeActivation').textContent=info.relu;
+  $('mStage').textContent='Layer 1';
+}
+
+function renderEar(){
+  const info=convAt(edgeMapVals,12,earPos,earKernel,10);
+  document.querySelectorAll('#edgeMapLarge .edge-cell').forEach(p=>p.classList.remove('window'));
+  info.touched.forEach(i=>$('edgeMapLarge').children[i].classList.add('window'));
+
+  const threshold=+$('threshold').value;
+  if(info.relu>=threshold)earHits.add(earPos);
+
+  $('earPos').value=earPos;$('earPosOut').textContent=earPos+1;
+  $('earFill').style.width=((earPos+1)/100*100)+'%';
+  $('earEquation').textContent=info.terms.join(' + ')+' = '+Math.round(info.sum);
+  $('earActivation').textContent=Math.round(info.relu);
+  $('earDetected').textContent=info.relu>=threshold?'YES ★':'No';
+  $('mStage').textContent='Layer 2';
+  $('mHits').textContent=earHits.size;
+
+  document.querySelectorAll('#earMap .ear-cell').forEach(c=>c.classList.remove('hit'));
+  earHits.forEach(i=>$('earMap').children[i].classList.add('hit'));
+
+  $('finalDecision').textContent=earHits.size>0?'👂 Cat-ear evidence detected':'No ear detected yet';
+}
+
+$('edgePos').addEventListener('input',e=>{edgePos=+e.target.value;renderEdge()});
+$('earPos').addEventListener('input',e=>{earPos=+e.target.value;renderEar()});
+
+$('edgeStep').addEventListener('click',()=>{renderEdge();edgePos=(edgePos+1)%144});
+$('earStep').addEventListener('click',()=>{renderEar();earPos=(earPos+1)%100});
+
+$('edgePlay').addEventListener('click',()=>{
+  if(edgeTimer){clearInterval(edgeTimer);edgeTimer=null;$('edgePlay').textContent='⏩ Play Layer 1';return}
+  $('edgePlay').textContent='⏸ Pause Layer 1';
+  edgeTimer=setInterval(()=>{
+    renderEdge();
+    if(edgePos>=143){clearInterval(edgeTimer);edgeTimer=null;$('edgePlay').textContent='⏩ Play Layer 1';return}
+    edgePos++;
+  },65);
+});
+
+$('earPlay').addEventListener('click',()=>{
+  if(earTimer){clearInterval(earTimer);earTimer=null;$('earPlay').textContent='⏩ Play Layer 2';return}
+  $('earPlay').textContent='⏸ Pause Layer 2';
+  earTimer=setInterval(()=>{
+    renderEar();
+    if(earPos>=99){clearInterval(earTimer);earTimer=null;$('earPlay').textContent='⏩ Play Layer 2';return}
+    earPos++;
+  },85);
+});
+
+$('edgeReset').addEventListener('click',()=>{
+  if(edgeTimer){clearInterval(edgeTimer);edgeTimer=null}
+  edgePos=0;$('edgePlay').textContent='⏩ Play Layer 1';renderEdge();
+});
+$('earReset').addEventListener('click',()=>{
+  if(earTimer){clearInterval(earTimer);earTimer=null}
+  earPos=0;earHits.clear();$('earPlay').textContent='⏩ Play Layer 2';renderEar();
+});
+
+$('threshold').addEventListener('input',()=>{
+  $('thresholdOut').textContent=$('threshold').value;
+  earHits.clear();
+  renderEar();
+});
+
+$('mathBtn').addEventListener('click',()=>{
+  $('mathPanel').classList.toggle('show');
+  $('mathBtn').textContent=$('mathPanel').classList.contains('show')?'📐 Hide mathematical concept':'📐 Mathematical concept';
+});
+
+renderEdge();renderEar();
+})();
+</script>
+</body>
+</html>

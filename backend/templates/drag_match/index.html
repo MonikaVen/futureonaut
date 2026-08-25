@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Drag Match</title>
+  <style>
+    :root { --bg:#f4f7fb; --ink:#0f172a; --accent:#1d4ed8; --muted:#64748b; --card:#fff; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: "Trebuchet MS", "Segoe UI", sans-serif; color:var(--ink);
+      background: linear-gradient(180deg,#dbeafe 0%, #f4f7fb 35%, #e2e8f0 100%); min-height:100vh; }
+    main { max-width:900px; margin:0 auto; padding:28px 16px 50px; }
+    h1 { margin:0 0 8px; }
+    .sub,.bar { color:var(--muted); }
+    .grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:18px; }
+    .col { background:var(--card); border:1px solid #cbd5e1; border-radius:14px; padding:14px; min-height:280px; }
+    .item { border:1px dashed #94a3b8; border-radius:10px; padding:12px; margin-top:8px; background:#f8fafc; cursor:grab; }
+    .item.dragging { opacity:.5; }
+    .drop { border:2px solid #93c5fd; background:#eff6ff; min-height:48px; }
+    .drop.ok { border-color:#16a34a; background:#dcfce7; }
+    .drop.bad { border-color:#dc2626; background:#fee2e2; }
+    button.primary { margin-top:14px; background:var(--accent); color:#fff; border:0; border-radius:10px; padding:10px 14px; font:inherit; cursor:pointer; }
+    @media (max-width:700px){ .grid{grid-template-columns:1fr;} }
+  </style>
+</head>
+<body>
+<main>
+  <h1 id="title">Match</h1>
+  <p class="sub" id="desc"></p>
+  <div class="bar">Score: <b id="score">0</b></div>
+  <div class="grid">
+    <div class="col"><h3>Terms</h3><div id="lefts"></div></div>
+    <div class="col"><h3>Meanings</h3><div id="rights"></div></div>
+  </div>
+  <button class="primary" id="check">Check matches</button>
+</main>
+<script>
+async function load() {
+  const data = await (await fetch('./content.json')).json();
+  document.getElementById('title').textContent = data.title || 'Match';
+  document.getElementById('desc').textContent = data.description || '';
+  const pairs = data.pairs || [];
+  let score = 0;
+  const lefts = document.getElementById('lefts');
+  const rights = document.getElementById('rights');
+  const shuffled = pairs.map(p => p.right).sort(() => Math.random() - 0.5);
+
+  pairs.forEach(p => {
+    if (window.LearnPlay) LearnPlay.taskStart(p.id);
+    const el = document.createElement('div');
+    el.className = 'item';
+    el.draggable = true;
+    el.textContent = p.left;
+    el.dataset.id = p.id;
+    el.addEventListener('dragstart', e => { el.classList.add('dragging'); e.dataTransfer.setData('text/plain', p.id); });
+    el.addEventListener('dragend', () => el.classList.remove('dragging'));
+    lefts.appendChild(el);
+  });
+
+  shuffled.forEach((text, idx) => {
+    const drop = document.createElement('div');
+    drop.className = 'item drop';
+    drop.dataset.right = text;
+    drop.innerHTML = `<div class="label">${text}</div><div class="slot" data-slot></div>`;
+    drop.addEventListener('dragover', e => e.preventDefault());
+    drop.addEventListener('drop', e => {
+      e.preventDefault();
+      const id = e.dataTransfer.getData('text/plain');
+      const dragged = lefts.querySelector(`[data-id="${id}"]`);
+      if (!dragged) return;
+      const slot = drop.querySelector('[data-slot]');
+      slot.innerHTML = '';
+      slot.appendChild(dragged);
+      drop.dataset.chosen = id;
+    });
+    rights.appendChild(drop);
+  });
+
+  document.getElementById('check').addEventListener('click', () => {
+    rights.querySelectorAll('.drop').forEach(drop => {
+      const chosen = drop.dataset.chosen;
+      const pair = pairs.find(p => p.id === chosen);
+      const correct = pair && pair.right === drop.dataset.right;
+      drop.classList.remove('ok','bad');
+      drop.classList.add(correct ? 'ok' : 'bad');
+      if (chosen && window.LearnPlay) {
+        LearnPlay.taskEnd(chosen);
+        LearnPlay.answer({ correct: !!correct, taskId: chosen, points: pair ? pair.points : 0 });
+        if (correct) { LearnPlay.score(pair.points || 10); score += pair.points || 10; }
+      }
+    });
+    document.getElementById('score').textContent = score;
+    if (window.LearnPlay) LearnPlay.complete({ score });
+  });
+}
+load();
+</script>
+</body>
+</html>
