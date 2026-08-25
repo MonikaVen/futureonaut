@@ -42,7 +42,7 @@ def list_languages() -> dict:
 
 
 @router.get("", response_model=list[GameOut])
-def list_games(db: Session = Depends(get_db), user: User = Depends(get_current_user)) -> list[GameOut]:
+def list_games(db: Session = Depends(get_db)) -> list[GameOut]:
     games = db.query(Game).order_by(Game.created_at.desc()).all()
     return [game_to_out(g) for g in games]
 
@@ -191,7 +191,7 @@ async def generate_game(
 
 
 @router.get("/{game_id}", response_model=GameOut)
-def get_game(game_id: UUID, db: Session = Depends(get_db), user: User = Depends(get_current_user)) -> GameOut:
+def get_game(game_id: UUID, db: Session = Depends(get_db)) -> GameOut:
     game = db.get(Game, game_id)
     if game is None:
         raise HTTPException(status_code=404, detail="Game not found")

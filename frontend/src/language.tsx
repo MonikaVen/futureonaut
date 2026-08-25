@@ -28,6 +28,8 @@ const COPY: Record<LangCode, Record<string, string>> = {
     creator: "Creator",
     admin: "Admin",
     logout: "Log out",
+    signIn: "Sign in",
+    signUp: "Sign up",
     search: "Search games",
     topic: "Topic",
     level: "Level",
@@ -36,6 +38,10 @@ const COPY: Record<LangCode, Record<string, string>> = {
     play: "Play",
     translating: "Translating game…",
     detected: "Detected",
+    mission:
+      "Mission: help learners build intuition for ML, Physics, and Math through short playable challenges — practice freely, then sign in to keep your scores and get guidance.",
+    guestPlayNote: "Playing as a guest — this run is not saved to your dashboard.",
+    signInToTrack: "Sign in to track scores",
   },
   lt: {
     games: "Žaidimai",
@@ -44,6 +50,8 @@ const COPY: Record<LangCode, Record<string, string>> = {
     creator: "Kūrėjas",
     admin: "Admin",
     logout: "Atsijungti",
+    signIn: "Prisijungti",
+    signUp: "Registruotis",
     search: "Ieškoti žaidimų",
     topic: "Tema",
     level: "Lygis",
@@ -52,6 +60,10 @@ const COPY: Record<LangCode, Record<string, string>> = {
     play: "Žaisti",
     translating: "Verčiama…",
     detected: "Aptikta",
+    mission:
+      "Misija: padėti mokytis ML, fizikos ir matematikos per trumpus žaidimus — žaisk laisvai, o prisijungęs išsaugosi rezultatus ir gausi rekomendacijas.",
+    guestPlayNote: "Žaidžiama kaip svečias — šis rezultatas nebus išsaugotas.",
+    signInToTrack: "Prisijunk, kad sektum rezultatus",
   },
   de: {
     games: "Spiele",
@@ -60,6 +72,8 @@ const COPY: Record<LangCode, Record<string, string>> = {
     creator: "Creator",
     admin: "Admin",
     logout: "Abmelden",
+    signIn: "Anmelden",
+    signUp: "Registrieren",
     search: "Spiele suchen",
     topic: "Thema",
     level: "Level",
@@ -68,6 +82,10 @@ const COPY: Record<LangCode, Record<string, string>> = {
     play: "Spielen",
     translating: "Übersetzung…",
     detected: "Erkannt",
+    mission:
+      "Mission: Intuition für ML, Physik und Mathematik durch kurze Spiel-Challenges aufbauen — frei üben, einloggen für Scores und Empfehlungen.",
+    guestPlayNote: "Gastmodus — dieser Lauf wird nicht gespeichert.",
+    signInToTrack: "Anmelden, um Scores zu speichern",
   },
   es: {
     games: "Juegos",
@@ -76,6 +94,8 @@ const COPY: Record<LangCode, Record<string, string>> = {
     creator: "Creador",
     admin: "Admin",
     logout: "Salir",
+    signIn: "Entrar",
+    signUp: "Registrarse",
     search: "Buscar juegos",
     topic: "Tema",
     level: "Nivel",
@@ -84,6 +104,10 @@ const COPY: Record<LangCode, Record<string, string>> = {
     play: "Jugar",
     translating: "Traduciendo…",
     detected: "Detectado",
+    mission:
+      "Misión: construir intuición en ML, Física y Matemáticas con retos jugables — practica libremente; inicia sesión para guardar puntuaciones.",
+    guestPlayNote: "Jugando como invitado — esta partida no se guarda.",
+    signInToTrack: "Inicia sesión para guardar",
   },
   fr: {
     games: "Jeux",
@@ -92,6 +116,8 @@ const COPY: Record<LangCode, Record<string, string>> = {
     creator: "Créateur",
     admin: "Admin",
     logout: "Déconnexion",
+    signIn: "Connexion",
+    signUp: "S'inscrire",
     search: "Rechercher",
     topic: "Sujet",
     level: "Niveau",
@@ -100,6 +126,10 @@ const COPY: Record<LangCode, Record<string, string>> = {
     play: "Jouer",
     translating: "Traduction…",
     detected: "Détecté",
+    mission:
+      "Mission : développer l'intuition en ML, physique et maths via de courts défis jouables — joue librement, connecte-toi pour garder tes scores.",
+    guestPlayNote: "Mode invité — cette partie n'est pas enregistrée.",
+    signInToTrack: "Se connecter pour suivre les scores",
   },
   pl: {
     games: "Gry",
@@ -108,6 +138,8 @@ const COPY: Record<LangCode, Record<string, string>> = {
     creator: "Twórca",
     admin: "Admin",
     logout: "Wyloguj",
+    signIn: "Zaloguj",
+    signUp: "Zarejestruj",
     search: "Szukaj gier",
     topic: "Temat",
     level: "Poziom",
@@ -116,6 +148,10 @@ const COPY: Record<LangCode, Record<string, string>> = {
     play: "Graj",
     translating: "Tłumaczenie…",
     detected: "Wykryto",
+    mission:
+      "Misja: budować intuicję w ML, fizyce i matematyce przez krótkie gry — graj swobodnie, zaloguj się, by zapisywać wyniki i dostawać wskazówki.",
+    guestPlayNote: "Tryb gościa — ten wynik nie zostanie zapisany.",
+    signInToTrack: "Zaloguj się, by śledzić wyniki",
   },
 };
 
