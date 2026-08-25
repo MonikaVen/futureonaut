@@ -7,8 +7,9 @@ RUN npm run build
 
 FROM nginx:1.27-alpine
 COPY nginx.conf.template /etc/nginx/templates/default.conf.template
+COPY docker-entrypoint.sh /docker-entrypoint-custom.sh
 COPY --from=build /app/dist /usr/share/nginx/html
+RUN chmod +x /docker-entrypoint-custom.sh
 ENV BACKEND_UPSTREAM=http://backend:8000
 EXPOSE 80
-# Official nginx image runs envsubst on /etc/nginx/templates via docker-entrypoint
-CMD ["nginx", "-g", "daemon off;"]
+ENTRYPOINT ["/docker-entrypoint-custom.sh"]
