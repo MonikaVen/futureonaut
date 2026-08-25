@@ -1,4 +1,4 @@
-import { NavLink, Outlet, Navigate } from "react-router-dom";
+import { NavLink, Outlet, Link } from "react-router-dom";
 import { useAuth } from "./auth";
 import { UI_LANGS, useLanguage } from "./language";
 
@@ -6,7 +6,6 @@ export function Shell() {
   const { user, logout, loading } = useAuth();
   const { lang, setLang, t } = useLanguage();
   if (loading) return <div className="app-shell">Loading…</div>;
-  if (!user) return <Navigate to="/login" replace />;
 
   return (
     <div className="app-shell">
@@ -16,12 +15,12 @@ export function Shell() {
         </NavLink>
         <nav className="nav-links">
           <NavLink to="/">{t("games")}</NavLink>
-          <NavLink to="/dashboard">{t("dashboard")}</NavLink>
-          <NavLink to="/recommendations">{t("forYou")}</NavLink>
-          {(user.role === "creator" || user.role === "admin") && (
+          {user && <NavLink to="/dashboard">{t("dashboard")}</NavLink>}
+          {user && <NavLink to="/recommendations">{t("forYou")}</NavLink>}
+          {user && (user.role === "creator" || user.role === "admin") && (
             <NavLink to="/creator">{t("creator")}</NavLink>
           )}
-          {user.role === "admin" && <NavLink to="/admin">{t("admin")}</NavLink>}
+          {user?.role === "admin" && <NavLink to="/admin">{t("admin")}</NavLink>}
           <label className="lang-select">
             <span className="meta">{t("language")}</span>
             <select
@@ -36,14 +35,30 @@ export function Shell() {
               ))}
             </select>
           </label>
-          <span className="meta">
-            {user.display_name} · {user.role}
-          </span>
-          <button className="btn secondary" type="button" onClick={logout}>
-            {t("logout")}
-          </button>
+          {user ? (
+            <>
+              <span className="meta">
+                {user.display_name} · {user.role}
+              </span>
+              <button className="btn secondary" type="button" onClick={logout}>
+                {t("logout")}
+              </button>
+            </>
+          ) : (
+            <>
+              <Link to="/login">{t("signIn")}</Link>
+              <Link className="btn accent" to="/register">
+                {t("signUp")}
+              </Link>
+            </>
+          )}
         </nav>
       </header>
+
+      <section className="mission">
+        <p>{t("mission")}</p>
+      </section>
+
       <Outlet />
     </div>
   );

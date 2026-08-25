@@ -10,6 +10,13 @@ import { RecommendationsPage } from "./pages/Recommendations";
 import { CreatorPage } from "./pages/Creator";
 import { AdminPage } from "./pages/Admin";
 
+function RequireAuth({ children }: { children: ReactNode }) {
+  const { user, loading } = useAuth();
+  if (loading) return null;
+  if (!user) return <Navigate to="/login" replace />;
+  return <>{children}</>;
+}
+
 function RequireRole({ roles, children }: { roles: string[]; children: ReactNode }) {
   const { user } = useAuth();
   if (!user || !roles.includes(user.role)) return <Navigate to="/" replace />;
@@ -24,8 +31,22 @@ export default function App() {
       <Route element={<Shell />}>
         <Route path="/" element={<CatalogPage />} />
         <Route path="/play/:gameId" element={<PlayPage />} />
-        <Route path="/dashboard" element={<DashboardPage />} />
-        <Route path="/recommendations" element={<RecommendationsPage />} />
+        <Route
+          path="/dashboard"
+          element={
+            <RequireAuth>
+              <DashboardPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/recommendations"
+          element={
+            <RequireAuth>
+              <RecommendationsPage />
+            </RequireAuth>
+          }
+        />
         <Route
           path="/creator"
           element={

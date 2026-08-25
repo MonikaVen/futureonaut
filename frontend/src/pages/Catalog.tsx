@@ -61,7 +61,7 @@ export function CatalogPage() {
     <div>
       <section className="hero">
         <h1>{t("games")}</h1>
-        <p>Search, filter by topic and level. Games translate to your selected language.</p>
+        <p>Search and play without an account. Sign in to save scores and recommendations.</p>
       </section>
       {error && <div className="error">{error}</div>}
 
