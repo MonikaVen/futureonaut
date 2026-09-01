@@ -83,6 +83,8 @@ const COPY: Record<LangCode, Record<string, string>> = {
     registerLede: "Join as a learner. Creators are assigned by an admin after signup.",
     pts: "pts",
     coverAlt: "Futureonaut — Grow with AI, ready for a changing world",
+    openMenu: "Open menu",
+    closeMenu: "Close menu",
   },
   lt: {
     games: "Žaidimai",
@@ -144,6 +146,8 @@ const COPY: Record<LangCode, Record<string, string>> = {
     registerLede: "Prisijunk kaip mokinys. Kūrėjai priskiriami po registracijos.",
     pts: "tšk.",
     coverAlt: "Futureonaut — Augk su DI, pasiruošęs kintančiam pasauliui",
+    openMenu: "Atidaryti meniu",
+    closeMenu: "Uždaryti meniu",
   },
   lv: {
     games: "Spēles",
@@ -205,6 +209,8 @@ const COPY: Record<LangCode, Record<string, string>> = {
     registerLede: "Pievienojies kā mācībnieks. Radītājus piešķir administrators.",
     pts: "pkt.",
     coverAlt: "Futureonaut — Aug ar MI, gatavs mainīgajai pasaulei",
+    openMenu: "Atvērt izvēlni",
+    closeMenu: "Aizvērt izvēlni",
   },
   et: {
     games: "Mängud",
@@ -266,6 +272,8 @@ const COPY: Record<LangCode, Record<string, string>> = {
     registerLede: "Liitu õppijana. Loojaid määrab administraator.",
     pts: "pkt",
     coverAlt: "Futureonaut — Kasva tehisintellektiga, valmis muutuvaks maailmaks",
+    openMenu: "Ava menüü",
+    closeMenu: "Sulge menüü",
   },
   fi: {
     games: "Pelit",
@@ -327,6 +335,8 @@ const COPY: Record<LangCode, Record<string, string>> = {
     registerLede: "Liity oppilaana. Tekijät määrittää ylläpitäjä.",
     pts: "p.",
     coverAlt: "Futureonaut — Kasva tekoälyn kanssa, valmiina muuttuvaan maailmaan",
+    openMenu: "Avaa valikko",
+    closeMenu: "Sulje valikko",
   },
   sv: {
     games: "Spel",
@@ -388,6 +398,8 @@ const COPY: Record<LangCode, Record<string, string>> = {
     registerLede: "Gå med som elev. Skapare tilldelas av en administratör.",
     pts: "p.",
     coverAlt: "Futureonaut — Väx med AI, redo för en föränderlig värld",
+    openMenu: "Öppna meny",
+    closeMenu: "Stäng meny",
   },
   no: {
     games: "Spill",
@@ -449,6 +461,8 @@ const COPY: Record<LangCode, Record<string, string>> = {
     registerLede: "Bli med som elev. Skapere tildeles av en administrator.",
     pts: "p.",
     coverAlt: "Futureonaut — Voks med AI, klar for en verden i endring",
+    openMenu: "Åpne meny",
+    closeMenu: "Lukk meny",
   },
 };
 

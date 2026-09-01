@@ -123,26 +123,22 @@ export function PlayPage() {
 
   return (
     <div className="player-wrap">
-      <div className="row" style={{ justifyContent: "space-between" }}>
-        <div>
-          <h1 style={{ fontFamily: "var(--font-display)", margin: 0 }}>{game.title}</h1>
+      <div className="row player-header">
+        <div className="player-header-copy">
+          <h1 className="player-title">{game.title}</h1>
           <p className="meta">{game.description}</p>
         </div>
         {user ? (
           <Link className="btn secondary" to="/dashboard">
-            Dashboard
+            {t("dashboard")}
           </Link>
         ) : (
           <Link className="btn secondary" to="/login">
-            Sign in to track scores
+            {t("signInToTrack")}
           </Link>
         )}
       </div>
-      {!user && (
-        <p className="guest-note">
-          Playing as a guest — progress is saved on this device and merges when you sign in.
-        </p>
-      )}
+      {!user && <p className="guest-note">{t("guestPlayNote")}</p>}
       {completed && session && (
         <ScoreCard
           sessionId={session.id}
@@ -169,15 +165,15 @@ export function PlayPage() {
       </div>
       <div className="metrics">
         <span>
-          Points <b>{points}</b>
+          {t("points")} <b>{points}</b>
         </span>
         <span>
-          Correct <b>
+          {t("correct")} <b>
             {correct}/{attempts}
           </b>
         </span>
         <span>
-          Task time <b>{(timeMs / 1000).toFixed(1)}s</b>
+          {t("taskTime")} <b>{(timeMs / 1000).toFixed(1)}s</b>
         </span>
       </div>
       <iframe

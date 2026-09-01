@@ -1,4 +1,5 @@
-import { NavLink, Outlet, Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { NavLink, Outlet, Link, useLocation } from "react-router-dom";
 import { useAuth } from "./auth";
 import { BrandLogo } from "./BrandLogo";
 import { LanguageSelect, useLanguage } from "./language";
@@ -6,6 +7,18 @@ import { LanguageSelect, useLanguage } from "./language";
 export function Shell() {
   const { user, logout, loading } = useAuth();
   const { t } = useLanguage();
+  const location = useLocation();
+  const [navOpen, setNavOpen] = useState(false);
+
+  useEffect(() => {
+    setNavOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    document.body.classList.toggle("nav-open", navOpen);
+    return () => document.body.classList.remove("nav-open");
+  }, [navOpen]);
+
   if (loading) {
     return (
       <div className="app-shell app-loading">
@@ -17,10 +30,22 @@ export function Shell() {
   return (
     <div className="app-shell">
       <header className="topnav">
-        <NavLink to="/" className="brand">
-          <BrandLogo />
-        </NavLink>
-        <nav className="nav-links">
+        <div className="topnav-bar">
+          <NavLink to="/" className="brand">
+            <BrandLogo />
+          </NavLink>
+          <button
+            type="button"
+            className="nav-toggle"
+            aria-expanded={navOpen}
+            aria-controls="main-nav"
+            aria-label={navOpen ? t("closeMenu") : t("openMenu")}
+            onClick={() => setNavOpen((open) => !open)}
+          >
+            <span className="nav-toggle-icon" aria-hidden />
+          </button>
+        </div>
+        <nav id="main-nav" className={`nav-links${navOpen ? " open" : ""}`}>
           <NavLink to="/">{t("games")}</NavLink>
           {user && <NavLink to="/dashboard">{t("dashboard")}</NavLink>}
           {user && <NavLink to="/recommendations">{t("forYou")}</NavLink>}
