@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { api, clearTokens, setTokens, type User } from "./api";
+import { getVisitorId } from "./visitor";
 
 interface AuthState {
   user: User | null;
@@ -40,9 +41,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [refreshMe]);
 
   const login = useCallback(async (email: string, password: string) => {
+    const visitor_id = getVisitorId();
     const tokens = await api<{ access_token: string; refresh_token: string }>("/api/auth/login", {
       method: "POST",
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email, password, visitor_id }),
     });
     setTokens(tokens.access_token, tokens.refresh_token);
     await refreshMe();
@@ -50,9 +52,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const register = useCallback(
     async (email: string, password: string, displayName: string) => {
+      const visitor_id = getVisitorId();
       await api("/api/auth/register", {
         method: "POST",
-        body: JSON.stringify({ email, password, display_name: displayName }),
+        body: JSON.stringify({ email, password, display_name: displayName, visitor_id }),
       });
       await login(email, password);
     },

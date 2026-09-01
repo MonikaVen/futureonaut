@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, type Game } from "../api";
+import { api, type Game, type GameAnalytics } from "../api";
 
 const QUIZ_SAMPLE = {
   title: "My Quiz",
@@ -40,10 +40,17 @@ export function CreatorPage() {
   const [aiType, setAiType] = useState("quiz");
   const [aiDiff, setAiDiff] = useState(2);
   const [aiCount, setAiCount] = useState(5);
+  const [analytics, setAnalytics] = useState<GameAnalytics[]>([]);
 
   async function reload() {
     const list = await api<Game[]>("/api/games/mine");
     setGames(list);
+    try {
+      const stats = await api<GameAnalytics[]>("/api/creator/analytics");
+      setAnalytics(stats);
+    } catch {
+      setAnalytics([]);
+    }
   }
 
   useEffect(() => {
@@ -133,6 +140,38 @@ export function CreatorPage() {
       </section>
       {error && <div className="error">{error}</div>}
       {message && <div className="panel" style={{ marginBottom: 12 }}>{message}</div>}
+
+      {analytics.length > 0 && (
+        <div className="panel" style={{ marginBottom: 16 }}>
+          <h2 style={{ fontFamily: "var(--font-display)", marginTop: 0 }}>Creator analytics</h2>
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Game</th>
+                <th>Views</th>
+                <th>Plays</th>
+                <th>Players</th>
+                <th>Avg time</th>
+                <th>Avg levels</th>
+                <th>Completion</th>
+              </tr>
+            </thead>
+            <tbody>
+              {analytics.map((row) => (
+                <tr key={row.game_id}>
+                  <td>{row.title}</td>
+                  <td>{row.views}</td>
+                  <td>{row.plays}</td>
+                  <td>{row.unique_players}</td>
+                  <td>{(row.avg_time_ms / 1000).toFixed(1)}s</td>
+                  <td>{row.avg_levels_completed.toFixed(1)}</td>
+                  <td>{(row.completion_rate * 100).toFixed(0)}%</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       <div className="panel" style={{ marginBottom: 16 }}>
         <h2 style={{ fontFamily: "var(--font-display)", marginTop: 0 }}>Upload game</h2>

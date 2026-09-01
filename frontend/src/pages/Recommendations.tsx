@@ -16,7 +16,7 @@ export function RecommendationsPage() {
     <div>
       <section className="hero">
         <h1>For you</h1>
-        <p>Suggested from weak topics, new games, and a gentle difficulty ramp.</p>
+        <p>Personalized picks from weak topics, new games, spaced review, and your difficulty level.</p>
       </section>
       {error && <div className="error">{error}</div>}
       <div className="grid">

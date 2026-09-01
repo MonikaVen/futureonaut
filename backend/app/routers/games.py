@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.auth import get_current_user, get_optional_user, require_roles
 from app.database import get_db
-from app.models import Game, GameSource, GameView, PlaySession, User, UserRole
+from app.models import Game, GameComment, GameLike, GameSource, GameView, PlaySession, User, UserRole
 from app.schemas import (
     AIGenerateRequest,
     GameOut,
@@ -24,6 +24,7 @@ from app.services.i18n import (
     translate_html,
 )
 from app.services.recommendations import game_to_out
+from app.services.social import enrich_games
 from app.services.storage import (
     delete_game_files,
     game_dir,
@@ -42,9 +43,12 @@ def list_languages() -> dict:
 
 
 @router.get("", response_model=list[GameOut])
-def list_games(db: Session = Depends(get_db)) -> list[GameOut]:
+def list_games(
+    db: Session = Depends(get_db),
+    user: User | None = Depends(get_optional_user),
+) -> list[GameOut]:
     games = db.query(Game).order_by(Game.created_at.desc()).all()
-    return [game_to_out(g) for g in games]
+    return enrich_games(db, games, user.id if user else None)
 
 
 @router.get("/mine", response_model=list[GameOut])
@@ -191,11 +195,15 @@ async def generate_game(
 
 
 @router.get("/{game_id}", response_model=GameOut)
-def get_game(game_id: UUID, db: Session = Depends(get_db)) -> GameOut:
+def get_game(
+    game_id: UUID,
+    db: Session = Depends(get_db),
+    user: User | None = Depends(get_optional_user),
+) -> GameOut:
     game = db.get(Game, game_id)
     if game is None:
         raise HTTPException(status_code=404, detail="Game not found")
-    return game_to_out(game)
+    return enrich_games(db, [game], user.id if user else None)[0]
 
 
 @router.post("/{game_id}/view", status_code=status.HTTP_204_NO_CONTENT)
@@ -252,6 +260,8 @@ def delete_game(
     for session in sessions:
         db.delete(session)
     db.query(GameView).filter(GameView.game_id == game.id).delete()
+    db.query(GameLike).filter(GameLike.game_id == game.id).delete()
+    db.query(GameComment).filter(GameComment.game_id == game.id).delete()
     delete_game_files(game.id)
     db.delete(game)
     db.commit()

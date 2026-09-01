@@ -26,6 +26,7 @@ services:
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:3080,http://localhost:3000}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:3080}
       GAMES_DIR: /data/games
     volumes:
       - games_data:/data/games

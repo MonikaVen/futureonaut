@@ -21,11 +21,28 @@ export interface Game {
   source_language?: string;
   created_at: string;
   play_url?: string | null;
+  like_count?: number;
+  comment_count?: number;
+  liked_by_me?: boolean;
+}
+
+export interface Comment {
+  id: string;
+  game_id: string;
+  user_id: string;
+  author_name: string;
+  body: string;
+  created_at: string;
+}
+
+export interface LikeToggle {
+  liked: boolean;
+  like_count: number;
 }
 
 export interface Session {
   id: string;
-  user_id: string;
+  user_id: string | null;
   game_id: string;
   started_at: string;
   ended_at: string | null;
@@ -33,7 +50,57 @@ export interface Session {
   total_time_ms: number;
   correct_count: number;
   attempt_count: number;
+  levels_completed?: number;
+  total_levels?: number | null;
   game_title?: string | null;
+}
+
+export interface ContinueSession {
+  session_id: string;
+  game_id: string;
+  game_title: string;
+  levels_completed: number;
+  total_levels: number | null;
+  total_points: number;
+  started_at: string;
+}
+
+export interface Classroom {
+  id: string;
+  name: string;
+  join_code: string;
+  teacher_id: string;
+  created_at: string;
+}
+
+export interface ClassroomAssignment {
+  id: string;
+  game_id: string;
+  game_title: string;
+  created_at: string;
+}
+
+export interface StudentProgress {
+  student_name: string;
+  student_email: string;
+  game_id: string;
+  game_title: string;
+  completed: boolean;
+  points: number;
+  accuracy: number;
+  levels_completed: number;
+  total_levels: number | null;
+}
+
+export interface ClassroomDetail {
+  id: string;
+  name: string;
+  join_code: string;
+  teacher_id: string;
+  is_teacher: boolean;
+  member_count: number;
+  assignments: ClassroomAssignment[];
+  progress: StudentProgress[];
 }
 
 export interface DashboardStats {
@@ -110,19 +177,21 @@ async function refreshAccess(): Promise<string | null> {
 
 export async function api<T>(
   path: string,
-  options: RequestInit = {},
+  options: RequestInit & { visitorId?: string } = {},
   retry = true
 ): Promise<T> {
-  const headers = new Headers(options.headers || {});
+  const { visitorId, ...fetchOptions } = options;
+  const headers = new Headers(fetchOptions.headers || {});
   const token = getAccessToken();
   if (token) headers.set("Authorization", `Bearer ${token}`);
-  if (options.body && !(options.body instanceof FormData) && !headers.has("Content-Type")) {
+  if (visitorId) headers.set("X-Visitor-Id", visitorId);
+  if (fetchOptions.body && !(fetchOptions.body instanceof FormData) && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
-  const res = await fetch(path, { ...options, headers });
+  const res = await fetch(path, { ...fetchOptions, headers });
   if (res.status === 401 && retry) {
     const next = await refreshAccess();
-    if (next) return api<T>(path, options, false);
+    if (next) return api<T>(path, { ...fetchOptions, headers, visitorId }, false);
   }
   if (!res.ok) {
     let detail = res.statusText;

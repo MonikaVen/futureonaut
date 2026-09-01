@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, type DashboardStats } from "../api";
+import { ContinuePlaying } from "../ContinuePlaying";
 
 export function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -21,6 +22,7 @@ export function DashboardPage() {
         <h1>Your progress</h1>
         <p>Scores, accuracy, and time across everything you have played.</p>
       </section>
+      <ContinuePlaying />
       <div className="stats" style={{ marginBottom: 18 }}>
         <div className="stat">
           <span className="meta">Sessions</span>

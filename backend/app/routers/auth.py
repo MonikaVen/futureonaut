@@ -13,7 +13,8 @@ from app.auth import (
 )
 from app.database import get_db
 from app.models import User, UserRole
-from app.schemas import TokenPair, TokenRefresh, UserCreate, UserLogin, UserOut
+from app.schemas import TokenPair, TokenRefresh, UserCreate, UserLogin, UserOut, GuestMergeIn
+from app.services.guest_merge import merge_guest_sessions
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -31,6 +32,8 @@ def register(body: UserCreate, db: Session = Depends(get_db)) -> User:
     db.add(user)
     db.commit()
     db.refresh(user)
+    if body.visitor_id:
+        merge_guest_sessions(db, user.id, body.visitor_id)
     return user
 
 
@@ -39,10 +42,22 @@ def login(body: UserLogin, db: Session = Depends(get_db)) -> TokenPair:
     user = db.query(User).filter(User.email == body.email.lower()).first()
     if user is None or not verify_password(body.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid email or password")
+    if body.visitor_id:
+        merge_guest_sessions(db, user.id, body.visitor_id)
     return TokenPair(
         access_token=create_access_token(user.id, user.role),
         refresh_token=create_refresh_token(user.id),
     )
+
+
+@router.post("/merge-guest")
+def merge_guest(
+    body: GuestMergeIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> dict:
+    merged = merge_guest_sessions(db, user.id, body.visitor_id)
+    return {"merged_sessions": merged}
 
 
 @router.post("/refresh", response_model=TokenPair)

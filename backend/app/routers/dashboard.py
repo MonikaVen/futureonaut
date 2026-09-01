@@ -1,13 +1,14 @@
 from collections import defaultdict
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, joinedload
 
 from app.auth import get_current_user, require_roles
 from app.database import get_db
-from app.models import Game, PlaySession, User, UserRole
+from app.models import Game, GameComment, PlaySession, User, UserRole
 from app.schemas import (
+    CommentOut,
     DashboardStats,
     GameAnalyticsOut,
     PlatformStats,
@@ -174,3 +175,43 @@ def game_analytics(
     user: User = Depends(require_roles(UserRole.admin)),
 ) -> list[GameAnalyticsOut]:
     return build_game_analytics(db)
+
+
+@admin_router.get("/comments", response_model=list[CommentOut])
+def list_all_comments(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(UserRole.admin)),
+) -> list[CommentOut]:
+    from sqlalchemy.orm import joinedload
+
+    comments = (
+        db.query(GameComment)
+        .options(joinedload(GameComment.user), joinedload(GameComment.game))
+        .order_by(GameComment.created_at.desc())
+        .limit(200)
+        .all()
+    )
+    return [
+        CommentOut(
+            id=c.id,
+            game_id=c.game_id,
+            user_id=c.user_id,
+            author_name=c.user.display_name if c.user else "Unknown",
+            body=c.body,
+            created_at=c.created_at,
+        )
+        for c in comments
+    ]
+
+
+@admin_router.delete("/comments/{comment_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_comment(
+    comment_id: UUID,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(UserRole.admin)),
+) -> None:
+    comment = db.get(GameComment, comment_id)
+    if comment is None:
+        raise HTTPException(status_code=404, detail="Comment not found")
+    db.delete(comment)
+    db.commit()

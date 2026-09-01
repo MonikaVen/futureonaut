@@ -9,6 +9,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
     func,
 )
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
@@ -34,6 +35,7 @@ class EventType(str, enum.Enum):
     answer = "answer"
     task_time = "task_time"
     level_complete = "level_complete"
+    milestone = "milestone"
     complete = "complete"
 
 
@@ -77,6 +79,7 @@ class GameView(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     game_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("games.id"), nullable=False)
     user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    visitor_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     viewed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     game: Mapped[Game] = relationship(back_populates="views")
@@ -87,7 +90,8 @@ class PlaySession(Base):
     __tablename__ = "play_sessions"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    visitor_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     game_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("games.id"), nullable=False)
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -98,9 +102,77 @@ class PlaySession(Base):
     levels_completed: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     total_levels: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
-    user: Mapped[User] = relationship(back_populates="sessions")
+    user: Mapped[User | None] = relationship(back_populates="sessions")
     game: Mapped[Game] = relationship(back_populates="sessions")
     events: Mapped[list["SessionEvent"]] = relationship(back_populates="session", cascade="all, delete-orphan")
+
+
+class Classroom(Base):
+    __tablename__ = "classrooms"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    join_code: Mapped[str] = mapped_column(String(8), unique=True, index=True, nullable=False)
+    teacher_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    teacher: Mapped[User] = relationship(foreign_keys=[teacher_id])
+    members: Mapped[list["ClassroomMember"]] = relationship(back_populates="classroom", cascade="all, delete-orphan")
+    assignments: Mapped[list["ClassroomAssignment"]] = relationship(
+        back_populates="classroom", cascade="all, delete-orphan"
+    )
+
+
+class ClassroomMember(Base):
+    __tablename__ = "classroom_members"
+    __table_args__ = (UniqueConstraint("classroom_id", "user_id", name="uq_classroom_member"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    classroom_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("classrooms.id"), nullable=False)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    joined_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    classroom: Mapped[Classroom] = relationship(back_populates="members")
+    user: Mapped[User] = relationship()
+
+
+class ClassroomAssignment(Base):
+    __tablename__ = "classroom_assignments"
+    __table_args__ = (UniqueConstraint("classroom_id", "game_id", name="uq_classroom_assignment"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    classroom_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("classrooms.id"), nullable=False)
+    game_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("games.id"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    classroom: Mapped[Classroom] = relationship(back_populates="assignments")
+    game: Mapped[Game] = relationship()
+
+
+class GameLike(Base):
+    __tablename__ = "game_likes"
+    __table_args__ = (UniqueConstraint("user_id", "game_id", name="uq_game_like_user_game"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    game_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("games.id"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    user: Mapped[User] = relationship()
+    game: Mapped[Game] = relationship()
+
+
+class GameComment(Base):
+    __tablename__ = "game_comments"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    game_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("games.id"), nullable=False)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    user: Mapped[User] = relationship()
+    game: Mapped[Game] = relationship()
 
 
 class SessionEvent(Base):

@@ -21,11 +21,13 @@ class UserCreate(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
     display_name: str = Field(default="", max_length=120)
+    visitor_id: str | None = Field(default=None, max_length=64)
 
 
 class UserLogin(BaseModel):
     email: EmailStr
     password: str
+    visitor_id: str | None = Field(default=None, max_length=64)
 
 
 class UserOut(BaseModel):
@@ -55,8 +57,31 @@ class GameOut(BaseModel):
     source_language: str = "en"
     created_at: datetime
     play_url: str | None = None
+    like_count: int = 0
+    comment_count: int = 0
+    liked_by_me: bool = False
 
     model_config = {"from_attributes": True}
+
+
+class CommentCreate(BaseModel):
+    body: str = Field(min_length=1, max_length=2000)
+
+
+class CommentOut(BaseModel):
+    id: uuid.UUID
+    game_id: uuid.UUID
+    user_id: uuid.UUID
+    author_name: str
+    body: str
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class LikeToggleOut(BaseModel):
+    liked: bool
+    like_count: int
 
 
 class GameUpdate(BaseModel):
@@ -134,6 +159,15 @@ class SessionCreate(BaseModel):
     game_id: uuid.UUID
 
 
+class GuestSessionCreate(BaseModel):
+    game_id: uuid.UUID
+    visitor_id: str = Field(min_length=8, max_length=64)
+
+
+class GuestMergeIn(BaseModel):
+    visitor_id: str = Field(min_length=8, max_length=64)
+
+
 class SessionEventIn(BaseModel):
     type: EventType
     payload: dict[str, Any] = Field(default_factory=dict)
@@ -141,7 +175,7 @@ class SessionEventIn(BaseModel):
 
 class SessionOut(BaseModel):
     id: uuid.UUID
-    user_id: uuid.UUID
+    user_id: uuid.UUID | None = None
     game_id: uuid.UUID
     started_at: datetime
     ended_at: datetime | None
@@ -151,8 +185,64 @@ class SessionOut(BaseModel):
     attempt_count: int
     levels_completed: int = 0
     total_levels: int | None = None
+    game_title: str | None = None
 
     model_config = {"from_attributes": True}
+
+
+class ContinueSessionOut(BaseModel):
+    session_id: uuid.UUID
+    game_id: uuid.UUID
+    game_title: str
+    levels_completed: int
+    total_levels: int | None
+    total_points: int
+    started_at: datetime
+
+
+class ClassroomCreate(BaseModel):
+    name: str = Field(min_length=2, max_length=120)
+
+
+class ClassroomJoin(BaseModel):
+    code: str = Field(min_length=4, max_length=8)
+
+
+class ClassroomOut(BaseModel):
+    id: uuid.UUID
+    name: str
+    join_code: str
+    teacher_id: uuid.UUID
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class AssignmentCreate(BaseModel):
+    game_id: uuid.UUID
+
+
+class StudentProgressOut(BaseModel):
+    student_name: str
+    student_email: str
+    game_id: uuid.UUID
+    game_title: str
+    completed: bool
+    points: int
+    accuracy: float
+    levels_completed: int
+    total_levels: int | None
+
+
+class ClassroomDetailOut(BaseModel):
+    id: uuid.UUID
+    name: str
+    join_code: str
+    teacher_id: uuid.UUID
+    is_teacher: bool
+    member_count: int
+    assignments: list[dict[str, Any]]
+    progress: list[StudentProgressOut]
 
 
 class SessionDetail(SessionOut):
@@ -183,12 +273,57 @@ class GameAnalyticsOut(BaseModel):
     topic: str
     difficulty: int
     views: int
+    unique_visitors: int
     plays: int
     unique_players: int
+    view_to_play_rate: float
     total_time_ms: int
     avg_time_ms: float
     avg_levels_completed: float
     completion_rate: float
+    avg_accuracy: float
+    avg_score: float
+
+
+class LevelFunnelOut(BaseModel):
+    level: int
+    sessions_reached: int
+    reach_rate: float
+
+
+class TaskStatOut(BaseModel):
+    task_id: str
+    completions: int
+    avg_duration_ms: float
+
+
+class DailyViewsOut(BaseModel):
+    date: str
+    views: int
+
+
+class RecentSessionOut(BaseModel):
+    session_id: uuid.UUID
+    user_email: str
+    started_at: datetime
+    duration_ms: int
+    levels_completed: int
+    total_levels: int | None
+    completed: bool
+    points: int
+    accuracy: float
+
+
+class GameAnalyticsDetailOut(GameAnalyticsOut):
+    level_funnel: list[LevelFunnelOut]
+    task_stats: list[TaskStatOut]
+    daily_views: list[DailyViewsOut]
+    recent_sessions: list[RecentSessionOut]
+    event_counts: dict[str, int]
+
+
+class GameViewIn(BaseModel):
+    visitor_id: str | None = Field(default=None, max_length=64)
 
 
 class RecommendationOut(BaseModel):

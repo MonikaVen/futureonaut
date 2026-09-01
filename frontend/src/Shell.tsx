@@ -17,6 +17,7 @@ export function Shell() {
           <NavLink to="/">{t("games")}</NavLink>
           {user && <NavLink to="/dashboard">{t("dashboard")}</NavLink>}
           {user && <NavLink to="/recommendations">{t("forYou")}</NavLink>}
+          {user && <NavLink to="/classrooms">{t("classrooms")}</NavLink>}
           {user && (user.role === "creator" || user.role === "admin") && (
             <NavLink to="/creator">{t("creator")}</NavLink>
           )}

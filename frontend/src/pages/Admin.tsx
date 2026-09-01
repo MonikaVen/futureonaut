@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, type Game, type GameAnalytics, type PlatformStats, type Role, type User } from "../api";
+import { api, type Comment, type Game, type GameAnalytics, type PlatformStats, type Role, type User } from "../api";
+import { useLanguage } from "../language";
 
 const TOPICS = ["AI", "Physics", "Math"] as const;
 
@@ -28,8 +29,10 @@ function formatPercent(rate: number): string {
 }
 
 export function AdminPage() {
+  const { t } = useLanguage();
   const [users, setUsers] = useState<User[]>([]);
   const [games, setGames] = useState<Game[]>([]);
+  const [comments, setComments] = useState<Comment[]>([]);
   const [analytics, setAnalytics] = useState<GameAnalytics[]>([]);
   const [stats, setStats] = useState<PlatformStats | null>(null);
   const [error, setError] = useState("");
@@ -37,16 +40,18 @@ export function AdminPage() {
   const [sortKey, setSortKey] = useState<SortKey>("views");
 
   async function load() {
-    const [u, s, g, a] = await Promise.all([
+    const [u, s, g, a, c] = await Promise.all([
       api<User[]>("/api/admin/users"),
       api<PlatformStats>("/api/admin/stats"),
       api<Game[]>("/api/games"),
       api<GameAnalytics[]>("/api/admin/game-analytics"),
+      api<Comment[]>("/api/admin/comments"),
     ]);
     setUsers(u);
     setStats(s);
     setGames(g);
     setAnalytics(a);
+    setComments(c);
   }
 
   useEffect(() => {
@@ -83,6 +88,22 @@ export function AdminPage() {
       setBusyId(null);
     }
   }
+
+  async function deleteComment(comment: Comment) {
+    if (!confirm("Delete this comment?")) return;
+    setBusyId(comment.id);
+    setError("");
+    try {
+      await api(`/api/admin/comments/${comment.id}`, { method: "DELETE" });
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Delete failed");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  const gameTitle = (id: string) => games.find((g) => g.id === id)?.title || id.slice(0, 8);
 
   return (
     <div>
@@ -209,6 +230,50 @@ export function AdminPage() {
                   </td>
                 </tr>
               ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="panel section-gap">
+        <h2 style={{ fontFamily: "var(--font-display)", marginTop: 0 }}>{t("moderateComments")}</h2>
+        <table className="table">
+          <thead>
+            <tr>
+              <th>Game</th>
+              <th>Author</th>
+              <th>Comment</th>
+              <th>When</th>
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            {comments.map((c) => (
+              <tr key={c.id}>
+                <td>
+                  <Link to={`/play/${c.game_id}`}>{gameTitle(c.game_id)}</Link>
+                </td>
+                <td>{c.author_name}</td>
+                <td>{c.body}</td>
+                <td className="meta">{new Date(c.created_at).toLocaleString()}</td>
+                <td>
+                  <button
+                    className="btn danger"
+                    type="button"
+                    disabled={busyId === c.id}
+                    onClick={() => deleteComment(c)}
+                  >
+                    {busyId === c.id ? "…" : t("deleteComment")}
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {!comments.length && (
+              <tr>
+                <td colSpan={5} className="meta">
+                  {t("noComments")}
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

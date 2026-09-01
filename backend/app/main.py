@@ -7,8 +7,9 @@ from sqlalchemy import text
 
 from app.config import get_settings
 from app.database import Base, engine
-from app.routers import auth, games, sessions
+from app.routers import auth, classrooms, creator, games, sessions, social
 from app.routers.dashboard import admin_router, router as dashboard_router
+from app.routers.share_page import router as share_page_router
 from app.seed import seed_admin
 from app.services.demo_seed import seed_demo_games
 
@@ -41,6 +42,32 @@ def ensure_schema() -> None:
                 """
             )
         )
+        conn.execute(
+            text(
+                """
+                DO $$ BEGIN
+                    ALTER TYPE eventtype ADD VALUE 'milestone';
+                EXCEPTION
+                    WHEN duplicate_object THEN NULL;
+                END $$;
+                """
+            )
+        )
+        conn.execute(
+            text("ALTER TABLE game_views ADD COLUMN IF NOT EXISTS visitor_id VARCHAR(64)")
+        )
+        conn.execute(
+            text("ALTER TABLE play_sessions ALTER COLUMN user_id DROP NOT NULL")
+        )
+        conn.execute(
+            text("ALTER TABLE play_sessions ADD COLUMN IF NOT EXISTS visitor_id VARCHAR(64)")
+        )
+        conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_play_sessions_visitor_id "
+                "ON play_sessions (visitor_id)"
+            )
+        )
 
 
 @asynccontextmanager
@@ -67,9 +94,13 @@ app.add_middleware(
 
 app.include_router(auth.router, prefix="/api")
 app.include_router(games.router, prefix="/api")
+app.include_router(social.router, prefix="/api")
 app.include_router(sessions.router, prefix="/api")
+app.include_router(classrooms.router, prefix="/api")
+app.include_router(creator.router, prefix="/api")
 app.include_router(dashboard_router, prefix="/api")
 app.include_router(admin_router, prefix="/api")
+app.include_router(share_page_router)
 
 
 @app.get("/api/health")

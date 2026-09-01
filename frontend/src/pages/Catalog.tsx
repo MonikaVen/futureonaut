@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, type Game } from "../api";
+import { GameShare } from "../GameShare";
+import { GameSocial } from "../GameSocial";
+import { ContinuePlaying } from "../ContinuePlaying";
 import { useLanguage } from "../language";
 
 const TOPICS = ["AI", "Physics", "Math"] as const;
@@ -44,6 +47,10 @@ export function CatalogPage() {
       .catch((err) => setError(err.message));
   }, []);
 
+  function patchGame(id: string, patch: Partial<Game>) {
+    setGames((prev) => prev.map((g) => (g.id === id ? { ...g, ...patch } : g)));
+  }
+
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
     let list = [...games];
@@ -80,9 +87,11 @@ export function CatalogPage() {
     <div>
       <section className="hero">
         <h1>{t("games")}</h1>
-        <p>Search and play without an account. Sign in to save scores and recommendations.</p>
+        <p>Search and play without an account. Sign in to save scores, like games, and comment.</p>
       </section>
       {error && <div className="error">{error}</div>}
+
+      <ContinuePlaying />
 
       <div className="topic-tabs" role="tablist" aria-label={t("topic")}>
         {(["All", ...TOPICS] as const).map((tp) => (
@@ -147,10 +156,21 @@ export function CatalogPage() {
               ))}
               <span className="tag">Lv {g.difficulty}</span>
             </div>
-            <div className="row">
+            <GameSocial
+              game={{
+                ...g,
+                like_count: g.like_count ?? 0,
+                comment_count: g.comment_count ?? 0,
+                liked_by_me: g.liked_by_me ?? false,
+              }}
+              compact
+              onUpdate={(patch) => patchGame(g.id, patch)}
+            />
+            <div className="row tile-actions">
               <Link className="btn accent" to={`/play/${g.id}`}>
                 {t("play")}
               </Link>
+              <GameShare gameId={g.id} title={g.title} description={g.description} compact />
             </div>
           </article>
         ))}

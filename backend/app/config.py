@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     openai_model: str = "gpt-4o-mini"
     cors_origins: str = "http://localhost:5173,http://localhost:3000"
     games_dir: str = "data/games"
+    public_base_url: str = ""
 
     @property
     def cors_origin_list(self) -> list[str]:

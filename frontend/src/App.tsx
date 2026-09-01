@@ -8,6 +8,7 @@ import { PlayPage } from "./pages/Play";
 import { DashboardPage } from "./pages/Dashboard";
 import { RecommendationsPage } from "./pages/Recommendations";
 import { CreatorPage } from "./pages/Creator";
+import { ClassroomPage } from "./pages/Classroom";
 import { AdminPage } from "./pages/Admin";
 
 function RequireAuth({ children }: { children: ReactNode }) {
@@ -44,6 +45,14 @@ export default function App() {
           element={
             <RequireAuth>
               <RecommendationsPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/classrooms"
+          element={
+            <RequireAuth>
+              <ClassroomPage />
             </RequireAuth>
           }
         />
