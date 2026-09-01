@@ -45,11 +45,12 @@ def enrich_games(db: Session, games: list[Game], user_id: UUID | None = None) ->
     for game in games:
         base = game_to_out(game)
         out.append(
-            GameOut(
-                **base.model_dump(),
-                like_count=int(like_counts.get(game.id, 0)),
-                comment_count=int(comment_counts.get(game.id, 0)),
-                liked_by_me=game.id in liked_ids,
+            base.model_copy(
+                update={
+                    "like_count": int(like_counts.get(game.id, 0)),
+                    "comment_count": int(comment_counts.get(game.id, 0)),
+                    "liked_by_me": game.id in liked_ids,
+                }
             )
         )
     return out
