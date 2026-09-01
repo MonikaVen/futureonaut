@@ -1,4 +1,4 @@
-export type SharePlatform = "copy" | "native" | "x" | "facebook" | "linkedin" | "whatsapp";
+export type SharePlatform = "copy" | "x" | "facebook" | "linkedin";
 
 /** Public URL used for Open Graph previews (crawler-friendly HTML). */
 export function gameShareUrl(gameId: string): string {
@@ -18,13 +18,11 @@ export function gameShareText(title: string, description?: string): string {
 export function shareLinks(gameId: string, title: string, description?: string) {
   const url = encodeURIComponent(gameShareUrl(gameId));
   const text = encodeURIComponent(gameShareText(title, description));
-  const combined = encodeURIComponent(`${gameShareText(title, description)} ${gameShareUrl(gameId)}`);
 
   return {
     x: `https://twitter.com/intent/tweet?text=${text}&url=${url}`,
     facebook: `https://www.facebook.com/sharer/sharer.php?u=${url}`,
     linkedin: `https://www.linkedin.com/sharing/share-offsite/?url=${url}`,
-    whatsapp: `https://wa.me/?text=${combined}`,
   };
 }
 

@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, type Comment, type Game, type LikeToggle } from "./api";
 import { useAuth } from "./auth";
+import { GameShare } from "./GameShare";
+import { CommentIcon, PlayIcon, StarIcon } from "./Icons";
 import { useLanguage } from "./language";
 
 type Props = {
@@ -9,6 +11,8 @@ type Props = {
   onUpdate: (patch: Partial<Pick<Game, "like_count" | "comment_count" | "liked_by_me">>) => void;
   showComments?: boolean;
   compact?: boolean;
+  shareTitle?: string;
+  shareDescription?: string;
 };
 
 function formatWhen(iso: string) {
@@ -24,13 +28,21 @@ function formatWhen(iso: string) {
   }
 }
 
-export function GameSocial({ game, onUpdate, showComments = false, compact = false }: Props) {
+export function GameSocial({
+  game,
+  onUpdate,
+  showComments = false,
+  compact = false,
+  shareTitle,
+  shareDescription,
+}: Props) {
   const { user } = useAuth();
   const { t } = useLanguage();
   const [comments, setComments] = useState<Comment[]>([]);
   const [body, setBody] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const showShare = Boolean(shareTitle);
 
   useEffect(() => {
     if (!showComments) return;
@@ -39,7 +51,7 @@ export function GameSocial({ game, onUpdate, showComments = false, compact = fal
       .catch(() => setComments([]));
   }, [game.id, showComments, game.comment_count]);
 
-  async function toggleLike() {
+  async function toggleFavourite() {
     if (!user) return;
     setBusy(true);
     setError("");
@@ -75,25 +87,64 @@ export function GameSocial({ game, onUpdate, showComments = false, compact = fal
 
   return (
     <div className={`social${compact ? " compact" : ""}${showComments ? " with-comments" : ""}`}>
-      <div className="social-actions">
-        {user ? (
-          <button
-            type="button"
-            className={`social-btn like${game.liked_by_me ? " active" : ""}`}
-            disabled={busy}
-            onClick={toggleLike}
-            aria-pressed={game.liked_by_me}
-          >
-            ♥ {game.like_count}
-          </button>
-        ) : (
-          <Link className="social-btn like" to="/login" title={t("signInToLike")}>
-            ♥ {game.like_count}
-          </Link>
+      <div className={`social-actions${showShare ? " social-actions-row" : ""}`}>
+        <div className="social-actions-left">
+          {user ? (
+            <button
+              type="button"
+              className={`social-btn favourite${game.liked_by_me ? " active" : ""}`}
+              disabled={busy}
+              onClick={toggleFavourite}
+              aria-pressed={game.liked_by_me}
+              title={game.liked_by_me ? t("removeFavourite") : t("addFavourite")}
+            >
+              <StarIcon filled={game.liked_by_me} />
+              <span>{t("favourite")}</span>
+            </button>
+          ) : (
+            <Link
+              className="social-btn favourite"
+              to="/login"
+              title={t("signInToFavourite")}
+            >
+              <StarIcon />
+              <span>{t("favourite")}</span>
+            </Link>
+          )}
+          <span className="social-chip" title={t("comments")}>
+            <CommentIcon />
+            <span>{game.comment_count}</span>
+          </span>
+          {!compact && game.like_count > 0 && (
+            <span className="social-count meta" title={t("favourite")}>
+              {game.like_count} {t("saved")}
+            </span>
+          )}
+        </div>
+        {compact && (
+          <>
+            <Link className="btn accent social-play-btn" to={`/play/${game.id}`}>
+              <PlayIcon size={14} />
+              <span>{t("play")}</span>
+            </Link>
+            {showShare && shareTitle && (
+              <GameShare
+                gameId={game.id}
+                title={shareTitle}
+                description={shareDescription}
+                compact
+              />
+            )}
+          </>
         )}
-        <span className="social-count" title={t("comments")}>
-          💬 {game.comment_count}
-        </span>
+        {!compact && showShare && shareTitle && (
+          <GameShare
+            gameId={game.id}
+            title={shareTitle}
+            description={shareDescription}
+            compact
+          />
+        )}
       </div>
 
       {showComments && (
@@ -110,7 +161,7 @@ export function GameSocial({ game, onUpdate, showComments = false, compact = fal
                 maxLength={2000}
               />
               <button className="btn accent" type="submit" disabled={busy || !body.trim()}>
-                {t("postComment")}
+                {t("post")}
               </button>
             </form>
           ) : (

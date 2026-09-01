@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, type Comment, type Game, type GameAnalytics, type PlatformStats, type Role, type User } from "../api";
-import { useLanguage } from "../language";
 
 const TOPICS = ["AI", "Physics", "Math"] as const;
 
@@ -29,7 +28,6 @@ function formatPercent(rate: number): string {
 }
 
 export function AdminPage() {
-  const { t } = useLanguage();
   const [users, setUsers] = useState<User[]>([]);
   const [games, setGames] = useState<Game[]>([]);
   const [comments, setComments] = useState<Comment[]>([]);
@@ -235,7 +233,7 @@ export function AdminPage() {
       </div>
 
       <div className="panel section-gap">
-        <h2 style={{ fontFamily: "var(--font-display)", marginTop: 0 }}>{t("moderateComments")}</h2>
+        <h2 style={{ fontFamily: "var(--font-display)", marginTop: 0 }}>Comments</h2>
         <table className="table">
           <thead>
             <tr>
@@ -262,7 +260,7 @@ export function AdminPage() {
                     disabled={busyId === c.id}
                     onClick={() => deleteComment(c)}
                   >
-                    {busyId === c.id ? "…" : t("deleteComment")}
+                    {busyId === c.id ? "…" : "Delete"}
                   </button>
                 </td>
               </tr>
@@ -270,7 +268,7 @@ export function AdminPage() {
             {!comments.length && (
               <tr>
                 <td colSpan={5} className="meta">
-                  {t("noComments")}
+                  No comments yet.
                 </td>
               </tr>
             )}

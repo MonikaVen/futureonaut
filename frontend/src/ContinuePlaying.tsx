@@ -2,9 +2,11 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, type ContinueSession } from "./api";
 import { useAuth } from "./auth";
+import { useLanguage } from "./language";
 
 export function ContinuePlaying() {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const [items, setItems] = useState<ContinueSession[]>([]);
 
   useEffect(() => {

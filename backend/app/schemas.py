@@ -59,6 +59,7 @@ class GameOut(BaseModel):
     play_url: str | None = None
     like_count: int = 0
     comment_count: int = 0
+    view_count: int = 0
     liked_by_me: bool = False
 
     model_config = {"from_attributes": True}

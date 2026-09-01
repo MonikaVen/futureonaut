@@ -1,17 +1,24 @@
 import { NavLink, Outlet, Link } from "react-router-dom";
 import { useAuth } from "./auth";
-import { UI_LANGS, useLanguage } from "./language";
+import { BrandLogo } from "./BrandLogo";
+import { LanguageSelect, useLanguage } from "./language";
 
 export function Shell() {
   const { user, logout, loading } = useAuth();
-  const { lang, setLang, t } = useLanguage();
-  if (loading) return <div className="app-shell">Loading…</div>;
+  const { t } = useLanguage();
+  if (loading) {
+    return (
+      <div className="app-shell app-loading">
+        <BrandLogo />
+      </div>
+    );
+  }
 
   return (
     <div className="app-shell">
       <header className="topnav">
         <NavLink to="/" className="brand">
-          Futureonaut
+          <BrandLogo />
         </NavLink>
         <nav className="nav-links">
           <NavLink to="/">{t("games")}</NavLink>
@@ -22,42 +29,30 @@ export function Shell() {
             <NavLink to="/creator">{t("creator")}</NavLink>
           )}
           {user?.role === "admin" && <NavLink to="/admin">{t("admin")}</NavLink>}
-          <label className="lang-select">
-            <span className="meta">{t("language")}</span>
-            <select
-              value={lang}
-              onChange={(e) => setLang(e.target.value as typeof lang)}
-              aria-label={t("language")}
-            >
-              {UI_LANGS.map((l) => (
-                <option key={l.code} value={l.code}>
-                  {l.label}
-                </option>
-              ))}
-            </select>
-          </label>
+          <LanguageSelect />
           {user ? (
-            <>
-              <span className="meta">
-                {user.display_name} · {user.role}
+            <div className="nav-user">
+              <span className="nav-user-meta">
+                {user.display_name}
+                <span className="nav-user-role">{user.role}</span>
               </span>
-              <button className="btn secondary" type="button" onClick={logout}>
+              <button className="btn secondary btn-sm" type="button" onClick={logout}>
                 {t("logout")}
               </button>
-            </>
+            </div>
           ) : (
-            <>
+            <div className="nav-auth">
               <Link to="/login">{t("signIn")}</Link>
-              <Link className="btn accent" to="/register">
+              <Link className="btn accent btn-sm" to="/register">
                 {t("signUp")}
               </Link>
-            </>
+            </div>
           )}
         </nav>
       </header>
 
-      <section className="mission">
-        <p>{t("mission")}</p>
+      <section className="platform-cover" aria-label="Futureonaut">
+        <img src="/cover.png" alt={t("coverAlt")} />
       </section>
 
       <Outlet />

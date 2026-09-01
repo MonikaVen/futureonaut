@@ -23,6 +23,7 @@ export interface Game {
   play_url?: string | null;
   like_count?: number;
   comment_count?: number;
+  view_count?: number;
   liked_by_me?: boolean;
 }
 

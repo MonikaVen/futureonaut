@@ -1,9 +1,8 @@
 from uuid import UUID, uuid4
-import json
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_user, get_optional_user, require_roles
@@ -16,13 +15,6 @@ from app.schemas import (
     TemplateGameCreate,
 )
 from app.services.generate import generate_ai_content, validate_template_content
-from app.services.i18n import (
-    SUPPORTED_LANGS,
-    detect_language,
-    extract_visible_text,
-    i18n_cache_path,
-    translate_html,
-)
 from app.services.recommendations import game_to_out
 from app.services.social import enrich_games
 from app.services.storage import (
@@ -35,11 +27,6 @@ from app.services.storage import (
 from app.services.topics import ensure_topic_tag
 
 router = APIRouter(prefix="/games", tags=["games"])
-
-
-@router.get("/languages")
-def list_languages() -> dict:
-    return {"languages": [{"code": k, "label": v} for k, v in SUPPORTED_LANGS.items()]}
 
 
 @router.get("", response_model=list[GameOut])
@@ -91,12 +78,6 @@ async def upload_game(
         title,
         description,
     )
-    # Detect language from HTML content when possible
-    try:
-        html_sample = (game_dir(game_id) / entry).read_text(encoding="utf-8", errors="replace")
-        lang = detect_language(title, description, extract_visible_text(html_sample))
-    except Exception:
-        lang = detect_language(title, description)
     game = Game(
         id=game_id,
         title=title,
@@ -106,7 +87,6 @@ async def upload_game(
         topic_tags=tags,
         difficulty=difficulty,
         entry_path=entry,
-        source_language=lang,
     )
     db.add(game)
     db.commit()
@@ -141,11 +121,6 @@ def create_from_template(
         difficulty=int(content.get("difficulty") or 1),
         entry_path=entry,
         template_type=body.template_type,
-        source_language=detect_language(
-            content.get("title", ""),
-            content.get("description", ""),
-            json.dumps(content, ensure_ascii=False),
-        ),
     )
     db.add(game)
     db.commit()
@@ -182,11 +157,6 @@ async def generate_game(
         difficulty=body.difficulty,
         entry_path=entry,
         template_type=body.template_type,
-        source_language=detect_language(
-            content.get("title", ""),
-            content.get("description", ""),
-            json.dumps(content, ensure_ascii=False),
-        ),
     )
     db.add(game)
     db.commit()
@@ -268,10 +238,9 @@ def delete_game(
 
 
 @router.get("/{game_id}/files/{file_path:path}")
-async def serve_game_file(
+def serve_game_file(
     game_id: UUID,
     file_path: str,
-    lang: str | None = Query(default=None),
     db: Session = Depends(get_db),
 ):
     game = db.get(Game, game_id)
@@ -281,37 +250,4 @@ async def serve_game_file(
     target = (base / file_path).resolve()
     if not str(target).startswith(str(base)) or not target.is_file():
         raise HTTPException(status_code=404, detail="File not found")
-
-    source_lang = getattr(game, "source_language", None) or "en"
-    target_lang = (lang or source_lang).lower()
-    is_html = target.suffix.lower() in {".html", ".htm"}
-
-    if (
-        not is_html
-        or target_lang == source_lang
-        or target_lang not in SUPPORTED_LANGS
-    ):
-        return FileResponse(target)
-
-    cache = i18n_cache_path(base, target_lang, file_path)
-    if cache.exists():
-        html = cache.read_text(encoding="utf-8", errors="replace")
-    else:
-        original = target.read_text(encoding="utf-8", errors="replace")
-        try:
-            html = await translate_html(original, source_lang, target_lang)
-        except Exception as exc:
-            raise HTTPException(status_code=502, detail=f"Translation failed: {exc}") from exc
-        cache.parent.mkdir(parents=True, exist_ok=True)
-        cache.write_text(html, encoding="utf-8")
-
-    # Keep relative asset paths resolving to the original game folder
-    if "<base " not in html.lower():
-        base_href = f"/api/games/{game_id}/files/"
-        if re_search_head := __import__("re").search(r"<head[^>]*>", html, flags=__import__("re").I):
-            idx = re_search_head.end()
-            html = html[:idx] + f'\n<base href="{base_href}">\n' + html[idx:]
-        else:
-            html = f'<base href="{base_href}">\n' + html
-
-    return HTMLResponse(content=html)
+    return FileResponse(target)

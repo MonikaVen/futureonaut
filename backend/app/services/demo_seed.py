@@ -8,7 +8,6 @@ from uuid import uuid4
 
 from app.database import SessionLocal
 from app.models import Game, GameSource, GameView, PlaySession, User, UserRole
-from app.services.i18n import detect_language, extract_visible_text
 from app.services.storage import delete_game_files, game_dir, save_uploaded_html, write_template_game
 from app.services.topics import ensure_topic_tag
 
@@ -96,9 +95,6 @@ def seed_demo_games() -> None:
                         difficulty=content["difficulty"],
                         entry_path=entry,
                         template_type=template_type,
-                        source_language=detect_language(
-                            content["title"], content["description"]
-                        ),
                     )
                 )
             db.commit()
@@ -106,7 +102,6 @@ def seed_demo_games() -> None:
         seed_html_pack(db, admin.id)
         prune_games_to_manifest(db)
         normalize_game_topics(db)
-        detect_missing_languages(db)
         restore_missing_game_files(db)
     finally:
         db.close()
@@ -171,27 +166,6 @@ def normalize_game_topics(db) -> None:
         db.commit()
 
 
-def detect_missing_languages(db) -> None:
-    changed = False
-    for game in db.query(Game).all():
-        sample = f"{game.title} {game.description or ''}"
-        try:
-            path = game_dir(game.id) / game.entry_path
-            if path.exists():
-                sample = (
-                    f"{sample} "
-                    f"{extract_visible_text(path.read_text(encoding='utf-8', errors='replace'))}"
-                )
-        except Exception:
-            pass
-        detected = detect_language(sample)
-        if (getattr(game, "source_language", None) or "en") != detected:
-            game.source_language = detected
-            changed = True
-    if changed:
-        db.commit()
-
-
 def seed_html_pack(db, owner_id) -> None:
     manifest_path = _seed_dir() / "manifest.json"
     if not manifest_path.exists():
@@ -224,11 +198,6 @@ def seed_html_pack(db, owner_id) -> None:
                 topic_tags=tags,
                 difficulty=int(item.get("difficulty") or 1),
                 entry_path=entry,
-                source_language=detect_language(
-                    title,
-                    item.get("description") or "",
-                    extract_visible_text(html),
-                ),
             )
         )
         existing_titles.add(title)

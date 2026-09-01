@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
 import { api, type Game } from "../api";
-import { GameShare } from "../GameShare";
-import { GameSocial } from "../GameSocial";
+import { GameCard } from "../GameCard";
 import { ContinuePlaying } from "../ContinuePlaying";
 import { useLanguage } from "../language";
 
@@ -32,6 +30,37 @@ function focusLabels(game: Game): string[] {
   );
 }
 
+type SortKey = "recent" | "popular" | "level-asc" | "level-desc" | "title";
+
+function popularityScore(game: Game): number {
+  return (
+    (game.view_count ?? 0) * 2 +
+    (game.like_count ?? 0) * 3 +
+    (game.comment_count ?? 0)
+  );
+}
+
+function sortGames(list: Game[], sort: SortKey): Game[] {
+  const sorted = [...list];
+  sorted.sort((a, b) => {
+    if (sort === "title") return a.title.localeCompare(b.title);
+    if (sort === "recent") {
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    }
+    if (sort === "popular") {
+      return (
+        popularityScore(b) - popularityScore(a) ||
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+    }
+    if (sort === "level-desc") {
+      return b.difficulty - a.difficulty || a.title.localeCompare(b.title);
+    }
+    return a.difficulty - b.difficulty || a.title.localeCompare(b.title);
+  });
+  return sorted;
+}
+
 export function CatalogPage() {
   const { t } = useLanguage();
   const [games, setGames] = useState<Game[]>([]);
@@ -39,7 +68,7 @@ export function CatalogPage() {
   const [query, setQuery] = useState("");
   const [topic, setTopic] = useState<"All" | (typeof TOPICS)[number]>("All");
   const [level, setLevel] = useState<"All" | "1" | "2" | "3" | "4" | "5">("All");
-  const [sort, setSort] = useState<"level-asc" | "level-desc" | "title">("level-asc");
+  const [sort, setSort] = useState<SortKey>("recent");
 
   useEffect(() => {
     api<Game[]>("/api/games")
@@ -56,14 +85,7 @@ export function CatalogPage() {
     let list = [...games];
     if (q) {
       list = list.filter((g) => {
-        const hay = [
-          g.title,
-          g.description,
-          g.source_language || "",
-          ...(g.topic_tags || []),
-        ]
-          .join(" ")
-          .toLowerCase();
+        const hay = [g.title, g.description, ...(g.topic_tags || [])].join(" ").toLowerCase();
         return hay.includes(q);
       });
     }
@@ -73,21 +95,14 @@ export function CatalogPage() {
     if (level !== "All") {
       list = list.filter((g) => g.difficulty === Number(level));
     }
-    list.sort((a, b) => {
-      if (sort === "title") return a.title.localeCompare(b.title);
-      if (sort === "level-desc") {
-        return b.difficulty - a.difficulty || a.title.localeCompare(b.title);
-      }
-      return a.difficulty - b.difficulty || a.title.localeCompare(b.title);
-    });
-    return list;
+    return sortGames(list, sort);
   }, [games, query, topic, level, sort]);
 
   return (
     <div>
       <section className="hero">
         <h1>{t("games")}</h1>
-        <p>Search and play without an account. Sign in to save scores, like games, and comment.</p>
+        <p>{t("catalogLede")}</p>
       </section>
       {error && <div className="error">{error}</div>}
 
@@ -103,7 +118,7 @@ export function CatalogPage() {
             className={`topic-tab${topic === tp ? " active" : ""}`}
             onClick={() => setTopic(tp)}
           >
-            {tp}
+            {tp === "All" ? t("all") : tp}
           </button>
         ))}
       </div>
@@ -121,7 +136,7 @@ export function CatalogPage() {
         <label>
           {t("level")}
           <select value={level} onChange={(e) => setLevel(e.target.value as typeof level)}>
-            <option value="All">All</option>
+            <option value="All">{t("all")}</option>
             {[1, 2, 3, 4, 5].map((n) => (
               <option key={n} value={String(n)}>
                 {n}
@@ -131,50 +146,30 @@ export function CatalogPage() {
         </label>
         <label>
           {t("sort")}
-          <select value={sort} onChange={(e) => setSort(e.target.value as typeof sort)}>
-            <option value="level-asc">Level ↑</option>
-            <option value="level-desc">Level ↓</option>
-            <option value="title">Title</option>
+          <select value={sort} onChange={(e) => setSort(e.target.value as SortKey)}>
+            <option value="recent">{t("recent")}</option>
+            <option value="popular">{t("popular")}</option>
+            <option value="level-asc">{t("levelAsc")}</option>
+            <option value="level-desc">{t("levelDesc")}</option>
+            <option value="title">{t("titleSort")}</option>
           </select>
         </label>
         <span className="meta filters-count">
-          {visible.length} of {games.length}
+          {visible.length} / {games.length}
         </span>
       </div>
 
       <div className="grid">
         {visible.map((g) => (
-          <article key={g.id} className="game-tile">
-            <h3>{g.title}</h3>
-            <p className="meta">{g.description || "No description"}</p>
-            <div className="tags">
-              <span className="tag topic">{primaryTopic(g)}</span>
-              {focusLabels(g).map((label) => (
-                <span key={label} className="tag focus">
-                  {label}
-                </span>
-              ))}
-              <span className="tag">Lv {g.difficulty}</span>
-            </div>
-            <GameSocial
-              game={{
-                ...g,
-                like_count: g.like_count ?? 0,
-                comment_count: g.comment_count ?? 0,
-                liked_by_me: g.liked_by_me ?? false,
-              }}
-              compact
-              onUpdate={(patch) => patchGame(g.id, patch)}
-            />
-            <div className="row tile-actions">
-              <Link className="btn accent" to={`/play/${g.id}`}>
-                {t("play")}
-              </Link>
-              <GameShare gameId={g.id} title={g.title} description={g.description} compact />
-            </div>
-          </article>
+          <GameCard
+            key={g.id}
+            game={g}
+            topic={primaryTopic(g)}
+            focusLabels={focusLabels(g)}
+            onUpdate={(patch) => patchGame(g.id, patch)}
+          />
         ))}
-        {!visible.length && !error && <p className="meta">No games match these filters.</p>}
+        {!visible.length && !error && <p className="meta">{t("noGamesMatch")}</p>}
       </div>
     </div>
   );

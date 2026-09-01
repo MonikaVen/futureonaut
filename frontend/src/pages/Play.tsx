@@ -4,8 +4,8 @@ import { api, type Game, type Session } from "../api";
 import { useAuth } from "../auth";
 import { GameShare } from "../GameShare";
 import { GameSocial } from "../GameSocial";
-import { useLanguage } from "../language";
 import { ScoreCard } from "../ScoreCard";
+import { useLanguage } from "../language";
 import { getVisitorId } from "../visitor";
 
 type SdkMessage = {
@@ -17,7 +17,7 @@ type SdkMessage = {
 export function PlayPage() {
   const { gameId } = useParams();
   const { user } = useAuth();
-  const { lang, t } = useLanguage();
+  const { t } = useLanguage();
   const visitorId = useMemo(() => getVisitorId(), []);
   const [game, setGame] = useState<Game | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -27,13 +27,11 @@ export function PlayPage() {
   const [timeMs, setTimeMs] = useState(0);
   const [completed, setCompleted] = useState(false);
   const [error, setError] = useState("");
-  const [frameReady, setFrameReady] = useState(false);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
     if (!gameId) return;
     let cancelled = false;
-    setFrameReady(false);
     setReady(false);
     setSession(null);
     setPoints(0);
@@ -110,47 +108,41 @@ export function PlayPage() {
     return () => window.removeEventListener("message", onMessage);
   }, [session, user, visitorId]);
 
-  const src = useMemo(() => {
-    if (!game) return "";
-    const needsTranslate = (game.source_language || "en") !== lang;
-    const q = needsTranslate ? `?lang=${encodeURIComponent(lang)}` : "";
-    return `/api/games/${game.id}/files/${game.entry_path}${q}`;
-  }, [game, lang]);
+  const src = game ? `/api/games/${game.id}/files/${game.entry_path}` : "";
 
   if (error) {
     return (
       <div>
         <div className="error">{error}</div>
-        <Link to="/">Back</Link>
+        <Link to="/">{t("back")}</Link>
       </div>
     );
   }
 
-  if (!game || !ready) return <p className="meta">Starting…</p>;
-
-  const translating = (game.source_language || "en") !== lang && !frameReady;
+  if (!game || !ready) return <p className="meta">{t("starting")}</p>;
 
   return (
     <div className="player-wrap">
       <div className="row" style={{ justifyContent: "space-between" }}>
         <div>
           <h1 style={{ fontFamily: "var(--font-display)", margin: 0 }}>{game.title}</h1>
-          <p className="meta">
-            {game.description} · {t("detected")}: {(game.source_language || "en").toUpperCase()} →{" "}
-            {lang.toUpperCase()}
-          </p>
+          <p className="meta">{game.description}</p>
         </div>
         {user ? (
           <Link className="btn secondary" to="/dashboard">
-            {t("dashboard")}
+            Dashboard
           </Link>
         ) : (
           <Link className="btn secondary" to="/login">
-            {t("signInToTrack")}
+            Sign in to track scores
           </Link>
         )}
       </div>
-      {!user && <p className="guest-note">{t("guestPlayNote")}</p>}
+      {!user && (
+        <p className="guest-note">
+          Playing as a guest — progress is saved on this device and merges when you sign in.
+        </p>
+      )}
       {completed && session && (
         <ScoreCard
           sessionId={session.id}
@@ -188,14 +180,11 @@ export function PlayPage() {
           Task time <b>{(timeMs / 1000).toFixed(1)}s</b>
         </span>
       </div>
-      {translating && <p className="meta">{t("translating")}</p>}
       <iframe
-        key={src}
         className="frame"
         title={game.title}
         src={src}
         sandbox="allow-scripts allow-same-origin allow-forms"
-        onLoad={() => setFrameReady(true)}
       />
     </div>
   );

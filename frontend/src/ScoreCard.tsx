@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useLanguage } from "./language";
 
 type Props = {
   sessionId: string;
@@ -20,7 +19,6 @@ export function ScoreCard({
   levelsCompleted,
   totalLevels,
 }: Props) {
-  const { t } = useLanguage();
   const [copied, setCopied] = useState(false);
   const accuracy = attempts ? Math.round((correct / attempts) * 100) : 0;
   const cardUrl = `${window.location.origin}/share/score/${sessionId}/card.svg`;
@@ -48,7 +46,7 @@ export function ScoreCard({
 
   return (
     <div className="score-card-panel">
-      <h2 style={{ fontFamily: "var(--font-display)", marginTop: 0 }}>{t("runComplete")}</h2>
+      <h2 style={{ fontFamily: "var(--font-display)", marginTop: 0 }}>Run complete!</h2>
       <p className="meta">{gameTitle}</p>
       <div className="score-card-stats">
         <div className="stat">
@@ -72,11 +70,11 @@ export function ScoreCard({
       <img className="score-card-preview" src={cardUrl} alt={`Score card for ${gameTitle}`} />
       <div className="row">
         <button className="btn accent" type="button" onClick={copyLink}>
-          {copied ? t("linkCopied") : t("copyScoreCard")}
+          {copied ? "Copied!" : "Copy score card"}
         </button>
         {typeof navigator !== "undefined" && navigator.share ? (
           <button className="btn secondary" type="button" onClick={nativeShare}>
-            {t("share")}
+            Share…
           </button>
         ) : null}
       </div>

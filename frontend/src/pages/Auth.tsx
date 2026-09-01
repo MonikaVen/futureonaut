@@ -1,9 +1,12 @@
 import { FormEvent, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
+import { BrandLogo } from "../BrandLogo";
 import { useAuth } from "../auth";
+import { LanguageSelect, useLanguage } from "../language";
 
 export function LoginPage() {
   const { user, login, loading } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -28,18 +31,19 @@ export function LoginPage() {
 
   return (
     <div className="auth-layout">
-      <div>
-        <h1 className="brand-hero">Futureonaut</h1>
-        <p className="lede">Learn by playing. Track progress. Get guided to what to try next.</p>
+      <div className="auth-brand">
+        <BrandLogo className="auth-brand-logo" />
+        <p className="lede">{t("loginLede")}</p>
       </div>
+      <LanguageSelect className="auth-lang-select" />
       <div className="panel">
         <form className="form" onSubmit={onSubmit}>
           <label>
-            Email
+            {t("email")}
             <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
           </label>
           <label>
-            Password
+            {t("password")}
             <input
               type="password"
               value={password}
@@ -51,9 +55,9 @@ export function LoginPage() {
           {error && <div className="error">{error}</div>}
           <div className="row">
             <button className="btn accent" disabled={busy} type="submit">
-              {busy ? "Signing in…" : "Sign in"}
+              {busy ? t("signingIn") : t("signIn")}
             </button>
-            <Link to="/register">Create account</Link>
+            <Link to="/register">{t("createAccount")}</Link>
           </div>
         </form>
       </div>
@@ -63,6 +67,7 @@ export function LoginPage() {
 
 export function RegisterPage() {
   const { user, register, loading } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -88,22 +93,23 @@ export function RegisterPage() {
 
   return (
     <div className="auth-layout">
-      <div>
-        <h1 className="brand-hero">Futureonaut</h1>
-        <p className="lede">Join as a learner. Creators are assigned by an admin after signup.</p>
+      <div className="auth-brand">
+        <BrandLogo className="auth-brand-logo" />
+        <p className="lede">{t("registerLede")}</p>
       </div>
+      <LanguageSelect className="auth-lang-select" />
       <div className="panel">
         <form className="form" onSubmit={onSubmit}>
           <label>
-            Display name
+            {t("displayName")}
             <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
           </label>
           <label>
-            Email
+            {t("email")}
             <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
           </label>
           <label>
-            Password
+            {t("password")}
             <input
               type="password"
               value={password}
@@ -115,9 +121,9 @@ export function RegisterPage() {
           {error && <div className="error">{error}</div>}
           <div className="row">
             <button className="btn accent" disabled={busy} type="submit">
-              {busy ? "Creating…" : "Create account"}
+              {busy ? t("creating") : t("createAccount")}
             </button>
-            <Link to="/login">Back to sign in</Link>
+            <Link to="/login">{t("backToSignIn")}</Link>
           </div>
         </form>
       </div>
