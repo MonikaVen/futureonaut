@@ -67,10 +67,25 @@ def post_event(
     elif body.type == EventType.task_time:
         if body.payload.get("phase") == "end":
             session.total_time_ms += int(body.payload.get("durationMs") or 0)
+    elif body.type == EventType.level_complete:
+        level = int(body.payload.get("level") or 0)
+        total = int(body.payload.get("totalLevels") or body.payload.get("total_levels") or 0)
+        if level > session.levels_completed:
+            session.levels_completed = level
+        if total > 0:
+            session.total_levels = total
     elif body.type == EventType.complete:
         session.ended_at = datetime.now(timezone.utc)
         if body.payload.get("durationMs") and session.total_time_ms == 0:
             session.total_time_ms = int(body.payload["durationMs"])
+        levels_done = int(body.payload.get("levelsCompleted") or body.payload.get("levels_completed") or 0)
+        total = int(body.payload.get("totalLevels") or body.payload.get("total_levels") or 0)
+        if levels_done > session.levels_completed:
+            session.levels_completed = levels_done
+        if total > 0:
+            session.total_levels = total
+        elif session.levels_completed > 0 and session.total_levels is None:
+            session.total_levels = session.levels_completed
 
     db.commit()
     db.refresh(session)

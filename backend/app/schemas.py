@@ -149,6 +149,8 @@ class SessionOut(BaseModel):
     total_time_ms: int
     correct_count: int
     attempt_count: int
+    levels_completed: int = 0
+    total_levels: int | None = None
 
     model_config = {"from_attributes": True}
 
@@ -173,6 +175,20 @@ class PlatformStats(BaseModel):
     sessions: int
     creators: int
     learners: int
+
+
+class GameAnalyticsOut(BaseModel):
+    game_id: uuid.UUID
+    title: str
+    topic: str
+    difficulty: int
+    views: int
+    plays: int
+    unique_players: int
+    total_time_ms: int
+    avg_time_ms: float
+    avg_levels_completed: float
+    completion_rate: float
 
 
 class RecommendationOut(BaseModel):

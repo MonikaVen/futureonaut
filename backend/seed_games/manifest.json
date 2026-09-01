@@ -3,294 +3,133 @@
     "file": "find_liucians_friends_knn.html",
     "title": "Find Liucians Friends KNN",
     "description": "Interactive Liucian learning game: Find Liucians Friends KNN.",
-    "topic_tags": [
-      "ML",
-      "ml-basics",
-      "knn"
-    ],
+    "topic_tags": ["AI", "Trustworthiness of AI"],
     "difficulty": 2
   },
   {
     "file": "find_the_whiskers_advanced.html",
     "title": "Find The Whiskers Advanced",
     "description": "Interactive Liucian learning game: Find The Whiskers Advanced.",
-    "topic_tags": [
-      "ML",
-      "computer-vision"
-    ],
+    "topic_tags": ["AI", "Computer Vision"],
     "difficulty": 1
   },
   {
     "file": "guess_liucians_mood.html",
     "title": "Guess Liucians Mood",
     "description": "Interactive Liucian learning game: Guess Liucians Mood.",
-    "topic_tags": [
-      "ML",
-      "ml-basics",
-      "classification"
-    ],
+    "topic_tags": ["AI", "Computer Vision", "Trustworthiness of AI"],
     "difficulty": 1
   },
   {
     "file": "liucian_attention_game.html",
     "title": "Liucian Attention Game",
     "description": "Interactive Liucian learning game: Liucian Attention Game.",
-    "topic_tags": [
-      "ML",
-      "transformers",
-      "attention"
-    ],
+    "topic_tags": ["AI", "Transformers"],
     "difficulty": 3
   },
   {
     "file": "liucian_cat_or_not_cat.html",
     "title": "Liucian Cat Or Not Cat",
     "description": "Interactive Liucian learning game: Liucian Cat Or Not Cat.",
-    "topic_tags": [
-      "ML",
-      "ml-basics",
-      "classification"
-    ],
+    "topic_tags": ["AI", "Computer Vision"],
     "difficulty": 1
   },
   {
     "file": "liucian_catch_the_red_dot.html",
     "title": "Liucian Catch The Red Dot",
     "description": "Interactive Liucian learning game: Liucian Catch The Red Dot.",
-    "topic_tags": [
-      "Physics",
-      "ml-basics",
-      "classification",
-      "perception",
-      "games"
-    ],
+    "topic_tags": ["Physics"],
     "difficulty": 1
   },
   {
     "file": "liucian_how_much_food.html",
     "title": "Liucian How Much Food",
     "description": "Interactive Liucian learning game: Liucian How Much Food.",
-    "topic_tags": [
-      "Math",
-      "math",
-      "estimation"
-    ],
+    "topic_tags": ["Math"],
     "difficulty": 1
   },
   {
     "file": "liucian_secrets_safe.html",
     "title": "Liucian Secrets Safe",
     "description": "Interactive Liucian learning game: Liucian Secrets Safe.",
-    "topic_tags": [
-      "Physics",
-      "security",
-      "crypto-basics"
-    ],
+    "topic_tags": ["Physics", "Privacy", "Cybersecurity"],
     "difficulty": 1
-  },
-  {
-    "file": "liucian_tokenizer_game_dictionary_training.html",
-    "title": "Liucian Tokenizer Game Dictionary Training",
-    "description": "Interactive Liucian learning game: Liucian Tokenizer Game Dictionary Training.",
-    "topic_tags": [
-      "ML",
-      "nlp",
-      "tokenization"
-    ],
-    "difficulty": 2
-  },
-  {
-    "file": "liucian_tokenizer_game_single_challenge.html",
-    "title": "Liucian Tokenizer Game Single Challenge",
-    "description": "Interactive Liucian learning game: Liucian Tokenizer Game Single Challenge.",
-    "topic_tags": [
-      "ML",
-      "nlp",
-      "tokenization"
-    ],
-    "difficulty": 2
-  },
-  {
-    "file": "liucian_tokenizer_game_updated.html",
-    "title": "Liucian Tokenizer Game Updated",
-    "description": "Interactive Liucian learning game: Liucian Tokenizer Game Updated.",
-    "topic_tags": [
-      "ML",
-      "nlp",
-      "tokenization"
-    ],
-    "difficulty": 2
   },
   {
     "file": "liucian_two_layer_cnn_corners.html",
     "title": "Liucian Two Layer CNN Corners",
     "description": "Interactive Liucian learning game: Liucian Two Layer CNN Corners.",
-    "topic_tags": [
-      "ML",
-      "cnn",
-      "computer-vision"
-    ],
+    "topic_tags": ["AI", "Computer Vision"],
     "difficulty": 2
   },
   {
     "file": "liucian_volume_box_challenge.html",
     "title": "Liucian Volume Box Challenge",
     "description": "Interactive Liucian learning game: Liucian Volume Box Challenge.",
-    "topic_tags": [
-      "Math",
-      "math"
-    ],
+    "topic_tags": ["Math"],
     "difficulty": 1
   },
   {
     "file": "liucian_word_map_embedding_training_math_explanation.html",
     "title": "Liucian Word Map Embedding Training Math Explanation",
     "description": "Interactive Liucian learning game: Liucian Word Map Embedding Training Math Explanation.",
-    "topic_tags": [
-      "Math",
-      "nlp",
-      "embeddings"
-    ],
+    "topic_tags": ["Math", "Large Language Models"],
     "difficulty": 3
   },
   {
     "file": "liuciano_jei_tai_zaidimas.html",
     "title": "Liuciano Jei Tai Zaidimas",
     "description": "Interactive Liucian learning game: Liuciano Jei Tai Zaidimas.",
-    "topic_tags": [
-      "ML",
-      "intro"
-    ],
+    "topic_tags": ["AI", "Trustworthiness of AI"],
     "difficulty": 1
   },
   {
     "file": "liucians_neuron.html",
     "title": "Liucians Neuron",
     "description": "Interactive Liucian learning game: Liucians Neuron.",
-    "topic_tags": [
-      "ML",
-      "neural-nets"
-    ],
+    "topic_tags": ["AI", "Trustworthiness of AI"],
     "difficulty": 2
   },
   {
     "file": "liucians_neuron_train_and_pytorch.html",
     "title": "Liucians Neuron Train And Pytorch",
     "description": "Interactive Liucian learning game: Liucians Neuron Train And Pytorch.",
-    "topic_tags": [
-      "ML",
-      "neural-nets"
-    ],
+    "topic_tags": ["AI", "Trustworthiness of AI"],
     "difficulty": 3
   },
   {
     "file": "lucian_mlp_backprop_game.html",
     "title": "Lucian MLP Backprop Game",
     "description": "Interactive Liucian learning game: Lucian MLP Backprop Game.",
-    "topic_tags": [
-      "ML",
-      "neural-nets",
-      "backprop"
-    ],
-    "difficulty": 3
-  },
-  {
-    "file": "lucian_world_model_obstacle_aware_future_planning.html",
-    "title": "Lucian World Model Obstacle Aware Future Planning",
-    "description": "Interactive Liucian learning game: Lucian World Model Obstacle Aware Future Planning.",
-    "topic_tags": [
-      "Physics",
-      "world-models",
-      "planning"
-    ],
+    "topic_tags": ["AI", "Trustworthiness of AI"],
     "difficulty": 3
   },
   {
     "file": "lucian_world_model_wider_furniture_correct_risk.html",
     "title": "Lucian World Model Wider Furniture Correct Risk",
     "description": "Interactive Liucian learning game: Lucian World Model Wider Furniture Correct Risk.",
-    "topic_tags": [
-      "Physics",
-      "world-models",
-      "planning"
-    ],
-    "difficulty": 3
-  },
-  {
-    "file": "lucias_ai_lab_full_game.html",
-    "title": "Lucias AI Lab Full Game",
-    "description": "Interactive Liucian learning game: Lucias AI Lab Full Game.",
-    "topic_tags": [
-      "ML",
-      "ai-lab",
-      "overview"
-    ],
-    "difficulty": 1
-  },
-  {
-    "file": "lucias_ai_lab_full_game_classifier_fixed.html",
-    "title": "Lucias AI Lab Full Game Classifier Fixed",
-    "description": "Interactive Liucian learning game: Lucias AI Lab Full Game Classifier Fixed.",
-    "topic_tags": [
-      "ML",
-      "ai-lab",
-      "overview"
-    ],
-    "difficulty": 2
-  },
-  {
-    "file": "lucias_ai_lab_full_game_lv2_fixed.html",
-    "title": "Lucias AI Lab Full Game LV2 Fixed",
-    "description": "Interactive Liucian learning game: Lucias AI Lab Full Game LV2 Fixed.",
-    "topic_tags": [
-      "ML",
-      "ai-lab",
-      "overview"
-    ],
+    "topic_tags": ["Physics"],
     "difficulty": 3
   },
   {
     "file": "perimeter_cat_walk_liucian.html",
     "title": "Perimeter Cat Walk Liucian",
     "description": "Interactive Liucian learning game: Perimeter Cat Walk Liucian.",
-    "topic_tags": [
-      "Math",
-      "ml-basics",
-      "classification",
-      "math"
-    ],
+    "topic_tags": ["Math"],
     "difficulty": 1
   },
   {
     "file": "pixels_make_liucian_feature_map_guess.html",
     "title": "Pixels Make Liucian Feature Map Guess",
     "description": "Interactive Liucian learning game: Pixels Make Liucian Feature Map Guess.",
-    "topic_tags": [
-      "ML",
-      "cnn",
-      "computer-vision"
-    ],
+    "topic_tags": ["AI", "Computer Vision"],
     "difficulty": 1
   },
   {
     "file": "transformer_concept_explorer.html",
     "title": "Transformer Concept Explorer",
     "description": "Interactive Liucian learning game: Transformer Concept Explorer.",
-    "topic_tags": [
-      "ML",
-      "transformers"
-    ],
-    "difficulty": 3
-  },
-  {
-    "file": "world_model_lab_game.html",
-    "title": "World Model Lab Game",
-    "description": "Interactive Liucian learning game: World Model Lab Game.",
-    "topic_tags": [
-      "Physics",
-      "world-models",
-      "planning"
-    ],
+    "topic_tags": ["AI", "Transformers"],
     "difficulty": 3
   }
 ]

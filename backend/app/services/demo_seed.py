@@ -7,15 +7,15 @@ from pathlib import Path
 from uuid import uuid4
 
 from app.database import SessionLocal
-from app.models import Game, GameSource, User, UserRole
+from app.models import Game, GameSource, GameView, PlaySession, User, UserRole
 from app.services.i18n import detect_language, extract_visible_text
-from app.services.storage import game_dir, save_uploaded_html, write_template_game
+from app.services.storage import delete_game_files, game_dir, save_uploaded_html, write_template_game
 from app.services.topics import ensure_topic_tag
 
 DEMO_QUIZ = {
     "title": "Intro to Neural Nets",
     "description": "Quick quiz on basic neural network concepts.",
-    "topic_tags": ["ML", "neural-nets", "ai-basics"],
+    "topic_tags": ["AI", "Trustworthiness of AI"],
     "difficulty": 1,
     "questions": [
         {
@@ -57,7 +57,7 @@ DEMO_QUIZ = {
 DEMO_MATCH = {
     "title": "Tokenization Match",
     "description": "Match NLP terms with their meanings.",
-    "topic_tags": ["ML", "nlp", "tokenization"],
+    "topic_tags": ["AI", "Large Language Models"],
     "difficulty": 2,
     "pairs": [
         {"id": "p1", "left": "Token", "right": "A unit of text the model sees", "points": 10},
@@ -104,11 +104,35 @@ def seed_demo_games() -> None:
             db.commit()
 
         seed_html_pack(db, admin.id)
+        prune_games_to_manifest(db)
         normalize_game_topics(db)
         detect_missing_languages(db)
         restore_missing_game_files(db)
     finally:
         db.close()
+
+
+def prune_games_to_manifest(db) -> None:
+    """Keep only games listed in the seed manifest (titles)."""
+    manifest_path = _seed_dir() / "manifest.json"
+    if not manifest_path.exists():
+        return
+    keep = {
+        (item.get("title") or item["file"])
+        for item in json.loads(manifest_path.read_text(encoding="utf-8"))
+    }
+    removed = 0
+    for game in db.query(Game).all():
+        if game.title in keep:
+            continue
+        for session in db.query(PlaySession).filter(PlaySession.game_id == game.id).all():
+            db.delete(session)
+        db.query(GameView).filter(GameView.game_id == game.id).delete()
+        delete_game_files(game.id)
+        db.delete(game)
+        removed += 1
+    if removed:
+        db.commit()
 
 
 def restore_missing_game_files(db) -> None:

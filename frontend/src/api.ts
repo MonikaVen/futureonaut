@@ -60,6 +60,20 @@ export interface PlatformStats {
   learners: number;
 }
 
+export interface GameAnalytics {
+  game_id: string;
+  title: string;
+  topic: string;
+  difficulty: number;
+  views: number;
+  plays: number;
+  unique_players: number;
+  total_time_ms: number;
+  avg_time_ms: number;
+  avg_levels_completed: number;
+  completion_rate: number;
+}
+
 const ACCESS_KEY = "lp_access";
 const REFRESH_KEY = "lp_refresh";
 

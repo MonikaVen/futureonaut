@@ -21,6 +21,26 @@ def ensure_schema() -> None:
                 "NOT NULL DEFAULT 'en'"
             )
         )
+        conn.execute(
+            text(
+                "ALTER TABLE play_sessions ADD COLUMN IF NOT EXISTS levels_completed "
+                "INTEGER NOT NULL DEFAULT 0"
+            )
+        )
+        conn.execute(
+            text("ALTER TABLE play_sessions ADD COLUMN IF NOT EXISTS total_levels INTEGER")
+        )
+        conn.execute(
+            text(
+                """
+                DO $$ BEGIN
+                    ALTER TYPE eventtype ADD VALUE 'level_complete';
+                EXCEPTION
+                    WHEN duplicate_object THEN NULL;
+                END $$;
+                """
+            )
+        )
 
 
 @asynccontextmanager

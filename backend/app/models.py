@@ -33,6 +33,7 @@ class EventType(str, enum.Enum):
     score = "score"
     answer = "answer"
     task_time = "task_time"
+    level_complete = "level_complete"
     complete = "complete"
 
 
@@ -67,6 +68,19 @@ class Game(Base):
 
     owner: Mapped[User] = relationship(back_populates="games")
     sessions: Mapped[list["PlaySession"]] = relationship(back_populates="game")
+    views: Mapped[list["GameView"]] = relationship(back_populates="game")
+
+
+class GameView(Base):
+    __tablename__ = "game_views"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    game_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("games.id"), nullable=False)
+    user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    viewed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    game: Mapped[Game] = relationship(back_populates="views")
+    user: Mapped[User | None] = relationship()
 
 
 class PlaySession(Base):
@@ -81,6 +95,8 @@ class PlaySession(Base):
     total_time_ms: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     correct_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     attempt_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    levels_completed: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    total_levels: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     user: Mapped[User] = relationship(back_populates="sessions")
     game: Mapped[Game] = relationship(back_populates="sessions")

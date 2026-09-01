@@ -3,11 +3,30 @@ import { Link } from "react-router-dom";
 import { api, type Game } from "../api";
 import { useLanguage } from "../language";
 
-const TOPICS = ["ML", "Physics", "Math"] as const;
+const TOPICS = ["AI", "Physics", "Math"] as const;
 
-function primaryTopic(game: Game): string {
-  const hit = game.topic_tags?.find((t) => TOPICS.includes(t as (typeof TOPICS)[number]));
-  return hit || "ML";
+const AI_FOCUS_LABELS = [
+  "Computer Vision",
+  "Large Language Models",
+  "Transformers",
+  "Privacy",
+  "Cybersecurity",
+  "Trustworthiness of AI",
+] as const;
+
+function primaryTopic(game: Game): (typeof TOPICS)[number] {
+  const hit = game.topic_tags?.find((t) =>
+    TOPICS.includes(t as (typeof TOPICS)[number])
+  );
+  if (hit) return hit as (typeof TOPICS)[number];
+  if (game.topic_tags?.includes("ML")) return "AI";
+  return "AI";
+}
+
+function focusLabels(game: Game): string[] {
+  return (game.topic_tags || []).filter((t) =>
+    AI_FOCUS_LABELS.includes(t as (typeof AI_FOCUS_LABELS)[number])
+  );
 }
 
 export function CatalogPage() {
@@ -65,6 +84,21 @@ export function CatalogPage() {
       </section>
       {error && <div className="error">{error}</div>}
 
+      <div className="topic-tabs" role="tablist" aria-label={t("topic")}>
+        {(["All", ...TOPICS] as const).map((tp) => (
+          <button
+            key={tp}
+            type="button"
+            role="tab"
+            aria-selected={topic === tp}
+            className={`topic-tab${topic === tp ? " active" : ""}`}
+            onClick={() => setTopic(tp)}
+          >
+            {tp}
+          </button>
+        ))}
+      </div>
+
       <div className="filters">
         <label className="filter-search">
           {t("search")}
@@ -74,17 +108,6 @@ export function CatalogPage() {
             placeholder={t("search")}
             onChange={(e) => setQuery(e.target.value)}
           />
-        </label>
-        <label>
-          {t("topic")}
-          <select value={topic} onChange={(e) => setTopic(e.target.value as typeof topic)}>
-            <option value="All">All</option>
-            {TOPICS.map((tp) => (
-              <option key={tp} value={tp}>
-                {tp}
-              </option>
-            ))}
-          </select>
         </label>
         <label>
           {t("level")}
@@ -116,11 +139,13 @@ export function CatalogPage() {
             <h3>{g.title}</h3>
             <p className="meta">{g.description || "No description"}</p>
             <div className="tags">
-              <span className="tag">{primaryTopic(g)}</span>
+              <span className="tag topic">{primaryTopic(g)}</span>
+              {focusLabels(g).map((label) => (
+                <span key={label} className="tag focus">
+                  {label}
+                </span>
+              ))}
               <span className="tag">Lv {g.difficulty}</span>
-              <span className="tag">
-                {t("detected")}: {(g.source_language || "en").toUpperCase()}
-              </span>
             </div>
             <div className="row">
               <Link className="btn accent" to={`/play/${g.id}`}>

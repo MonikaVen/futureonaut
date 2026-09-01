@@ -1,34 +1,66 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, type Game, type PlatformStats, type Role, type User } from "../api";
+import { api, type Game, type GameAnalytics, type PlatformStats, type Role, type User } from "../api";
 
-const TOPICS = ["ML", "Physics", "Math"] as const;
+const TOPICS = ["AI", "Physics", "Math"] as const;
+
+type SortKey = "views" | "plays" | "avg_time_ms" | "avg_levels_completed" | "completion_rate" | "title";
 
 function primaryTopic(game: Game): string {
-  return game.topic_tags?.find((t) => TOPICS.includes(t as (typeof TOPICS)[number])) || "ML";
+  const hit = game.topic_tags?.find((t) => TOPICS.includes(t as (typeof TOPICS)[number]));
+  if (hit) return hit;
+  if (game.topic_tags?.includes("ML")) return "AI";
+  return "AI";
+}
+
+function formatDuration(ms: number): string {
+  if (ms <= 0) return "—";
+  const sec = ms / 1000;
+  if (sec < 60) return `${sec.toFixed(0)}s`;
+  const min = Math.floor(sec / 60);
+  const rem = Math.round(sec % 60);
+  return `${min}m ${rem}s`;
+}
+
+function formatPercent(rate: number): string {
+  if (rate <= 0) return "—";
+  return `${Math.round(rate * 100)}%`;
 }
 
 export function AdminPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [games, setGames] = useState<Game[]>([]);
+  const [analytics, setAnalytics] = useState<GameAnalytics[]>([]);
   const [stats, setStats] = useState<PlatformStats | null>(null);
   const [error, setError] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [sortKey, setSortKey] = useState<SortKey>("views");
 
   async function load() {
-    const [u, s, g] = await Promise.all([
+    const [u, s, g, a] = await Promise.all([
       api<User[]>("/api/admin/users"),
       api<PlatformStats>("/api/admin/stats"),
       api<Game[]>("/api/games"),
+      api<GameAnalytics[]>("/api/admin/game-analytics"),
     ]);
     setUsers(u);
     setStats(s);
     setGames(g);
+    setAnalytics(a);
   }
 
   useEffect(() => {
     load().catch((err) => setError(err.message));
   }, []);
+
+  const sortedAnalytics = useMemo(() => {
+    const list = [...analytics];
+    list.sort((a, b) => {
+      if (sortKey === "title") return a.title.localeCompare(b.title);
+      return (b[sortKey] as number) - (a[sortKey] as number);
+    });
+    return list;
+  }, [analytics, sortKey]);
 
   async function setRole(userId: string, role: Role) {
     await api(`/api/admin/users/${userId}/role`, {
@@ -83,6 +115,64 @@ export function AdminPage() {
           </div>
         </div>
       )}
+
+      <div className="panel section-gap">
+        <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
+          <h2 style={{ fontFamily: "var(--font-display)", margin: 0 }}>Game popularity</h2>
+          <label className="meta">
+            Sort by{" "}
+            <select value={sortKey} onChange={(e) => setSortKey(e.target.value as SortKey)}>
+              <option value="views">Views</option>
+              <option value="plays">Plays</option>
+              <option value="avg_time_ms">Avg time</option>
+              <option value="avg_levels_completed">Avg levels</option>
+              <option value="completion_rate">Completion</option>
+              <option value="title">Title</option>
+            </select>
+          </label>
+        </div>
+        <p className="meta">
+          Views count every play-page open (guests included). Plays, time, levels, and completion
+          come from signed-in sessions tracked via the SDK.
+        </p>
+        <table className="table">
+          <thead>
+            <tr>
+              <th>Title</th>
+              <th>Topic</th>
+              <th>Views</th>
+              <th>Plays</th>
+              <th>Players</th>
+              <th>Avg time</th>
+              <th>Avg levels</th>
+              <th>Completion</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sortedAnalytics.map((row) => (
+              <tr key={row.game_id}>
+                <td>
+                  <Link to={`/play/${row.game_id}`}>{row.title}</Link>
+                </td>
+                <td>{row.topic}</td>
+                <td>{row.views}</td>
+                <td>{row.plays}</td>
+                <td>{row.unique_players}</td>
+                <td>{formatDuration(row.avg_time_ms)}</td>
+                <td>{row.avg_levels_completed > 0 ? row.avg_levels_completed.toFixed(1) : "—"}</td>
+                <td>{formatPercent(row.completion_rate)}</td>
+              </tr>
+            ))}
+            {!sortedAnalytics.length && (
+              <tr>
+                <td colSpan={8} className="meta">
+                  No analytics yet. Open a game to record views.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
 
       <div className="panel section-gap">
         <h2 style={{ fontFamily: "var(--font-display)", marginTop: 0 }}>Games</h2>

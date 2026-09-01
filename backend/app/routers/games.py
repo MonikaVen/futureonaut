@@ -6,9 +6,9 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Upload
 from fastapi.responses import FileResponse, HTMLResponse
 from sqlalchemy.orm import Session
 
-from app.auth import get_current_user, require_roles
+from app.auth import get_current_user, get_optional_user, require_roles
 from app.database import get_db
-from app.models import Game, GameSource, PlaySession, User, UserRole
+from app.models import Game, GameSource, GameView, PlaySession, User, UserRole
 from app.schemas import (
     AIGenerateRequest,
     GameOut,
@@ -198,6 +198,19 @@ def get_game(game_id: UUID, db: Session = Depends(get_db)) -> GameOut:
     return game_to_out(game)
 
 
+@router.post("/{game_id}/view", status_code=status.HTTP_204_NO_CONTENT)
+def record_game_view(
+    game_id: UUID,
+    db: Session = Depends(get_db),
+    user: User | None = Depends(get_optional_user),
+) -> None:
+    game = db.get(Game, game_id)
+    if game is None:
+        raise HTTPException(status_code=404, detail="Game not found")
+    db.add(GameView(game_id=game.id, user_id=user.id if user else None))
+    db.commit()
+
+
 @router.patch("/{game_id}", response_model=GameOut)
 def update_game(
     game_id: UUID,
@@ -238,6 +251,7 @@ def delete_game(
     sessions = db.query(PlaySession).filter(PlaySession.game_id == game.id).all()
     for session in sessions:
         db.delete(session)
+    db.query(GameView).filter(GameView.game_id == game.id).delete()
     delete_game_files(game.id)
     db.delete(game)
     db.commit()

@@ -9,12 +9,14 @@ from app.database import get_db
 from app.models import Game, PlaySession, User, UserRole
 from app.schemas import (
     DashboardStats,
+    GameAnalyticsOut,
     PlatformStats,
     RecommendationOut,
     SessionDetail,
     UserOut,
     UserRoleUpdate,
 )
+from app.services.game_analytics import build_game_analytics
 from app.services.recommendations import recommend_games
 
 router = APIRouter(tags=["dashboard"])
@@ -164,3 +166,11 @@ def platform_stats(
         creators=db.query(User).filter(User.role == UserRole.creator).count(),
         learners=db.query(User).filter(User.role == UserRole.learner).count(),
     )
+
+
+@admin_router.get("/game-analytics", response_model=list[GameAnalyticsOut])
+def game_analytics(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(UserRole.admin)),
+) -> list[GameAnalyticsOut]:
+    return build_game_analytics(db)

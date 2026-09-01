@@ -39,6 +39,7 @@ export function PlayPage() {
         const g = await api<Game>(`/api/games/${gameId}`);
         if (cancelled) return;
         setGame(g);
+        api(`/api/games/${gameId}/view`, { method: "POST" }).catch(() => {});
         if (user) {
           const s = await api<Session>("/api/sessions", {
             method: "POST",

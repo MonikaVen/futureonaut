@@ -60,6 +60,12 @@
     complete: function (extra) {
       emit("complete", Object.assign({ durationMs: Date.now() - sessionStart }, extra || {}));
     },
+    levelComplete: function (level, totalLevels) {
+      emit("level_complete", {
+        level: Number(level) || 0,
+        totalLevels: Number(totalLevels) || 0,
+      });
+    },
   };
 
   global.LearnPlay = LearnPlay;
