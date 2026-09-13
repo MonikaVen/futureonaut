@@ -1,11 +1,12 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, type Game, type GameAnalytics } from "../api";
+import { api, type Game, type GameAnalytics, type GameAnalyticsDetail } from "../api";
+import { GameAnalyticsDetailPanel } from "../GameAnalyticsDetail";
 
 const QUIZ_SAMPLE = {
   title: "My Quiz",
   description: "Short practice quiz",
-  topic_tags: ["practice"],
+  topic_tags: ["Math"],
   difficulty: 1,
   questions: [
     {
@@ -19,6 +20,34 @@ const QUIZ_SAMPLE = {
       points: 10,
     },
   ],
+};
+
+const DRAG_SAMPLE = {
+  title: "Match the terms",
+  description: "Drag each term to its meaning",
+  topic_tags: ["AI"],
+  difficulty: 1,
+  pairs: [
+    { id: "p1", left: "Neuron", right: "A unit that transforms inputs into an output", points: 10 },
+    { id: "p2", left: "Loss", right: "A number that measures prediction error", points: 10 },
+  ],
+};
+
+const TIMED_SAMPLE = {
+  title: "Quick recall",
+  description: "Answer before the timer runs out",
+  topic_tags: ["Physics"],
+  difficulty: 1,
+  items: [
+    { id: "t1", prompt: "Unit of force?", answer: "newton", points: 10, time_limit_ms: 20000 },
+    { id: "t2", prompt: "Speed of light symbol?", answer: "c", points: 10, time_limit_ms: 15000 },
+  ],
+};
+
+const TEMPLATE_SAMPLES: Record<string, object> = {
+  quiz: QUIZ_SAMPLE,
+  drag_match: DRAG_SAMPLE,
+  timed_challenge: TIMED_SAMPLE,
 };
 
 export function CreatorPage() {
@@ -35,6 +64,8 @@ export function CreatorPage() {
 
   const [templateType, setTemplateType] = useState("quiz");
   const [templateJson, setTemplateJson] = useState(JSON.stringify(QUIZ_SAMPLE, null, 2));
+  const [detailId, setDetailId] = useState<string | null>(null);
+  const [detail, setDetail] = useState<GameAnalyticsDetail | null>(null);
 
   const [aiTopic, setAiTopic] = useState("photosynthesis");
   const [aiType, setAiType] = useState("quiz");
@@ -144,6 +175,7 @@ export function CreatorPage() {
       {analytics.length > 0 && (
         <div className="panel" style={{ marginBottom: 16 }}>
           <h2 style={{ fontFamily: "var(--font-display)", marginTop: 0 }}>Creator analytics</h2>
+          <p className="meta">Click a game for funnel, task time, and recent sessions.</p>
           <table className="table">
             <thead>
               <tr>
@@ -158,7 +190,17 @@ export function CreatorPage() {
             </thead>
             <tbody>
               {analytics.map((row) => (
-                <tr key={row.game_id}>
+                <tr
+                  key={row.game_id}
+                  className={detailId === row.game_id ? "row-selected" : ""}
+                  onClick={() => {
+                    setDetailId(row.game_id);
+                    api<GameAnalyticsDetail>(`/api/creator/analytics/${row.game_id}`)
+                      .then(setDetail)
+                      .catch((err) => setError(err.message));
+                  }}
+                  style={{ cursor: "pointer" }}
+                >
                   <td>{row.title}</td>
                   <td>{row.views}</td>
                   <td>{row.plays}</td>
@@ -170,6 +212,15 @@ export function CreatorPage() {
               ))}
             </tbody>
           </table>
+          {detail && detailId === detail.game_id && (
+            <GameAnalyticsDetailPanel
+              detail={detail}
+              onClose={() => {
+                setDetail(null);
+                setDetailId(null);
+              }}
+            />
+          )}
         </div>
       )}
 
@@ -222,7 +273,15 @@ export function CreatorPage() {
         <form className="form" onSubmit={createTemplate} style={{ maxWidth: "100%" }}>
           <label>
             Template
-            <select value={templateType} onChange={(e) => setTemplateType(e.target.value)}>
+            <select
+              value={templateType}
+              onChange={(e) => {
+                const next = e.target.value;
+                setTemplateType(next);
+                const sample = TEMPLATE_SAMPLES[next];
+                if (sample) setTemplateJson(JSON.stringify(sample, null, 2));
+              }}
+            >
               <option value="quiz">quiz</option>
               <option value="drag_match">drag_match</option>
               <option value="timed_challenge">timed_challenge</option>

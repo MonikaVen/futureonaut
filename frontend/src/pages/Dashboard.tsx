@@ -42,8 +42,39 @@ export function DashboardPage() {
         </div>
       </div>
 
+      {stats.per_game.length > 0 && (
+        <div className="panel" style={{ marginBottom: 16 }}>
+          <h2 style={{ fontFamily: "var(--font-display)", marginTop: 0 }}>Your games</h2>
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Game</th>
+                <th>Plays</th>
+                <th>Best score</th>
+                <th>Accuracy</th>
+              </tr>
+            </thead>
+            <tbody>
+              {stats.per_game.map((g) => (
+                <tr key={g.game_id}>
+                  <td>
+                    <Link to={`/play/${g.game_id}`}>{g.title}</Link>
+                  </td>
+                  <td>{g.plays}</td>
+                  <td>{g.best_score}</td>
+                  <td>{(g.accuracy * 100).toFixed(0)}%</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
       <div className="panel" style={{ marginBottom: 16 }}>
         <h2 style={{ fontFamily: "var(--font-display)", marginTop: 0 }}>By topic</h2>
+        <p className="meta">
+          Weak topics feed <Link to="/recommendations">personalized picks</Link>.
+        </p>
         {stats.by_topic.length === 0 && <p className="meta">Play games to unlock topic insights.</p>}
         <table className="table">
           <thead>

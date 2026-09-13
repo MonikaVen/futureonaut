@@ -1126,6 +1126,46 @@ button, input, select, textarea {
   margin-bottom: 1rem;
 }
 
+.fav-filter {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+}
+.row-selected td {
+  background: rgba(0, 212, 255, 0.08);
+}
+.analytics-detail {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+}
+.analytics-detail h4 {
+  font-family: var(--font-display);
+  margin: 1rem 0 0.4rem;
+}
+.view-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 72px;
+  margin: 0.5rem 0 1rem;
+}
+.view-bar {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+}
+.view-bar span {
+  display: block;
+  width: 100%;
+  min-height: 4px;
+  background: var(--accent, #00d4ff);
+  border-radius: 2px 2px 0 0;
+  opacity: 0.85;
+}
+
 .classroom-layout {
   display: grid;
   grid-template-columns: minmax(240px, 300px) 1fr;

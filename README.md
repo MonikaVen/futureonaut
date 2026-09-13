@@ -75,6 +75,8 @@ AI generation uses an OpenAI-compatible Chat Completions API (`OPENAI_API_KEY`, 
 
 Share pages and Open Graph previews use `PUBLIC_BASE_URL` (Compose default: `http://localhost:3080`).
 
+Reopening a game resumes the latest unfinished session instead of starting a blank one. Classroom assignments show each learner's status; teachers can unassign games, remove students, or delete a class. Creators and admins can open a game's analytics row for funnel, task time, and recent sessions.
+
 ## API health
 
 `GET http://localhost:8000/api/health`

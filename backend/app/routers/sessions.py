@@ -30,6 +30,30 @@ def _session_out(session: PlaySession) -> SessionOut:
     )
 
 
+def _resume_or_create(
+    db: Session,
+    game: Game,
+    *,
+    user_id: UUID | None = None,
+    visitor_id: str | None = None,
+) -> PlaySession:
+    query = db.query(PlaySession).filter(PlaySession.game_id == game.id, PlaySession.ended_at.is_(None))
+    if user_id:
+        query = query.filter(PlaySession.user_id == user_id)
+    else:
+        query = query.filter(PlaySession.visitor_id == visitor_id, PlaySession.user_id.is_(None))
+    existing = query.order_by(PlaySession.started_at.desc()).first()
+    if existing:
+        existing.game = game
+        return existing
+    session = PlaySession(user_id=user_id, visitor_id=visitor_id, game_id=game.id)
+    db.add(session)
+    db.commit()
+    db.refresh(session)
+    session.game = game
+    return session
+
+
 def _can_access(session: PlaySession, user: User | None, visitor_id: str | None) -> bool:
     if user and session.user_id == user.id:
         return True
@@ -49,12 +73,7 @@ def start_session(
     game = db.get(Game, body.game_id)
     if game is None:
         raise HTTPException(status_code=404, detail="Game not found")
-    session = PlaySession(user_id=user.id, game_id=game.id)
-    db.add(session)
-    db.commit()
-    db.refresh(session)
-    session.game = game
-    return _session_out(session)
+    return _session_out(_resume_or_create(db, game, user_id=user.id))
 
 
 @router.post("/guest", response_model=SessionOut, status_code=201)
@@ -64,12 +83,7 @@ def start_guest_session(body: GuestSessionCreate, db: Session = Depends(get_db))
         raise HTTPException(status_code=404, detail="Game not found")
     if not body.visitor_id or len(body.visitor_id) > 64:
         raise HTTPException(status_code=400, detail="visitor_id required")
-    session = PlaySession(visitor_id=body.visitor_id, game_id=game.id)
-    db.add(session)
-    db.commit()
-    db.refresh(session)
-    session.game = game
-    return _session_out(session)
+    return _session_out(_resume_or_create(db, game, visitor_id=body.visitor_id))
 
 
 @router.get("/continue", response_model=list[ContinueSessionOut])

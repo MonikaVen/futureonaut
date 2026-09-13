@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, type Comment, type Game, type GameAnalytics, type PlatformStats, type Role, type User } from "../api";
+import { api, type Comment, type Game, type GameAnalytics, type GameAnalyticsDetail, type PlatformStats, type Role, type User } from "../api";
+import { GameAnalyticsDetailPanel } from "../GameAnalyticsDetail";
 
 const TOPICS = ["AI", "Physics", "Math"] as const;
 
@@ -36,6 +37,8 @@ export function AdminPage() {
   const [error, setError] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>("views");
+  const [detailId, setDetailId] = useState<string | null>(null);
+  const [detail, setDetail] = useState<GameAnalyticsDetail | null>(null);
 
   async function load() {
     const [u, s, g, a, c] = await Promise.all([
@@ -152,7 +155,7 @@ export function AdminPage() {
         </div>
         <p className="meta">
           Views count every play-page open (guests included). Plays, time, levels, and completion
-          come from signed-in sessions tracked via the SDK.
+          come from sessions tracked via the SDK. Click a row for the funnel and recent sessions.
         </p>
         <table className="table">
           <thead>
@@ -169,9 +172,21 @@ export function AdminPage() {
           </thead>
           <tbody>
             {sortedAnalytics.map((row) => (
-              <tr key={row.game_id}>
+              <tr
+                key={row.game_id}
+                className={detailId === row.game_id ? "row-selected" : ""}
+                style={{ cursor: "pointer" }}
+                onClick={() => {
+                  setDetailId(row.game_id);
+                  api<GameAnalyticsDetail>(`/api/admin/game-analytics/${row.game_id}`)
+                    .then(setDetail)
+                    .catch((err) => setError(err.message));
+                }}
+              >
                 <td>
-                  <Link to={`/play/${row.game_id}`}>{row.title}</Link>
+                  <Link to={`/play/${row.game_id}`} onClick={(e) => e.stopPropagation()}>
+                    {row.title}
+                  </Link>
                 </td>
                 <td>{row.topic}</td>
                 <td>{row.views}</td>
@@ -191,6 +206,15 @@ export function AdminPage() {
             )}
           </tbody>
         </table>
+        {detail && detailId === detail.game_id && (
+          <GameAnalyticsDetailPanel
+            detail={detail}
+            onClose={() => {
+              setDetail(null);
+              setDetailId(null);
+            }}
+          />
+        )}
       </div>
 
       <div className="panel section-gap">

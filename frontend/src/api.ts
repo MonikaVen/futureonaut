@@ -79,9 +79,15 @@ export interface ClassroomAssignment {
   game_id: string;
   game_title: string;
   created_at: string;
+  completed?: boolean;
+  points?: number;
+  accuracy?: number;
+  levels_completed?: number;
+  total_levels?: number | null;
 }
 
 export interface StudentProgress {
+  student_id: string;
   student_name: string;
   student_email: string;
   game_id: string;
@@ -104,13 +110,21 @@ export interface ClassroomDetail {
   progress: StudentProgress[];
 }
 
+export interface PerGameStat {
+  game_id: string;
+  title: string;
+  best_score: number;
+  plays: number;
+  accuracy: number;
+}
+
 export interface DashboardStats {
   total_sessions: number;
   total_points: number;
   avg_accuracy: number;
   avg_task_time_ms: number;
   recent_sessions: Session[];
-  per_game: Array<Record<string, unknown>>;
+  per_game: PerGameStat[];
   by_topic: Array<Record<string, unknown>>;
 }
 
@@ -134,12 +148,34 @@ export interface GameAnalytics {
   topic: string;
   difficulty: number;
   views: number;
+  unique_visitors: number;
   plays: number;
   unique_players: number;
+  view_to_play_rate: number;
   total_time_ms: number;
   avg_time_ms: number;
   avg_levels_completed: number;
   completion_rate: number;
+  avg_accuracy: number;
+  avg_score: number;
+}
+
+export interface GameAnalyticsDetail extends GameAnalytics {
+  level_funnel: Array<{ level: number; sessions_reached: number; reach_rate: number }>;
+  task_stats: Array<{ task_id: string; completions: number; avg_duration_ms: number }>;
+  daily_views: Array<{ date: string; views: number }>;
+  recent_sessions: Array<{
+    session_id: string;
+    user_email: string;
+    started_at: string;
+    duration_ms: number;
+    levels_completed: number;
+    total_levels: number | null;
+    completed: boolean;
+    points: number;
+    accuracy: number;
+  }>;
+  event_counts: Record<string, number>;
 }
 
 const ACCESS_KEY = "lp_access";

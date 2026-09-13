@@ -91,6 +91,68 @@ export function ClassroomPage() {
     }
   }
 
+  async function refreshDetail() {
+    if (!selectedId) return;
+    const d = await api<ClassroomDetail>(`/api/classrooms/${selectedId}`);
+    setDetail(d);
+  }
+
+  async function unassign(assignmentId: string) {
+    if (!selectedId) return;
+    setError("");
+    try {
+      await api(`/api/classrooms/${selectedId}/assignments/${assignmentId}`, { method: "DELETE" });
+      setMessage("Assignment removed.");
+      await refreshDetail();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unassign failed");
+    }
+  }
+
+  async function leaveClass() {
+    if (!selectedId) return;
+    if (!confirm("Leave this class?")) return;
+    setError("");
+    try {
+      await api(`/api/classrooms/${selectedId}/leave`, { method: "POST" });
+      setMessage("You left the class.");
+      setSelectedId(null);
+      setDetail(null);
+      await loadClassrooms();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Leave failed");
+    }
+  }
+
+  async function deleteClass() {
+    if (!selectedId) return;
+    if (!confirm("Delete this class and its assignments?")) return;
+    setError("");
+    try {
+      await api(`/api/classrooms/${selectedId}`, { method: "DELETE" });
+      setMessage("Class deleted.");
+      setSelectedId(null);
+      setDetail(null);
+      await loadClassrooms();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Delete failed");
+    }
+  }
+
+  async function removeStudent(studentId: string) {
+    if (!selectedId) return;
+    if (!confirm("Remove this student from the class?")) return;
+    setError("");
+    try {
+      await api(`/api/classrooms/${selectedId}/members/${studentId}`, { method: "DELETE" });
+      setMessage("Student removed.");
+      await refreshDetail();
+      await loadClassrooms();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Remove failed");
+    }
+  }
+
   return (
     <div>
       <section className="hero">
@@ -159,20 +221,45 @@ export function ClassroomPage() {
                     ) : null}
                   </p>
                 </div>
-                {user?.id === detail.teacher_id && (
-                  <span className="tag topic">Teacher</span>
-                )}
+                <div className="row" style={{ gap: 8 }}>
+                  {user?.id === detail.teacher_id && <span className="tag topic">Teacher</span>}
+                  {detail.is_teacher ? (
+                    <button className="btn danger btn-sm" type="button" onClick={deleteClass}>
+                      Delete class
+                    </button>
+                  ) : (
+                    <button className="btn secondary btn-sm" type="button" onClick={leaveClass}>
+                      Leave class
+                    </button>
+                  )}
+                </div>
               </div>
 
               <h3>Assignments</h3>
               {detail.assignments.length === 0 && <p className="meta">No games assigned yet.</p>}
               <ul className="assignment-list">
                 {detail.assignments.map((a) => (
-                  <li key={a.id} className="row" style={{ justifyContent: "space-between" }}>
-                    <span>{a.game_title}</span>
-                    <Link className="btn accent" to={`/play/${a.game_id}`}>
-                      Play
-                    </Link>
+                  <li key={a.id} className="row" style={{ justifyContent: "space-between", gap: 8 }}>
+                    <span>
+                      {a.game_title}
+                      <span className="meta" style={{ marginLeft: 8 }}>
+                        {a.completed
+                          ? `Done · ${a.points ?? 0} pts`
+                          : a.points
+                            ? `In progress · ${a.points} pts`
+                            : "Not started"}
+                      </span>
+                    </span>
+                    <span className="row" style={{ gap: 8 }}>
+                      <Link className="btn accent btn-sm" to={`/play/${a.game_id}`}>
+                        {a.completed ? "Replay" : "Play"}
+                      </Link>
+                      {detail.is_teacher && (
+                        <button className="btn secondary btn-sm" type="button" onClick={() => unassign(a.id)}>
+                          Remove
+                        </button>
+                      )}
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -208,6 +295,7 @@ export function ClassroomPage() {
                         <th>Points</th>
                         <th>Accuracy</th>
                         <th>Levels</th>
+                        <th />
                       </tr>
                     </thead>
                     <tbody>
@@ -215,12 +303,23 @@ export function ClassroomPage() {
                         <tr key={`${p.student_email}-${p.game_id}-${i}`}>
                           <td>{p.student_name}</td>
                           <td>{p.game_title}</td>
-                          <td>{p.completed ? "Done" : "In progress"}</td>
+                          <td>{p.completed ? "Done" : p.points ? "In progress" : "Not started"}</td>
                           <td>{p.points}</td>
                           <td>{(p.accuracy * 100).toFixed(0)}%</td>
                           <td>
                             {p.levels_completed}
                             {p.total_levels ? `/${p.total_levels}` : ""}
+                          </td>
+                          <td>
+                            {detail.progress.findIndex((x) => x.student_id === p.student_id) === i && (
+                              <button
+                                className="btn secondary btn-sm"
+                                type="button"
+                                onClick={() => removeStudent(p.student_id)}
+                              >
+                                Remove
+                              </button>
+                            )}
                           </td>
                         </tr>
                       ))}

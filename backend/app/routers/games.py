@@ -1,13 +1,23 @@
 from uuid import UUID, uuid4
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_user, get_optional_user, require_roles
 from app.database import get_db
-from app.models import Game, GameComment, GameLike, GameSource, GameView, PlaySession, User, UserRole
+from app.models import (
+    ClassroomAssignment,
+    Game,
+    GameComment,
+    GameLike,
+    GameSource,
+    GameView,
+    PlaySession,
+    User,
+    UserRole,
+)
 from app.schemas import (
     AIGenerateRequest,
     GameOut,
@@ -181,11 +191,19 @@ def record_game_view(
     game_id: UUID,
     db: Session = Depends(get_db),
     user: User | None = Depends(get_optional_user),
+    x_visitor_id: str | None = Header(default=None, alias="X-Visitor-Id"),
 ) -> None:
     game = db.get(Game, game_id)
     if game is None:
         raise HTTPException(status_code=404, detail="Game not found")
-    db.add(GameView(game_id=game.id, user_id=user.id if user else None))
+    visitor = (x_visitor_id or "").strip()[:64] or None
+    db.add(
+        GameView(
+            game_id=game.id,
+            user_id=user.id if user else None,
+            visitor_id=visitor,
+        )
+    )
     db.commit()
 
 
@@ -229,6 +247,7 @@ def delete_game(
     sessions = db.query(PlaySession).filter(PlaySession.game_id == game.id).all()
     for session in sessions:
         db.delete(session)
+    db.query(ClassroomAssignment).filter(ClassroomAssignment.game_id == game.id).delete()
     db.query(GameView).filter(GameView.game_id == game.id).delete()
     db.query(GameLike).filter(GameLike.game_id == game.id).delete()
     db.query(GameComment).filter(GameComment.game_id == game.id).delete()

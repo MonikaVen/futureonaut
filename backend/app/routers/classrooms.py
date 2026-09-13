@@ -7,11 +7,12 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, joinedload
 
-from app.auth import get_current_user, require_roles
+from app.auth import get_current_user
 from app.database import get_db
 from app.models import Classroom, ClassroomAssignment, ClassroomMember, Game, PlaySession, User, UserRole
 from app.schemas import (
     AssignmentCreate,
+    ClassroomAssignmentOut,
     ClassroomCreate,
     ClassroomDetailOut,
     ClassroomJoin,
@@ -25,6 +26,62 @@ router = APIRouter(prefix="/classrooms", tags=["classrooms"])
 def _gen_code() -> str:
     alphabet = string.ascii_uppercase + string.digits
     return "".join(secrets.choice(alphabet) for _ in range(6))
+
+
+def _require_classroom(db: Session, classroom_id: UUID) -> Classroom:
+    classroom = db.get(Classroom, classroom_id)
+    if classroom is None:
+        raise HTTPException(status_code=404, detail="Classroom not found")
+    return classroom
+
+
+def _is_member(db: Session, classroom_id: UUID, user_id: UUID) -> bool:
+    return (
+        db.query(ClassroomMember)
+        .filter(ClassroomMember.classroom_id == classroom_id, ClassroomMember.user_id == user_id)
+        .first()
+        is not None
+    )
+
+
+def _latest_session(db: Session, user_id: UUID, game_id: UUID) -> PlaySession | None:
+    return (
+        db.query(PlaySession)
+        .filter(PlaySession.user_id == user_id, PlaySession.game_id == game_id)
+        .order_by(PlaySession.started_at.desc())
+        .first()
+    )
+
+
+def _progress_from_session(session: PlaySession | None) -> dict:
+    if session is None:
+        return {
+            "completed": False,
+            "points": 0,
+            "accuracy": 0.0,
+            "levels_completed": 0,
+            "total_levels": None,
+        }
+    acc = (session.correct_count / session.attempt_count) if session.attempt_count else 0.0
+    return {
+        "completed": bool(session.ended_at),
+        "points": session.total_points,
+        "accuracy": acc,
+        "levels_completed": session.levels_completed or 0,
+        "total_levels": session.total_levels,
+    }
+
+
+def _assignment_out(db: Session, assignment: ClassroomAssignment, user_id: UUID) -> ClassroomAssignmentOut:
+    game = assignment.game or db.get(Game, assignment.game_id)
+    progress = _progress_from_session(_latest_session(db, user_id, assignment.game_id))
+    return ClassroomAssignmentOut(
+        id=assignment.id,
+        game_id=assignment.game_id,
+        game_title=game.title if game else "",
+        created_at=assignment.created_at,
+        **progress,
+    )
 
 
 @router.post("", response_model=ClassroomOut, status_code=status.HTTP_201_CREATED)
@@ -98,16 +155,9 @@ def classroom_detail(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> ClassroomDetailOut:
-    classroom = db.get(Classroom, classroom_id)
-    if classroom is None:
-        raise HTTPException(status_code=404, detail="Classroom not found")
+    classroom = _require_classroom(db, classroom_id)
     is_teacher = classroom.teacher_id == user.id
-    is_member = (
-        db.query(ClassroomMember)
-        .filter(ClassroomMember.classroom_id == classroom.id, ClassroomMember.user_id == user.id)
-        .first()
-        is not None
-    )
+    is_member = _is_member(db, classroom.id, user.id)
     if not is_teacher and not is_member:
         raise HTTPException(status_code=403, detail="Not in this class")
 
@@ -130,29 +180,19 @@ def classroom_detail(
         game_ids = [a.game_id for a in assignments]
         for member in members:
             for gid in game_ids:
-                session = (
-                    db.query(PlaySession)
-                    .filter(PlaySession.user_id == member.user_id, PlaySession.game_id == gid)
-                    .order_by(PlaySession.started_at.desc())
-                    .first()
-                )
+                session = _latest_session(db, member.user_id, gid)
                 game = db.get(Game, gid)
                 if not game:
                     continue
-                acc = 0.0
-                if session and session.attempt_count:
-                    acc = session.correct_count / session.attempt_count
+                stats = _progress_from_session(session)
                 progress.append(
                     StudentProgressOut(
+                        student_id=member.user_id,
                         student_name=member.user.display_name if member.user else "?",
                         student_email=member.user.email if member.user else "",
                         game_id=gid,
                         game_title=game.title,
-                        completed=bool(session and session.ended_at),
-                        points=session.total_points if session else 0,
-                        accuracy=acc,
-                        levels_completed=session.levels_completed if session else 0,
-                        total_levels=session.total_levels if session else None,
+                        **stats,
                     )
                 )
 
@@ -163,15 +203,7 @@ def classroom_detail(
         teacher_id=classroom.teacher_id,
         is_teacher=is_teacher,
         member_count=len(members),
-        assignments=[
-            {
-                "id": str(a.id),
-                "game_id": str(a.game_id),
-                "game_title": a.game.title if a.game else "",
-                "created_at": a.created_at.isoformat(),
-            }
-            for a in assignments
-        ],
+        assignments=[_assignment_out(db, a, user.id) for a in assignments],
         progress=progress,
     )
 
@@ -201,3 +233,76 @@ def assign_game(
     db.add(ClassroomAssignment(classroom_id=classroom.id, game_id=game.id))
     db.commit()
     return {"ok": True}
+
+
+@router.delete("/{classroom_id}/assignments/{assignment_id}", status_code=status.HTTP_204_NO_CONTENT)
+def unassign_game(
+    classroom_id: UUID,
+    assignment_id: UUID,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> None:
+    classroom = _require_classroom(db, classroom_id)
+    if classroom.teacher_id != user.id:
+        raise HTTPException(status_code=403, detail="Only the teacher can unassign games")
+    assignment = db.get(ClassroomAssignment, assignment_id)
+    if assignment is None or assignment.classroom_id != classroom.id:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    db.delete(assignment)
+    db.commit()
+
+
+@router.post("/{classroom_id}/leave", status_code=status.HTTP_204_NO_CONTENT)
+def leave_classroom(
+    classroom_id: UUID,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> None:
+    classroom = _require_classroom(db, classroom_id)
+    if classroom.teacher_id == user.id:
+        raise HTTPException(status_code=400, detail="Teacher cannot leave — delete the class instead")
+    member = (
+        db.query(ClassroomMember)
+        .filter(ClassroomMember.classroom_id == classroom.id, ClassroomMember.user_id == user.id)
+        .first()
+    )
+    if member is None:
+        raise HTTPException(status_code=404, detail="Not in this class")
+    db.delete(member)
+    db.commit()
+
+
+@router.delete("/{classroom_id}/members/{member_user_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_member(
+    classroom_id: UUID,
+    member_user_id: UUID,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> None:
+    classroom = _require_classroom(db, classroom_id)
+    if classroom.teacher_id != user.id:
+        raise HTTPException(status_code=403, detail="Only the teacher can remove members")
+    if member_user_id == classroom.teacher_id:
+        raise HTTPException(status_code=400, detail="Cannot remove the teacher")
+    member = (
+        db.query(ClassroomMember)
+        .filter(ClassroomMember.classroom_id == classroom.id, ClassroomMember.user_id == member_user_id)
+        .first()
+    )
+    if member is None:
+        raise HTTPException(status_code=404, detail="Member not found")
+    db.delete(member)
+    db.commit()
+
+
+@router.delete("/{classroom_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_classroom(
+    classroom_id: UUID,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> None:
+    classroom = _require_classroom(db, classroom_id)
+    if classroom.teacher_id != user.id and user.role != UserRole.admin:
+        raise HTTPException(status_code=403, detail="Only the teacher can delete this class")
+    db.delete(classroom)
+    db.commit()

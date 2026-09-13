@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { api, type Game } from "../api";
 import { GameCard } from "../GameCard";
 import { ContinuePlaying } from "../ContinuePlaying";
+import { useAuth } from "../auth";
 import { useLanguage } from "../language";
 
 const TOPICS = ["AI", "Physics", "Math"] as const;
@@ -63,12 +64,14 @@ function sortGames(list: Game[], sort: SortKey): Game[] {
 
 export function CatalogPage() {
   const { t } = useLanguage();
+  const { user } = useAuth();
   const [games, setGames] = useState<Game[]>([]);
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
   const [topic, setTopic] = useState<"All" | (typeof TOPICS)[number]>("All");
   const [level, setLevel] = useState<"All" | "1" | "2" | "3" | "4" | "5">("All");
   const [sort, setSort] = useState<SortKey>("recent");
+  const [onlyFavs, setOnlyFavs] = useState(false);
 
   useEffect(() => {
     api<Game[]>("/api/games")
@@ -95,8 +98,11 @@ export function CatalogPage() {
     if (level !== "All") {
       list = list.filter((g) => g.difficulty === Number(level));
     }
+    if (onlyFavs) {
+      list = list.filter((g) => g.liked_by_me);
+    }
     return sortGames(list, sort);
-  }, [games, query, topic, level, sort]);
+  }, [games, query, topic, level, sort, onlyFavs]);
 
   return (
     <div>
@@ -154,6 +160,16 @@ export function CatalogPage() {
             <option value="title">{t("titleSort")}</option>
           </select>
         </label>
+        {user && (
+          <label className="fav-filter">
+            <input
+              type="checkbox"
+              checked={onlyFavs}
+              onChange={(e) => setOnlyFavs(e.target.checked)}
+            />
+            {t("favourites")}
+          </label>
+        )}
         <span className="meta filters-count">
           {visible.length} / {games.length}
         </span>

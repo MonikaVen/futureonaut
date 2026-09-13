@@ -223,7 +223,20 @@ class AssignmentCreate(BaseModel):
     game_id: uuid.UUID
 
 
+class ClassroomAssignmentOut(BaseModel):
+    id: uuid.UUID
+    game_id: uuid.UUID
+    game_title: str
+    created_at: datetime
+    completed: bool = False
+    points: int = 0
+    accuracy: float = 0.0
+    levels_completed: int = 0
+    total_levels: int | None = None
+
+
 class StudentProgressOut(BaseModel):
+    student_id: uuid.UUID
     student_name: str
     student_email: str
     game_id: uuid.UUID
@@ -242,7 +255,7 @@ class ClassroomDetailOut(BaseModel):
     teacher_id: uuid.UUID
     is_teacher: bool
     member_count: int
-    assignments: list[dict[str, Any]]
+    assignments: list[ClassroomAssignmentOut]
     progress: list[StudentProgressOut]
 
 

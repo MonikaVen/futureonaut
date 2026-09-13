@@ -10,6 +10,7 @@ from app.models import Game, GameComment, PlaySession, User, UserRole
 from app.schemas import (
     CommentOut,
     DashboardStats,
+    GameAnalyticsDetailOut,
     GameAnalyticsOut,
     PlatformStats,
     RecommendationOut,
@@ -17,7 +18,7 @@ from app.schemas import (
     UserOut,
     UserRoleUpdate,
 )
-from app.services.game_analytics import build_game_analytics
+from app.services.game_analytics import build_game_analytics, build_game_analytics_detail
 from app.services.recommendations import recommend_games
 
 router = APIRouter(tags=["dashboard"])
@@ -175,6 +176,15 @@ def game_analytics(
     user: User = Depends(require_roles(UserRole.admin)),
 ) -> list[GameAnalyticsOut]:
     return build_game_analytics(db)
+
+
+@admin_router.get("/game-analytics/{game_id}", response_model=GameAnalyticsDetailOut)
+def game_analytics_detail(
+    game_id: UUID,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(UserRole.admin)),
+) -> GameAnalyticsDetailOut:
+    return build_game_analytics_detail(db, game_id)
 
 
 @admin_router.get("/comments", response_model=list[CommentOut])
