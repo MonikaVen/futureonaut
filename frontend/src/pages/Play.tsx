@@ -123,65 +123,59 @@ export function PlayPage() {
 
   return (
     <div className="player-wrap">
-      <div className="row player-header">
-        <div className="player-header-copy">
-          <h1 className="player-title">{game.title}</h1>
-          <p className="meta">{game.description}</p>
+      <div className="player-bar">
+        <Link className="player-back" to="/">
+          {t("back")}
+        </Link>
+        <h1 className="player-title">{game.title}</h1>
+        <div className="metrics metrics-inline" aria-live="polite">
+          <span>
+            {t("points")} <b>{points}</b>
+          </span>
+          <span>
+            {t("correct")}{" "}
+            <b>
+              {correct}/{attempts}
+            </b>
+          </span>
+          <span>
+            {t("taskTime")} <b>{(timeMs / 1000).toFixed(1)}s</b>
+          </span>
         </div>
-        {user ? (
-          <Link className="btn secondary" to="/dashboard">
-            {t("dashboard")}
-          </Link>
-        ) : (
-          <Link className="btn secondary" to="/login">
-            {t("signInToTrack")}
-          </Link>
-        )}
       </div>
       {!user && <p className="guest-note">{t("guestPlayNote")}</p>}
-      {completed && session && (
-        <ScoreCard
-          sessionId={session.id}
-          gameTitle={game.title}
-          points={session.total_points}
-          correct={session.correct_count}
-          attempts={session.attempt_count}
-          levelsCompleted={session.levels_completed}
-          totalLevels={session.total_levels}
-        />
-      )}
-      <div className="row player-tools">
-        <GameSocial
-          game={{
-            ...game,
-            like_count: game.like_count ?? 0,
-            comment_count: game.comment_count ?? 0,
-            liked_by_me: game.liked_by_me ?? false,
-          }}
-          showComments
-          onUpdate={(patch) => setGame((g) => (g ? { ...g, ...patch } : g))}
-        />
-        <GameShare gameId={game.id} title={game.title} description={game.description} />
-      </div>
-      <div className="metrics">
-        <span>
-          {t("points")} <b>{points}</b>
-        </span>
-        <span>
-          {t("correct")} <b>
-            {correct}/{attempts}
-          </b>
-        </span>
-        <span>
-          {t("taskTime")} <b>{(timeMs / 1000).toFixed(1)}s</b>
-        </span>
-      </div>
       <iframe
         className="frame"
         title={game.title}
         src={src}
         sandbox="allow-scripts allow-same-origin allow-forms"
       />
+      {completed && session && (
+        <div className="player-after">
+          <ScoreCard
+            sessionId={session.id}
+            gameTitle={game.title}
+            points={session.total_points}
+            correct={session.correct_count}
+            attempts={session.attempt_count}
+            levelsCompleted={session.levels_completed}
+            totalLevels={session.total_levels}
+          />
+          <div className="row player-tools">
+            <GameSocial
+              game={{
+                ...game,
+                like_count: game.like_count ?? 0,
+                comment_count: game.comment_count ?? 0,
+                liked_by_me: game.liked_by_me ?? false,
+              }}
+              showComments
+              onUpdate={(patch) => setGame((g) => (g ? { ...g, ...patch } : g))}
+            />
+            <GameShare gameId={game.id} title={game.title} description={game.description} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

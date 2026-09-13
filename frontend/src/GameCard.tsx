@@ -1,4 +1,3 @@
-import { Link } from "react-router-dom";
 import type { Game } from "./api";
 import { GamePreview } from "./GamePreview";
 import { GameSocial } from "./GameSocial";
@@ -16,7 +15,12 @@ export function GameCard({ game, topic, focusLabels, onUpdate }: Props) {
 
   return (
     <article className="game-tile">
-      <GamePreview gameId={game.id} entryPath={game.entry_path} title={game.title} />
+      <GamePreview
+        gameId={game.id}
+        title={game.title}
+        topic={topic}
+        difficulty={game.difficulty}
+      />
       <div className="game-tile-body">
         <h3>{game.title}</h3>
         <p className="meta game-tile-desc">{game.description || t("noDescription")}</p>

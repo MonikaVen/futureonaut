@@ -1,49 +1,36 @@
-import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { PlayIcon } from "./Icons";
+import { useLanguage } from "./language";
 
 type Props = {
   gameId: string;
-  entryPath: string;
   title: string;
+  topic: string;
+  difficulty: number;
 };
 
-export function GamePreview({ gameId, entryPath, title }: Props) {
-  const rootRef = useRef<HTMLDivElement>(null);
-  const [active, setActive] = useState(false);
+function posterTopic(topic: string): "ai" | "physics" | "math" {
+  const value = topic.toLowerCase();
+  if (value === "physics") return "physics";
+  if (value === "math") return "math";
+  return "ai";
+}
 
-  useEffect(() => {
-    const el = rootRef.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setActive(true);
-          observer.disconnect();
-        }
-      },
-      { rootMargin: "120px" }
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
-
-  const src = `/api/games/${gameId}/files/${entryPath}`;
+export function GamePreview({ gameId, title, topic, difficulty }: Props) {
+  const { t } = useLanguage();
+  const kind = posterTopic(topic);
 
   return (
-    <div className="game-preview" ref={rootRef}>
-      {active ? (
-        <iframe
-          className="game-preview-frame"
-          src={src}
-          title={`${title} preview`}
-          sandbox="allow-scripts allow-same-origin"
-          loading="lazy"
-          tabIndex={-1}
-        />
-      ) : (
-        <div className="game-preview-skeleton" aria-hidden />
-      )}
-      <Link className="game-preview-overlay" to={`/play/${gameId}`} aria-label={`Play ${title}`} />
-    </div>
+    <Link
+      className={`game-poster topic-${kind}`}
+      to={`/play/${gameId}`}
+      aria-label={`${t("play")} ${title}`}
+    >
+      <span className="game-poster-topic">{topic}</span>
+      <span className="game-poster-play" aria-hidden>
+        <PlayIcon size={22} />
+      </span>
+      <span className="game-poster-level">Lv {difficulty}</span>
+    </Link>
   );
 }

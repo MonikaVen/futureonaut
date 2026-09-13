@@ -9,6 +9,7 @@ export function Shell() {
   const { t } = useLanguage();
   const location = useLocation();
   const [navOpen, setNavOpen] = useState(false);
+  const isPlay = location.pathname.startsWith("/play/");
 
   useEffect(() => {
     setNavOpen(false);
@@ -19,6 +20,11 @@ export function Shell() {
     return () => document.body.classList.remove("nav-open");
   }, [navOpen]);
 
+  useEffect(() => {
+    document.body.classList.toggle("play-focus", isPlay);
+    return () => document.body.classList.remove("play-focus");
+  }, [isPlay]);
+
   if (loading) {
     return (
       <div className="app-shell app-loading">
@@ -28,7 +34,7 @@ export function Shell() {
   }
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell${isPlay ? " play-focus" : ""}`}>
       <header className="topnav">
         <div className="topnav-bar">
           <NavLink to="/" className="brand">
@@ -76,9 +82,11 @@ export function Shell() {
         </nav>
       </header>
 
-      <section className="platform-cover" aria-label="Futureonaut">
-        <img src="/cover.png" alt={t("coverAlt")} />
-      </section>
+      {!isPlay && (
+        <section className="platform-cover" aria-label="Futureonaut">
+          <img src="/cover.png" alt={t("coverAlt")} />
+        </section>
+      )}
 
       <Outlet />
     </div>

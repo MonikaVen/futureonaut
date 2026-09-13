@@ -5,14 +5,57 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Timed Challenge</title>
   <style>
-    :root { --ink:#111827; --accent:#b45309; --muted:#6b7280; --card:#fff7ed; }
-    body { margin:0; font-family: "Gill Sans", "Segoe UI", sans-serif; color:var(--ink);
-      background: radial-gradient(circle at 20% 20%, #fdba74aa, transparent 40%), linear-gradient(135deg,#fff7ed,#ffedd5); min-height:100vh; }
-    main { max-width:680px; margin:0 auto; padding:28px 16px; }
-    .card { background:var(--card); border:1px solid #fdba74; border-radius:16px; padding:18px; margin-top:14px; }
-    input { width:100%; padding:12px; border-radius:10px; border:1px solid #d1d5db; font:inherit; }
-    button { margin-top:10px; background:var(--accent); color:#fff; border:0; border-radius:10px; padding:10px 14px; font:inherit; cursor:pointer; }
-    .muted { color:var(--muted); }
+    :root {
+      --bg: #0c1220;
+      --ink: #eef4fb;
+      --muted: #9aabc4;
+      --accent: #3ec8e8;
+      --card: #121a2c;
+      --line: rgba(62, 200, 232, 0.22);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Exo 2", "Segoe UI", system-ui, sans-serif;
+      color: var(--ink);
+      background: var(--bg);
+      min-height: 100vh;
+      line-height: 1.55;
+      font-size: 17px;
+    }
+    main { max-width: 680px; margin: 0 auto; padding: 28px 16px; }
+    h1 { margin: 0 0 8px; font-size: 1.45rem; font-weight: 650; }
+    .muted { color: var(--muted); }
+    .muted b { color: var(--ink); }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 18px;
+      margin-top: 14px;
+    }
+    input {
+      width: 100%;
+      padding: 12px;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: #0c1220;
+      color: var(--ink);
+      font: inherit;
+    }
+    input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+    button {
+      margin-top: 10px;
+      background: var(--accent);
+      color: #050810;
+      border: 0;
+      border-radius: 10px;
+      padding: 10px 14px;
+      font: inherit;
+      font-weight: 650;
+      cursor: pointer;
+    }
+    button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   </style>
 </head>
 <body>
