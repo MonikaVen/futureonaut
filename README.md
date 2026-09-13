@@ -46,9 +46,12 @@ Frontend dev server: http://localhost:5173 (proxies `/api` to the backend).
 
 | Role | Capabilities |
 |------|----------------|
-| Learner | Register, play games, dashboard, recommendations |
-| Creator | Upload HTML/ZIP games, template games, AI generation |
-| Admin | User roles, platform stats, full game management |
+| Guest | Browse and play without an account; progress stays on the device and merges on sign-in |
+| Learner | Register, play games, dashboard, recommendations, classrooms, favourites, comments, share cards |
+| Creator | Upload HTML/ZIP games, template games, AI generation, classroom assignments |
+| Admin | User roles, platform stats, game popularity analytics, full game management |
+
+Catalog filters cover AI / Physics / Math, difficulty, and popularity. The UI is mobile-friendly and available in English plus Baltic and Nordic languages (LT, LV, ET, FI, SV, NO).
 
 ### Metrics SDK
 
@@ -57,6 +60,7 @@ Every uploaded or generated game gets `learnplay-sdk.js` injected. Games can cal
 - `LearnPlay.score(delta)`
 - `LearnPlay.answer({ correct, taskId, points })`
 - `LearnPlay.taskStart(taskId)` / `LearnPlay.taskEnd(taskId)`
+- `LearnPlay.levelComplete(level, totalLevels)`
 - `LearnPlay.complete()`
 
 The play page listens via `postMessage` and posts events to `/api/sessions/{id}/events`.
@@ -68,6 +72,8 @@ The play page listens via `postMessage` and posts events to `/api/sessions/{id}/
 - `timed_challenge`
 
 AI generation uses an OpenAI-compatible Chat Completions API (`OPENAI_API_KEY`, `OPENAI_BASE_URL`, `OPENAI_MODEL`).
+
+Share pages and Open Graph previews use `PUBLIC_BASE_URL` (Compose default: `http://localhost:3080`).
 
 ## API health
 
