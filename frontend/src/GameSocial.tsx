@@ -77,7 +77,7 @@ export function GameSocial({
       });
       setComments((prev) => [comment, ...prev]);
       setBody("");
-      onUpdate({ comment_count: game.comment_count + 1 });
+      onUpdate({ comment_count: (game.comment_count ?? 0) + 1 });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed");
     } finally {
@@ -113,9 +113,9 @@ export function GameSocial({
           )}
           <span className="social-chip" title={t("comments")}>
             <CommentIcon />
-            <span>{game.comment_count}</span>
+            <span>{game.comment_count ?? 0}</span>
           </span>
-          {!compact && game.like_count > 0 && (
+          {!compact && (game.like_count ?? 0) > 0 && (
             <span className="social-count meta" title={t("favourite")}>
               {game.like_count} {t("saved")}
             </span>

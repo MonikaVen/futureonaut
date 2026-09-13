@@ -72,7 +72,7 @@ export function ScoreCard({
         <button className="btn accent" type="button" onClick={copyLink}>
           {copied ? "Copied!" : "Copy score card"}
         </button>
-        {typeof navigator !== "undefined" && navigator.share ? (
+        {typeof navigator.share === "function" ? (
           <button className="btn secondary" type="button" onClick={nativeShare}>
             Share…
           </button>
