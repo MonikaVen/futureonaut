@@ -4,8 +4,7 @@ import { GameCard } from "../GameCard";
 import { ContinuePlaying } from "../ContinuePlaying";
 import { useAuth } from "../auth";
 import { useLanguage } from "../language";
-
-const TOPICS = ["AI", "Physics", "Math"] as const;
+import { TOPICS, primaryTopic } from "../gameMeta";
 
 const AI_FOCUS_LABELS = [
   "Computer Vision",
@@ -16,19 +15,14 @@ const AI_FOCUS_LABELS = [
   "Trustworthiness of AI",
 ] as const;
 
-function primaryTopic(game: Game): (typeof TOPICS)[number] {
-  const hit = game.topic_tags?.find((t) =>
-    TOPICS.includes(t as (typeof TOPICS)[number])
-  );
-  if (hit) return hit as (typeof TOPICS)[number];
-  if (game.topic_tags?.includes("ML")) return "AI";
-  return "AI";
-}
-
 function focusLabels(game: Game): string[] {
   return (game.topic_tags || []).filter((t) =>
     AI_FOCUS_LABELS.includes(t as (typeof AI_FOCUS_LABELS)[number])
   );
+}
+
+function topicOf(game: Game) {
+  return primaryTopic(game.topic_tags);
 }
 
 type SortKey = "recent" | "popular" | "level-asc" | "level-desc" | "title";
@@ -93,7 +87,7 @@ export function CatalogPage() {
       });
     }
     if (topic !== "All") {
-      list = list.filter((g) => primaryTopic(g) === topic);
+      list = list.filter((g) => topicOf(g) === topic);
     }
     if (level !== "All") {
       list = list.filter((g) => g.difficulty === Number(level));
@@ -175,18 +169,21 @@ export function CatalogPage() {
         </span>
       </div>
 
-      <div className="grid">
-        {visible.map((g) => (
-          <GameCard
-            key={g.id}
-            game={g}
-            topic={primaryTopic(g)}
-            focusLabels={focusLabels(g)}
-            onUpdate={(patch) => patchGame(g.id, patch)}
-          />
-        ))}
-        {!visible.length && !error && <p className="meta">{t("noGamesMatch")}</p>}
-      </div>
+      <section className="preview-card-section" aria-label={t("catalogSection")}>
+        <h2>{t("catalogSection")}</h2>
+        <div className="grid">
+          {visible.map((g) => (
+            <GameCard
+              key={g.id}
+              game={g}
+              topic={topicOf(g)}
+              focusLabels={focusLabels(g)}
+              onUpdate={(patch) => patchGame(g.id, patch)}
+            />
+          ))}
+          {!visible.length && !error && <p className="meta">{t("noGamesMatch")}</p>}
+        </div>
+      </section>
     </div>
   );
 }

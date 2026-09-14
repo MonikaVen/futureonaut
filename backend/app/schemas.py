@@ -195,6 +195,9 @@ class ContinueSessionOut(BaseModel):
     session_id: uuid.UUID
     game_id: uuid.UUID
     game_title: str
+    game_description: str = ""
+    topic_tags: list[str] = Field(default_factory=list)
+    difficulty: int = 1
     levels_completed: int
     total_levels: int | None
     total_points: int

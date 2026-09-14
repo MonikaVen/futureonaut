@@ -52,6 +52,9 @@ const COPY: Record<LangCode, Record<string, string>> = {
     noGamesMatch: "No games match these filters.",
     catalogLede:
       "Search and play without an account. Sign in to save scores, favourite games, and comment.",
+    catalogSection: "Browse games",
+    forYouLede:
+      "Personalized picks from weak topics, new games, spaced review, and your difficulty level.",
     favourite: "Favourite",
     removeFavourite: "Remove from favourites",
     addFavourite: "Add to favourites",
@@ -116,6 +119,9 @@ const COPY: Record<LangCode, Record<string, string>> = {
     noGamesMatch: "Nėra žaidimų pagal filtrus.",
     catalogLede:
       "Ieškok ir žaisk be paskyros. Prisijunk, kad išsaugotum rezultatus, mėgstamiausius ir komentarus.",
+    catalogSection: "Naršyti žaidimus",
+    forYouLede:
+      "Asmeniniai pasiūlymai pagal silpnas temas, naujus žaidimus, kartojimą ir tavo lygį.",
     favourite: "Mėgstamas",
     removeFavourite: "Pašalinti iš mėgstamų",
     addFavourite: "Pridėti į mėgstamus",
@@ -180,6 +186,9 @@ const COPY: Record<LangCode, Record<string, string>> = {
     noGamesMatch: "Nav spēļu pēc filtriem.",
     catalogLede:
       "Meklē un spēlē bez konta. Pieraksties, lai saglabātu rezultātus, favorītus un komentārus.",
+    catalogSection: "Pārlūkot spēles",
+    forYouLede:
+      "Personalizēti ieteikumi pēc vājajām tēmām, jaunām spēlēm, atkārtošanas un tava līmeņa.",
     favourite: "Favorīts",
     removeFavourite: "Noņemt no favorītiem",
     addFavourite: "Pievienot favorītiem",
@@ -244,6 +253,9 @@ const COPY: Record<LangCode, Record<string, string>> = {
     noGamesMatch: "Filtritele vastavaid mänge pole.",
     catalogLede:
       "Otsi ja mängi ilma kontota. Logi sisse, et salvestada tulemusi, lemmikuid ja kommentaare.",
+    catalogSection: "Sirvi mänge",
+    forYouLede:
+      "Isiklikud soovitused nõrkade teemade, uute mängude, kordamise ja sinu taseme põhjal.",
     favourite: "Lemmik",
     removeFavourite: "Eemalda lemmikutest",
     addFavourite: "Lisa lemmikutesse",
@@ -308,6 +320,9 @@ const COPY: Record<LangCode, Record<string, string>> = {
     noGamesMatch: "Yhtään peliä ei vastaa suodattimia.",
     catalogLede:
       "Hae ja pelaa ilman tiliä. Kirjaudu sisään tallentaaksesi tulokset, suosikit ja kommentit.",
+    catalogSection: "Selaa pelejä",
+    forYouLede:
+      "Henkilökohtaisia valintoja heikoista aiheista, uusista peleistä, kertaamisesta ja tasostasi.",
     favourite: "Suosikki",
     removeFavourite: "Poista suosikeista",
     addFavourite: "Lisää suosikkeihin",
@@ -372,6 +387,9 @@ const COPY: Record<LangCode, Record<string, string>> = {
     noGamesMatch: "Inga spel matchar filtren.",
     catalogLede:
       "Sök och spela utan konto. Logga in för att spara poäng, favoriter och kommentarer.",
+    catalogSection: "Bläddra bland spel",
+    forYouLede:
+      "Personliga val från svaga ämnen, nya spel, repetition och din nivå.",
     favourite: "Favorit",
     removeFavourite: "Ta bort från favoriter",
     addFavourite: "Lägg till i favoriter",
@@ -436,6 +454,9 @@ const COPY: Record<LangCode, Record<string, string>> = {
     noGamesMatch: "Ingen spill matcher filtrene.",
     catalogLede:
       "Søk og spill uten konto. Logg inn for å lagre poeng, favoritter og kommentarer.",
+    catalogSection: "Bla gjennom spill",
+    forYouLede:
+      "Personlige valg fra svake emner, nye spill, repetisjon og ditt nivå.",
     favourite: "Favoritt",
     removeFavourite: "Fjern fra favoritter",
     addFavourite: "Legg til i favoritter",

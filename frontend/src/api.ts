@@ -60,6 +60,9 @@ export interface ContinueSession {
   session_id: string;
   game_id: string;
   game_title: string;
+  game_description?: string;
+  topic_tags?: string[];
+  difficulty?: number;
   levels_completed: number;
   total_levels: number | null;
   total_points: number;

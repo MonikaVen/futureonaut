@@ -1,7 +1,6 @@
 import type { Game } from "./api";
 import { GamePreview } from "./GamePreview";
 import { GameSocial } from "./GameSocial";
-import { useLanguage } from "./language";
 
 type Props = {
   game: Game;
@@ -11,28 +10,25 @@ type Props = {
 };
 
 export function GameCard({ game, topic, focusLabels, onUpdate }: Props) {
-  const { t } = useLanguage();
-
   return (
     <article className="game-tile">
       <GamePreview
         gameId={game.id}
         title={game.title}
+        description={game.description}
         topic={topic}
         difficulty={game.difficulty}
       />
       <div className="game-tile-body">
-        <h3>{game.title}</h3>
-        <p className="meta game-tile-desc">{game.description || t("noDescription")}</p>
-        <div className="tags">
-          <span className="tag topic">{topic}</span>
-          {focusLabels.map((label) => (
-            <span key={label} className="tag focus">
-              {label}
-            </span>
-          ))}
-          <span className="tag">Lv {game.difficulty}</span>
-        </div>
+        {focusLabels.length > 0 ? (
+          <div className="tags">
+            {focusLabels.map((label) => (
+              <span key={label} className="tag focus">
+                {label}
+              </span>
+            ))}
+          </div>
+        ) : null}
         <GameSocial
           game={{
             ...game,

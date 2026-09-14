@@ -1,8 +1,11 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import { api, type Recommendation } from "../api";
+import { GamePreview } from "../GamePreview";
+import { primaryTopic } from "../gameMeta";
+import { useLanguage } from "../language";
 
 export function RecommendationsPage() {
+  const { t } = useLanguage();
   const [items, setItems] = useState<Recommendation[]>([]);
   const [error, setError] = useState("");
 
@@ -15,29 +18,28 @@ export function RecommendationsPage() {
   return (
     <div>
       <section className="hero">
-        <h1>For you</h1>
-        <p>Personalized picks from weak topics, new games, spaced review, and your difficulty level.</p>
+        <h1>{t("forYou")}</h1>
+        <p>{t("forYouLede")}</p>
       </section>
       {error && <div className="error">{error}</div>}
-      <div className="grid">
-        {items.map((r) => (
-          <article key={r.game.id} className="game-tile">
-            <h3>{r.game.title}</h3>
-            <p className="meta">{r.reason}</p>
-            <div className="tags">
-              <span className="tag">Lv {r.game.difficulty}</span>
-              {r.game.topic_tags?.map((t) => (
-                <span className="tag" key={t}>
-                  {t}
-                </span>
-              ))}
-            </div>
-            <Link className="btn accent" to={`/play/${r.game.id}`}>
-              Play
-            </Link>
-          </article>
-        ))}
-      </div>
+      <section className="preview-card-section">
+        <div className="grid">
+          {items.map((r) => (
+            <article key={r.game.id} className="game-tile">
+              <GamePreview
+                gameId={r.game.id}
+                title={r.game.title}
+                description={r.game.description}
+                topic={primaryTopic(r.game.topic_tags)}
+                difficulty={r.game.difficulty}
+              />
+              <div className="game-tile-body">
+                <p className="meta">{r.reason}</p>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }

@@ -405,7 +405,17 @@ button, input, select, textarea {
 .grid {
   display: grid;
   gap: 1.25rem;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+}
+
+.preview-card-section {
+  margin: 0 0 1.5rem;
+}
+.preview-card-section > h2 {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  letter-spacing: 0.04em;
+  margin: 0 0 0.9rem;
 }
 
 .game-tile {
@@ -418,89 +428,188 @@ button, input, select, textarea {
   background: var(--surface);
   overflow: hidden;
   min-height: 11rem;
-  transition: border-color 0.2s ease;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .game-tile-body {
   display: flex;
   flex-direction: column;
   gap: 0.65rem;
-  padding: 1rem 1.15rem 1.15rem;
+  padding: 0.9rem 1.1rem 1.05rem;
   flex: 1;
 }
 
 .game-tile-body .social {
-  margin-top: 0.35rem;
-  padding-top: 0.85rem;
+  margin-top: auto;
+  padding-top: 0.75rem;
   border-top: 1px solid var(--line);
 }
 
-.game-tile-desc {
+.continue-tile-body {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.continue-tile-body .meta {
   margin: 0;
+}
+.continue-tile-body .btn {
+  flex-shrink: 0;
+}
+
+.game-preview {
+  --orb-x: 85%;
+  --orb-y: 8%;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 0.4rem;
+  aspect-ratio: 16 / 10;
+  min-height: 11rem;
+  padding: 0.9rem 1rem 0.85rem;
+  text-decoration: none;
+  color: var(--ink);
+  overflow: hidden;
+  isolation: isolate;
+  border-bottom: 1px solid var(--line);
+  background:
+    radial-gradient(ellipse 90% 80% at var(--orb-x) var(--orb-y), var(--poster-glow, rgba(0, 212, 255, 0.2)), transparent 58%),
+    linear-gradient(165deg, #141d30 0%, #0a1220 52%, #070c16 100%);
+}
+
+.game-preview::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(5, 8, 16, 0.08) 10%, rgba(5, 8, 16, 0.72) 100%);
+  z-index: 0;
+  pointer-events: none;
+}
+
+.game-preview > * {
+  position: relative;
+  z-index: 1;
+}
+
+.game-preview.topic-ai {
+  --poster-glow: rgba(0, 212, 255, 0.28);
+}
+.game-preview.topic-physics {
+  --poster-glow: rgba(123, 92, 255, 0.32);
+}
+.game-preview.topic-math {
+  --poster-glow: rgba(62, 200, 136, 0.26);
+}
+
+.game-preview-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-bottom: auto;
+}
+
+.game-preview-brand {
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.game-preview-play {
+  width: 1.85rem;
+  height: 1.85rem;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 212, 255, 0.12);
+  color: var(--accent);
+  flex-shrink: 0;
+  transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+
+.game-preview-title {
+  font-family: var(--font-display);
+  margin: 0;
+  font-size: 1.02rem;
+  letter-spacing: 0.03em;
+  line-height: 1.25;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
 
-.game-poster {
-  position: relative;
+.game-preview-lede {
+  margin: 0;
+  color: #9eb4d0;
+  font-size: 0.82rem;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.game-preview-meta {
   display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  aspect-ratio: 16 / 10;
-  padding: 0.85rem 1rem;
-  text-decoration: none;
-  color: var(--ink);
-  border-bottom: 1px solid var(--line);
-  background:
-    radial-gradient(ellipse 80% 70% at 20% 120%, var(--poster-glow, rgba(0, 212, 255, 0.16)), transparent 62%),
-    linear-gradient(165deg, #10182a 0%, #0a1220 55%, #070c16 100%);
+  flex-wrap: wrap;
+  gap: 0.35rem;
 }
 
-.game-poster.topic-ai {
-  --poster-glow: rgba(0, 212, 255, 0.22);
-}
-.game-poster.topic-physics {
-  --poster-glow: rgba(123, 92, 255, 0.26);
-}
-.game-poster.topic-math {
-  --poster-glow: rgba(62, 200, 136, 0.22);
-}
-
-.game-poster-topic {
-  font-size: 0.78rem;
+.game-preview-chip {
+  font-size: 0.7rem;
   font-weight: 600;
-  letter-spacing: 0.04em;
-  color: var(--ink);
-}
-
-.game-poster-level {
-  font-size: 0.75rem;
-  color: var(--muted);
-}
-
-.game-poster-play {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  color: rgba(232, 244, 255, 0.35);
-  pointer-events: none;
-}
-
-.game-poster:hover,
-.game-poster:focus-visible {
-  color: var(--ink);
-}
-
-.game-poster:hover .game-poster-play,
-.game-poster:focus-visible .game-poster-play {
+  letter-spacing: 0.03em;
+  padding: 0.16rem 0.5rem;
+  border-radius: var(--radius-pill);
+  background: rgba(0, 212, 255, 0.14);
   color: var(--accent);
+}
+
+.game-preview-chip.level {
+  background: rgba(123, 92, 255, 0.18);
+  color: #c8bcff;
+}
+
+.game-preview-chip.progress {
+  background: rgba(232, 244, 255, 0.08);
+  color: var(--ink);
+}
+
+.game-preview-bar {
+  display: block;
+  height: 3px;
+  margin-top: 0.15rem;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.game-preview-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.game-preview:hover,
+.game-preview:focus-visible {
+  color: var(--ink);
+}
+
+.game-preview:hover .game-preview-play,
+.game-preview:focus-visible .game-preview-play {
+  background: var(--accent);
+  color: #041018;
+  transform: scale(1.06);
 }
 
 .game-tile:hover {
   border-color: var(--line-strong);
+  box-shadow: var(--shadow-glow);
 }
 
 .game-tile h3 {
@@ -1134,22 +1243,7 @@ body.play-focus {
 }
 
 .continue-section {
-  margin-bottom: 1.25rem;
-}
-.continue-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 0.85rem;
-}
-.continue-card {
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: 0.9rem 1rem;
-  background: rgba(255, 255, 255, 0.02);
-}
-.continue-card h3 {
-  margin: 0 0 0.35rem;
-  font-size: 1rem;
+  margin-bottom: 1.35rem;
 }
 
 .score-card-panel {
@@ -1493,6 +1587,15 @@ body.play-focus {
 
   .game-tile-body {
     padding: 0.9rem 0.95rem 1rem;
+  }
+
+  .continue-tile-body {
+    flex-wrap: wrap;
+  }
+
+  .game-preview {
+    min-height: 12rem;
+    aspect-ratio: 5 / 4;
   }
 
   .social.compact .social-btn span {

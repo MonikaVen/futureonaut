@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, type ContinueSession } from "./api";
 import { useAuth } from "./auth";
+import { GamePreview } from "./GamePreview";
+import { primaryTopic } from "./gameMeta";
 import { useLanguage } from "./language";
 
 export function ContinuePlaying() {
@@ -22,25 +24,43 @@ export function ContinuePlaying() {
   if (!user || items.length === 0) return null;
 
   return (
-    <section className="continue-section panel">
-      <h2 style={{ fontFamily: "var(--font-display)", marginTop: 0 }}>Continue where you left off</h2>
-      <div className="continue-grid">
-        {items.map((item) => (
-          <article key={item.session_id} className="continue-card">
-            <h3>{item.game_title}</h3>
-            <p className="meta">
-              {item.total_points} pts
-              {item.total_levels
-                ? ` · Level ${item.levels_completed}/${item.total_levels}`
-                : item.levels_completed
-                  ? ` · Level ${item.levels_completed}`
-                  : ""}
-            </p>
-            <Link className="btn accent" to={`/play/${item.game_id}`}>
-              Continue
-            </Link>
-          </article>
-        ))}
+    <section className="preview-card-section continue-section">
+      <h2>{t("continueSection")}</h2>
+      <div className="grid">
+        {items.map((item) => {
+          const progressPct =
+            item.total_levels && item.total_levels > 0
+              ? Math.round((item.levels_completed / item.total_levels) * 100)
+              : null;
+          const progressLabel = item.total_levels
+            ? `${t("level")} ${item.levels_completed}/${item.total_levels}`
+            : item.levels_completed
+              ? `${t("level")} ${item.levels_completed}`
+              : undefined;
+
+          return (
+            <article key={item.session_id} className="game-tile">
+              <GamePreview
+                gameId={item.game_id}
+                title={item.game_title}
+                description={item.game_description}
+                topic={primaryTopic(item.topic_tags)}
+                difficulty={item.difficulty ?? 1}
+                progressLabel={progressLabel}
+                progressPct={progressPct}
+              />
+              <div className="game-tile-body continue-tile-body">
+                <p className="meta">
+                  {item.total_points} {t("pts")}
+                  {progressLabel ? ` · ${progressLabel}` : ""}
+                </p>
+                <Link className="btn accent" to={`/play/${item.game_id}`}>
+                  {t("continue")}
+                </Link>
+              </div>
+            </article>
+          );
+        })}
       </div>
     </section>
   );
