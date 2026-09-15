@@ -65,6 +65,7 @@ Every uploaded or generated game gets `learnplay-sdk.js` injected. Games can cal
 - `LearnPlay.milestone({ id, label, level, totalLevels })`
 - `LearnPlay.stage(done, total, { complete, points, label })`
 - `LearnPlay.complete()`
+- The SDK also posts `resize` with the game’s content height so the play iframe can grow to fit.
 
 The play page listens via `postMessage` and posts events to `/api/sessions/{id}/events`.
 

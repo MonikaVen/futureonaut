@@ -30,6 +30,7 @@ export function PlayPage() {
   const [totalLevels, setTotalLevels] = useState<number | null>(null);
   const [error, setError] = useState("");
   const [ready, setReady] = useState(false);
+  const [frameHeight, setFrameHeight] = useState<number | null>(null);
   const frameRef = useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
@@ -44,6 +45,7 @@ export function PlayPage() {
     setCompleted(false);
     setLevelsCompleted(0);
     setTotalLevels(null);
+    setFrameHeight(null);
     (async () => {
       try {
         const g = await api<Game>(`/api/games/${gameId}`);
@@ -86,6 +88,14 @@ export function PlayPage() {
       if (!data || data.source !== "learnplay-sdk" || !data.type) return;
       const payload = data.payload || {};
 
+      if (data.type === "resize") {
+        const height = Number(payload.height);
+        if (Number.isFinite(height) && height > 0) {
+          setFrameHeight(Math.min(16000, Math.max(420, Math.ceil(height) + 12)));
+        }
+        return;
+      }
+
       if (data.type === "score") setPoints((p) => p + Number(payload.delta || 0));
       if (data.type === "answer") {
         setAttempts((a) => a + 1);
@@ -96,6 +106,16 @@ export function PlayPage() {
       }
 
       if (!session) return;
+      if (
+        data.type !== "score" &&
+        data.type !== "answer" &&
+        data.type !== "task_time" &&
+        data.type !== "level_complete" &&
+        data.type !== "milestone" &&
+        data.type !== "complete"
+      ) {
+        return;
+      }
       api<Session>(`/api/sessions/${session.id}/events`, {
         method: "POST",
         body: JSON.stringify({ type: data.type, payload }),
@@ -173,6 +193,7 @@ export function PlayPage() {
         className="frame"
         title={game.title}
         src={src}
+        style={frameHeight ? { height: frameHeight, minHeight: frameHeight } : undefined}
         sandbox="allow-scripts allow-forms"
         referrerPolicy="no-referrer"
       />

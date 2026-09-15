@@ -142,4 +142,72 @@
   };
 
   global.LearnPlay = LearnPlay;
+
+  var lastHeight = 0;
+  var sizeTimer = 0;
+
+  function contentHeight() {
+    var doc = global.document;
+    if (!doc) return 0;
+    var el = doc.documentElement;
+    var body = doc.body;
+    var values = [
+      el && el.scrollHeight,
+      el && el.offsetHeight,
+      body && body.scrollHeight,
+      body && body.offsetHeight,
+    ];
+    var max = 0;
+    for (var i = 0; i < values.length; i++) {
+      var n = Number(values[i]) || 0;
+      if (n > max) max = n;
+    }
+    return max;
+  }
+
+  LearnPlay.fit = function () {
+    var height = contentHeight();
+    if (!height || Math.abs(height - lastHeight) < 2) {
+      return height;
+    }
+    lastHeight = height;
+    emit("resize", { height: height });
+    return height;
+  };
+
+  function scheduleFit() {
+    if (sizeTimer) {
+      global.clearTimeout(sizeTimer);
+    }
+    sizeTimer = global.setTimeout(function () {
+      LearnPlay.fit();
+    }, 60);
+  }
+
+  function watchSize() {
+    LearnPlay.fit();
+    try {
+      if (typeof global.ResizeObserver === "function" && global.document) {
+        var ro = new global.ResizeObserver(scheduleFit);
+        if (global.document.documentElement) ro.observe(global.document.documentElement);
+        if (global.document.body) ro.observe(global.document.body);
+      }
+    } catch (e3) {
+      /* ignore */
+    }
+    try {
+      global.addEventListener("load", scheduleFit);
+      global.addEventListener("resize", scheduleFit);
+    } catch (e4) {
+      /* ignore */
+    }
+  }
+
+  if (typeof global.document !== "undefined") {
+    if (global.document.readyState === "loading") {
+      global.document.addEventListener("DOMContentLoaded", watchSize);
+    } else {
+      watchSize();
+    }
+  }
 })(typeof window !== "undefined" ? window : globalThis);

@@ -81,6 +81,42 @@ console.log(JSON.stringify(events.map(e => ({{ type: e.type, payload: e.payload 
         self.assertEqual(complete["payload"]["levelsCompleted"], 5)
         self.assertEqual(complete["payload"]["totalLevels"], 5)
 
+    def test_sdk_fit_emits_resize(self) -> None:
+        script = f"""
+const fs = require('fs');
+const vm = require('vm');
+const events = [];
+const doc = {{
+  readyState: 'complete',
+  documentElement: {{ scrollHeight: 2400, offsetHeight: 800 }},
+  body: {{ scrollHeight: 2380, offsetHeight: 780 }},
+  addEventListener() {{}},
+}};
+const sandbox = {{
+  Date,
+  document: doc,
+  addEventListener() {{}},
+  CustomEvent: class CustomEvent {{
+    constructor(type, init) {{ this.type = type; this.detail = init && init.detail; }}
+  }}
+}};
+sandbox.window = sandbox;
+sandbox.globalThis = sandbox;
+sandbox.parent = {{ postMessage(msg) {{ events.push(msg); }} }};
+vm.runInNewContext(fs.readFileSync({json.dumps(str(SDK_PATH))}, 'utf8'), sandbox);
+sandbox.LearnPlay.fit();
+console.log(JSON.stringify(events.filter(e => e.type === 'resize').map(e => e.payload)));
+"""
+        result = subprocess.run(
+            ["node", "-e", script],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        payloads = json.loads(result.stdout)
+        self.assertGreaterEqual(len(payloads), 1)
+        self.assertEqual(payloads[0]["height"], 2400)
+
 
 if __name__ == "__main__":
     unittest.main()
