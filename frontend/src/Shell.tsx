@@ -3,11 +3,12 @@ import { NavLink, Outlet, Link, useLocation } from "react-router-dom";
 import { useAuth } from "./auth";
 import { BrandLogo } from "./BrandLogo";
 import { LanguageSelect, useLanguage } from "./language";
-import { ThemeToggle } from "./theme";
+import { ThemeToggle, useTheme } from "./theme";
 
 export function Shell() {
   const { user, logout, loading } = useAuth();
   const { t } = useLanguage();
+  const { theme } = useTheme();
   const location = useLocation();
   const [navOpen, setNavOpen] = useState(false);
   const isPlay = location.pathname.startsWith("/play/");
@@ -91,8 +92,11 @@ export function Shell() {
       </header>
 
       {!isPlay && (
-        <section className="platform-cover" aria-label="Futureonaut">
-          <img src="/cover.png" alt={t("coverAlt")} />
+        <section className={`platform-cover platform-cover-${theme}`} aria-label="Futureonaut">
+          <img
+            src={theme === "dark" ? "/cover-dark.png" : "/cover.png"}
+            alt={t("coverAlt")}
+          />
         </section>
       )}
 
