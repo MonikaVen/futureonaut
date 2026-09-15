@@ -320,6 +320,25 @@ button, input, select, textarea {
   );
 }
 
+html:not([data-theme="dark"]) .platform-cover::after {
+  background: linear-gradient(0deg, var(--cover-bottom) 0%, transparent 12%);
+}
+
+html:not([data-theme="dark"]) .platform-cover img {
+  mask-image: linear-gradient(
+    to bottom,
+    black 0%,
+    black 94%,
+    transparent 100%
+  );
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    black 0%,
+    black 94%,
+    transparent 100%
+  );
+}
+
 .auth-brand {
   display: grid;
   gap: 0.75rem;
