@@ -214,7 +214,7 @@ def list_all_comments(
     ]
 
 
-@admin_router.delete("/comments/{comment_id}", status_code=status.HTTP_204_NO_CONTENT)
+@admin_router.delete("/comments/{comment_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 def delete_comment(
     comment_id: UUID,
     db: Session = Depends(get_db),

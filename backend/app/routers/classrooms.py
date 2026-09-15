@@ -235,7 +235,7 @@ def assign_game(
     return {"ok": True}
 
 
-@router.delete("/{classroom_id}/assignments/{assignment_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{classroom_id}/assignments/{assignment_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 def unassign_game(
     classroom_id: UUID,
     assignment_id: UUID,
@@ -252,7 +252,7 @@ def unassign_game(
     db.commit()
 
 
-@router.post("/{classroom_id}/leave", status_code=status.HTTP_204_NO_CONTENT)
+@router.post("/{classroom_id}/leave", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 def leave_classroom(
     classroom_id: UUID,
     db: Session = Depends(get_db),
@@ -272,7 +272,7 @@ def leave_classroom(
     db.commit()
 
 
-@router.delete("/{classroom_id}/members/{member_user_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{classroom_id}/members/{member_user_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 def remove_member(
     classroom_id: UUID,
     member_user_id: UUID,
@@ -295,7 +295,7 @@ def remove_member(
     db.commit()
 
 
-@router.delete("/{classroom_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{classroom_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 def delete_classroom(
     classroom_id: UUID,
     db: Session = Depends(get_db),

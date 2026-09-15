@@ -98,6 +98,27 @@ class SnapshotTests(unittest.TestCase):
         img = Image.open(io.BytesIO(png))
         self.assertEqual(img.size, (1200, 630))
 
+    def test_light_theme_html_stays_readable(self) -> None:
+        from app.services.snapshot import _palette, render_preview_png
+
+        game = self._game(template_type=None, title="Find Liucians Friends KNN")
+        with tempfile.TemporaryDirectory() as tmp:
+            dest = Path(tmp) / str(game.id)
+            dest.mkdir()
+            (dest / "index.html").write_text(
+                """<html><style>:root{--bg:#f7f7f8;--card:#fff;--text:#1f2937;--muted:#6b7280;--border:#d1d5db}
+                body{background:#fff;color:var(--text)}</style>
+                <body><h1>Find Liucian's Friends</h1><button>Predict friend group</button></body></html>""",
+                encoding="utf-8",
+            )
+            with patch("app.services.snapshot.game_dir", return_value=dest):
+                palette = _palette(game, dest)
+                png = render_preview_png(game)
+        self.assertLess(sum(palette["ink"]) / 3, 80)
+        self.assertGreater(sum(palette["bg"]) / 3, 200)
+        img = Image.open(io.BytesIO(png))
+        self.assertEqual(img.size, (1200, 630))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -114,6 +114,12 @@ def _hex_to_rgb(value: str, fallback: tuple[int, int, int]) -> tuple[int, int, i
 
 def _plain(text: str, limit: int = 160) -> str:
     cleaned = _WS.sub(" ", _TAG.sub(" ", text or "")).replace("&nbsp;", " ").strip()
+    cleaned = "".join(
+        ch
+        for ch in cleaned
+        if ch.isprintable() and (ch.isalnum() or ch.isspace() or ch in ".,;:!?-'’“”()[]&/%+#·")
+    )
+    cleaned = _WS.sub(" ", cleaned).strip()
     if len(cleaned) <= limit:
         return cleaned
     return cleaned[: limit - 1].rstrip() + "…"
@@ -165,6 +171,10 @@ def _css_vars(html: str) -> dict[str, str]:
     return found
 
 
+def _luma(rgb: tuple[int, int, int]) -> float:
+    return 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]
+
+
 def _palette(game, dest: Path) -> dict[str, tuple[int, int, int]]:
     accent = _TOPIC_ACCENT[_topic(game)]
     palette = {
@@ -180,15 +190,36 @@ def _palette(game, dest: Path) -> dict[str, tuple[int, int, int]]:
     if html_path.is_file():
         html = html_path.read_text(encoding="utf-8", errors="replace")[:80_000]
         vars_map = _css_vars(html)
-        for key in ("bg", "ink", "muted", "card", "accent"):
-            value = vars_map.get(key, "")
+        aliases = {
+            "bg": "bg",
+            "ink": "ink",
+            "text": "ink",
+            "muted": "muted",
+            "card": "card",
+            "accent": "accent",
+            "border": "line",
+        }
+        for src, dest_key in aliases.items():
+            value = vars_map.get(src, "")
             if value.startswith("#"):
-                palette[key] = _hex_to_rgb(value, palette[key])
+                palette[dest_key] = _hex_to_rgb(value, palette[dest_key])
         body_bg = re.search(r"body\s*\{[^}]*background(?:-color)?:\s*([^;]+)", html, re.I)
         if body_bg:
             hexes = _HEX.findall(body_bg.group(1))
             if hexes:
                 palette["bg"] = _hex_to_rgb(hexes[0], palette["bg"])
+    if _luma(palette["bg"]) >= 150:
+        if _luma(palette["ink"]) >= 140:
+            palette["ink"] = (31, 41, 55)
+        if _luma(palette["muted"]) >= 150:
+            palette["muted"] = (107, 114, 128)
+        if _luma(palette["line"]) >= 200:
+            palette["line"] = (209, 213, 219)
+        if _luma(palette["card"]) >= 230:
+            palette["card"] = (255, 255, 255)
+        palette["chrome"] = (18, 24, 36)
+    elif _luma(palette["ink"]) < 90:
+        palette["ink"] = (238, 244, 251)
     return palette
 
 

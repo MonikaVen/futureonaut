@@ -190,7 +190,7 @@ def get_game(
     return enrich_games(db, [game], user.id if user else None)[0]
 
 
-@router.post("/{game_id}/view", status_code=status.HTTP_204_NO_CONTENT)
+@router.post("/{game_id}/view", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 def record_game_view(
     game_id: UUID,
     db: Session = Depends(get_db),
@@ -238,7 +238,7 @@ def update_game(
     return game_to_out(game)
 
 
-@router.delete("/{game_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{game_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 def delete_game(
     game_id: UUID,
     db: Session = Depends(get_db),
