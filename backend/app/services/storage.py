@@ -10,10 +10,15 @@ from uuid import UUID
 from app.config import get_settings
 
 SDK_MARKER = "learnplay-sdk.js"
+I18N_MARKER = "learnplay-i18n.js"
 
 
 def sdk_source_path() -> Path:
     return Path(__file__).resolve().parents[2] / "sdk" / "learnplay-sdk.js"
+
+
+def i18n_source_path() -> Path:
+    return Path(__file__).resolve().parents[2] / "sdk" / "learnplay-i18n.js"
 
 
 def games_root() -> Path:
@@ -29,19 +34,34 @@ def game_dir(game_id: UUID) -> Path:
 
 
 def inject_sdk_into_html(html: str) -> str:
-    sdk_tag = f'<script src="./{SDK_MARKER}"></script>'
-    if SDK_MARKER in html:
+    if I18N_MARKER not in html and SDK_MARKER in html:
+        html = html.replace(
+            f'<script src="./{SDK_MARKER}"></script>',
+            f'<script src="./{I18N_MARKER}"></script>\n  <script src="./{SDK_MARKER}"></script>',
+            1,
+        )
         return html
+    tags = []
+    if I18N_MARKER not in html:
+        tags.append(f'<script src="./{I18N_MARKER}"></script>')
+    if SDK_MARKER not in html:
+        tags.append(f'<script src="./{SDK_MARKER}"></script>')
+    if not tags:
+        return html
+    block = "  " + "\n  ".join(tags) + "\n"
     if re.search(r"</head\s*>", html, flags=re.IGNORECASE):
-        return re.sub(r"</head\s*>", f"  {sdk_tag}\n</head>", html, count=1, flags=re.IGNORECASE)
+        return re.sub(r"</head\s*>", block + "</head>", html, count=1, flags=re.IGNORECASE)
     if re.search(r"<body[^>]*>", html, flags=re.IGNORECASE):
-        return re.sub(r"(<body[^>]*>)", rf"\1\n  {sdk_tag}", html, count=1, flags=re.IGNORECASE)
-    return f"{sdk_tag}\n{html}"
+        return re.sub(r"(<body[^>]*>)", rf"\1\n{block}", html, count=1, flags=re.IGNORECASE)
+    return block + html
 
 
 def write_sdk(dest_dir: Path) -> None:
-    dest = dest_dir / SDK_MARKER
-    shutil.copyfile(sdk_source_path(), dest)
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(sdk_source_path(), dest_dir / SDK_MARKER)
+    i18n = i18n_source_path()
+    if i18n.exists():
+        shutil.copyfile(i18n, dest_dir / I18N_MARKER)
 
 
 def ensure_sdk_injected(dest_dir: Path, entry_path: str = "index.html") -> str:
@@ -66,7 +86,7 @@ def save_uploaded_zip(game_id: UUID, zip_bytes: bytes) -> str:
         zf.extractall(dest)
     zip_path.unlink(missing_ok=True)
     # flatten if single top-level folder
-    children = [c for c in dest.iterdir() if c.name != SDK_MARKER]
+    children = [c for c in dest.iterdir() if c.name not in {SDK_MARKER, I18N_MARKER}]
     if len(children) == 1 and children[0].is_dir():
         nested = children[0]
         for item in nested.iterdir():

@@ -66,6 +66,9 @@
   <div class="card" id="panel"></div>
 </main>
 <script>
+function t(s) {
+  return window.LearnPlay && LearnPlay.t ? LearnPlay.t(s) : s;
+}
 async function load() {
   const res = await fetch('./content.json');
   const data = await res.json();
@@ -80,7 +83,7 @@ async function load() {
   function render() {
     prog.textContent = `${Math.min(i+1, questions.length)}/${questions.length}`;
       if (i >= questions.length) {
-      panel.innerHTML = `<p>Done! Final score: <b>${score}</b></p>`;
+      panel.innerHTML = `<p>${t("Done! Final score:")} <b>${score}</b></p>`;
       if (window.LearnPlay) LearnPlay.complete({ score, levelsCompleted: questions.length, totalLevels: questions.length });
       return;
     }

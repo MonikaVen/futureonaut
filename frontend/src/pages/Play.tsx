@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, type Game, type Session } from "../api";
 import { useAuth } from "../auth";
 import { GameShare } from "../GameShare";
 import { GameSocial } from "../GameSocial";
 import { ScoreCard } from "../ScoreCard";
-import { useLanguage } from "../language";
+import { UI_LANGS, useLanguage, type LangCode } from "../language";
+import { useTheme, type Theme } from "../theme";
 import { getVisitorId } from "../visitor";
 
 type SdkMessage = {
@@ -17,7 +18,8 @@ type SdkMessage = {
 export function PlayPage() {
   const { gameId } = useParams();
   const { user } = useAuth();
-  const { t } = useLanguage();
+  const { t, lang, setLang } = useLanguage();
+  const { theme, setTheme } = useTheme();
   const visitorId = useMemo(() => getVisitorId(), []);
   const [game, setGame] = useState<Game | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -32,10 +34,28 @@ export function PlayPage() {
   const [ready, setReady] = useState(false);
   const [frameHeight, setFrameHeight] = useState<number | null>(null);
   const frameRef = useRef<HTMLIFrameElement>(null);
+  const iframeSrcRef = useRef("");
+  const iframeGameIdRef = useRef<string | null>(null);
+  const prefsRef = useRef({ theme, lang });
+  prefsRef.current = { theme, lang };
+
+  const postPrefs = useCallback((target?: Window | MessageEventSource | null) => {
+    const win = (target && "postMessage" in target ? target : frameRef.current?.contentWindow) as
+      | Window
+      | null
+      | undefined;
+    if (!win || typeof win.postMessage !== "function") return;
+    win.postMessage(
+      { source: "learnplay-host", type: "prefs", payload: { ...prefsRef.current } },
+      "*"
+    );
+  }, []);
 
   useEffect(() => {
     if (!gameId) return;
     let cancelled = false;
+    iframeSrcRef.current = "";
+    iframeGameIdRef.current = null;
     setReady(false);
     setSession(null);
     setPoints(0);
@@ -96,6 +116,23 @@ export function PlayPage() {
         return;
       }
 
+      if (data.type === "ready") {
+        postPrefs(ev.source as Window);
+        return;
+      }
+
+      if (data.type === "prefs") {
+        const nextTheme = payload.theme;
+        const nextLang = typeof payload.lang === "string" ? payload.lang.slice(0, 2).toLowerCase() : "";
+        if (nextTheme === "dark" || nextTheme === "light") {
+          setTheme(nextTheme as Theme);
+        }
+        if (UI_LANGS.some((item) => item.code === nextLang)) {
+          setLang(nextLang as LangCode);
+        }
+        return;
+      }
+
       if (data.type === "score") setPoints((p) => p + Number(payload.delta || 0));
       if (data.type === "answer") {
         setAttempts((a) => a + 1);
@@ -141,9 +178,23 @@ export function PlayPage() {
     }
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, [session, user, visitorId]);
+  }, [session, user, visitorId, postPrefs, setLang, setTheme]);
 
-  const src = game ? `/api/games/${game.id}/files/${game.entry_path}` : "";
+  useEffect(() => {
+    postPrefs();
+  }, [theme, lang, ready, postPrefs]);
+
+  const src = useMemo(() => {
+    if (!game) return "";
+    if (iframeGameIdRef.current === game.id && iframeSrcRef.current) {
+      return iframeSrcRef.current;
+    }
+    const params = new URLSearchParams({ theme, lang });
+    const next = `/api/games/${game.id}/files/${game.entry_path}?${params.toString()}`;
+    iframeGameIdRef.current = game.id;
+    iframeSrcRef.current = next;
+    return next;
+  }, [game, theme, lang]);
 
   if (error) {
     return (
@@ -193,6 +244,7 @@ export function PlayPage() {
         className="frame"
         title={game.title}
         src={src}
+        onLoad={() => postPrefs()}
         style={frameHeight ? { height: frameHeight, minHeight: frameHeight } : undefined}
         sandbox="allow-scripts allow-forms"
         referrerPolicy="no-referrer"

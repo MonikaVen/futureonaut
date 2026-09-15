@@ -117,6 +117,112 @@ console.log(JSON.stringify(events.filter(e => e.type === 'resize').map(e => e.pa
         self.assertGreaterEqual(len(payloads), 1)
         self.assertEqual(payloads[0]["height"], 2400)
 
+    def test_i18n_pack_covers_ui_languages(self) -> None:
+        path = SDK_PATH.parent / "learnplay-i18n.js"
+        self.assertTrue(path.is_file())
+        text = path.read_text(encoding="utf-8")
+        self.assertIn("LEARNPLAY_I18N", text)
+        for code in ("en", "lt", "lv", "et", "fi", "sv", "no"):
+            self.assertIn(f'"{code}"', text)
+        self.assertIn("Reset", text)
+
+    def test_inject_sdk_includes_i18n_before_sdk(self) -> None:
+        from app.services.storage import inject_sdk_into_html
+
+        html = "<html><head><title>G</title></head><body></body></html>"
+        out = inject_sdk_into_html(html)
+        self.assertIn("learnplay-i18n.js", out)
+        self.assertIn("learnplay-sdk.js", out)
+        self.assertLess(out.index("learnplay-i18n.js"), out.index("learnplay-sdk.js"))
+
+        already = inject_sdk_into_html('<head><script src="./learnplay-sdk.js"></script></head>')
+        self.assertIn("learnplay-i18n.js", already)
+        self.assertLess(already.index("learnplay-i18n.js"), already.index("learnplay-sdk.js"))
+        self.assertEqual(already.count("learnplay-sdk.js"), 1)
+
+    def test_sdk_translates_and_applies_prefs(self) -> None:
+        i18n_path = SDK_PATH.parent / "learnplay-i18n.js"
+        script = f"""
+const fs = require('fs');
+const vm = require('vm');
+const events = [];
+const attrs = {{}};
+const styleNode = {{ id: '', textContent: '' }};
+const html = {{
+  style: {{}},
+  lang: 'en',
+  setAttribute(k, v) {{ attrs[k] = v; }},
+  getAttribute(k) {{ return attrs[k]; }},
+  appendChild() {{}},
+}};
+const nodes = {{}};
+const doc = {{
+  readyState: 'loading',
+  documentElement: html,
+  body: null,
+  head: {{ appendChild(el) {{ if (el && el.id) nodes[el.id] = el; }} }},
+  getElementById(id) {{ return nodes[id] || null; }},
+  createElement() {{ return styleNode; }},
+  addEventListener() {{}},
+}};
+const sandbox = {{
+  Date,
+  document: doc,
+  addEventListener() {{}},
+  CustomEvent: class CustomEvent {{
+    constructor(type, init) {{ this.type = type; this.detail = init && init.detail; }}
+  }}
+}};
+sandbox.window = sandbox;
+sandbox.globalThis = sandbox;
+sandbox.parent = {{ postMessage(msg) {{ events.push(msg); }} }};
+vm.runInNewContext(
+  fs.readFileSync({json.dumps(str(i18n_path))}, 'utf8') + '\\n' +
+  fs.readFileSync({json.dumps(str(SDK_PATH))}, 'utf8'),
+  sandbox
+);
+sandbox.LearnPlay.setPrefs({{ theme: 'dark', lang: 'lt' }});
+const afterLt = {{
+  theme: attrs['data-lp-theme'],
+  lang: attrs['data-lp-lang'],
+  htmlLang: html.lang,
+  resetLt: sandbox.LearnPlay.t('Reset')
+}};
+sandbox.LearnPlay.setPrefs({{ lang: 'fi' }});
+const resetFiFromLt = sandbox.LearnPlay.t('Atstatyti');
+const resetFiDirect = sandbox.LearnPlay.t('Reset');
+console.log(JSON.stringify(Object.assign(afterLt, {{
+  resetFiFromLt,
+  resetFiDirect,
+  hasSetPrefs: typeof sandbox.LearnPlay.setPrefs === 'function',
+  hasT: typeof sandbox.LearnPlay.t === 'function'
+}})));
+"""
+        result = subprocess.run(
+            ["node", "-e", script],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        data = json.loads(result.stdout)
+        self.assertTrue(data["hasSetPrefs"])
+        self.assertTrue(data["hasT"])
+        self.assertEqual(data["theme"], "dark")
+        self.assertEqual(data["lang"], "lt")
+        self.assertEqual(data["htmlLang"], "lt")
+        self.assertEqual(data["resetLt"], "Atstatyti")
+        self.assertEqual(data["resetFiFromLt"], "Nollaa")
+        self.assertEqual(data["resetFiDirect"], "Nollaa")
+
+    def test_templates_use_learnplay_t(self) -> None:
+        root = Path(__file__).resolve().parents[1] / "templates"
+        missing = []
+        for html in sorted(root.glob("*/index.html")):
+            text = html.read_text(encoding="utf-8")
+            if "LearnPlay.t" not in text:
+                missing.append(str(html.relative_to(root)))
+        self.assertEqual(missing, [])
+
 
 if __name__ == "__main__":
     unittest.main()

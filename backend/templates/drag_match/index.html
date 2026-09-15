@@ -78,6 +78,9 @@
   <button class="primary" id="check">Check matches</button>
 </main>
 <script>
+function t(s) {
+  return window.LearnPlay && LearnPlay.t ? LearnPlay.t(s) : s;
+}
 async function load() {
   const data = await (await fetch('./content.json')).json();
   document.getElementById('title').textContent = data.title || 'Match';
@@ -119,6 +122,7 @@ async function load() {
     rights.appendChild(drop);
   });
 
+  document.getElementById('check').textContent = t("Check matches");
   document.getElementById('check').addEventListener('click', () => {
     rights.querySelectorAll('.drop').forEach(drop => {
       const chosen = drop.dataset.chosen;

@@ -66,6 +66,9 @@
   <div class="card" id="panel"></div>
 </main>
 <script>
+function t(s) {
+  return window.LearnPlay && LearnPlay.t ? LearnPlay.t(s) : s;
+}
 async function load() {
   const data = await (await fetch('./content.json')).json();
   document.getElementById('title').textContent = data.title || 'Timed Challenge';
@@ -81,7 +84,7 @@ async function load() {
   function next() {
     clearTimer();
     if (i >= items.length) {
-      panel.innerHTML = `<p>Finished! Score: <b>${score}</b></p>`;
+      panel.innerHTML = `<p>${t("Finished! Score:")} <b>${score}</b></p>`;
       if (window.LearnPlay) LearnPlay.complete({ score, levelsCompleted: items.length, totalLevels: items.length });
       return;
     }
@@ -89,7 +92,7 @@ async function load() {
     let left = Math.round((item.time_limit_ms || 30000) / 1000);
     timerEl.textContent = left;
     if (window.LearnPlay) LearnPlay.taskStart(item.id);
-    panel.innerHTML = `<p><b>${item.prompt}</b></p><input id="ans" placeholder="Your answer" /><button id="go">Submit</button>`;
+    panel.innerHTML = `<p><b>${item.prompt}</b></p><input id="ans" placeholder="${t("Your answer")}" /><button id="go">${t("Submit")}</button>`;
     const input = document.getElementById('ans');
     input.focus();
     timer = setInterval(() => {
