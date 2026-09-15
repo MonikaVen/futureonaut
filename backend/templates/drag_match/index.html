@@ -133,7 +133,11 @@ async function load() {
       }
     });
     document.getElementById('score').textContent = score;
-    if (window.LearnPlay) LearnPlay.complete({ score });
+    const solved = rights.querySelectorAll('.drop.ok').length;
+    if (window.LearnPlay) {
+      LearnPlay.progress({ level: solved, totalLevels: pairs.length });
+      LearnPlay.complete({ score, levelsCompleted: solved, totalLevels: pairs.length });
+    }
   });
 }
 load();

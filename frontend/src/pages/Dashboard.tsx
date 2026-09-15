@@ -40,6 +40,14 @@ export function DashboardPage() {
           <span className="meta">Avg task time</span>
           <b>{(stats.avg_task_time_ms / 1000).toFixed(1)}s</b>
         </div>
+        <div className="stat">
+          <span className="meta">Games solved</span>
+          <b>{stats.games_solved ?? 0}</b>
+        </div>
+        <div className="stat">
+          <span className="meta">Levels solved</span>
+          <b>{stats.levels_solved ?? 0}</b>
+        </div>
       </div>
 
       {stats.per_game.length > 0 && (
@@ -52,6 +60,8 @@ export function DashboardPage() {
                 <th>Plays</th>
                 <th>Best score</th>
                 <th>Accuracy</th>
+                <th>Status</th>
+                <th>Levels</th>
               </tr>
             </thead>
             <tbody>
@@ -63,6 +73,11 @@ export function DashboardPage() {
                   <td>{g.plays}</td>
                   <td>{g.best_score}</td>
                   <td>{(g.accuracy * 100).toFixed(0)}%</td>
+                  <td>{g.completed ? "Solved" : "In progress"}</td>
+                  <td>
+                    {g.levels_completed ?? 0}
+                    {g.total_levels ? `/${g.total_levels}` : ""}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -107,6 +122,8 @@ export function DashboardPage() {
               <th>Points</th>
               <th>Accuracy</th>
               <th>Time</th>
+              <th>Levels</th>
+              <th>Status</th>
             </tr>
           </thead>
           <tbody>
@@ -122,6 +139,11 @@ export function DashboardPage() {
                     : "—"}
                 </td>
                 <td>{(s.total_time_ms / 1000).toFixed(1)}s</td>
+                <td>
+                  {s.levels_completed ?? 0}
+                  {s.total_levels ? `/${s.total_levels}` : ""}
+                </td>
+                <td>{s.ended_at || s.completed ? "Solved" : "In progress"}</td>
               </tr>
             ))}
           </tbody>

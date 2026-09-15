@@ -361,6 +361,12 @@ function correctNow(){
 function reward(){
  const firstTime=!state.completed.includes(state.level);
  if(firstTime){state.completed.push(state.level);state.stars+=100;state.badges+=1}
+ if(window.LearnPlay){
+   LearnPlay.progress({level:state.completed.length,totalLevels:10});
+   LearnPlay.milestone({id:"level-"+state.level,label:levels[state.level].title,level:state.completed.length,totalLevels:10});
+   if(firstTime) LearnPlay.score(100);
+   if(firstTime && state.completed.length>=10) LearnPlay.complete({levelsCompleted:10,totalLevels:10,score:state.stars});
+ }
  el.feedback.className="feedback ok";
  el.feedback.textContent=firstTime?"Correct! +100 ⭐  Badge unlocked 🏆":"Correct! Level replay complete ✓";
  el.luciaStatus.textContent="Level complete ✓";el.levelMeter.style.width="100%";el.luciaExplain.textContent="Great work. Lucia learned this concept.";

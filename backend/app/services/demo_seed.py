@@ -9,7 +9,7 @@ from uuid import uuid4
 from app.database import SessionLocal
 from app.models import Game, GameSource, GameView, PlaySession, User, UserRole
 from app.services.snapshot import ensure_game_preview, write_game_preview
-from app.services.storage import delete_game_files, game_dir, save_uploaded_html, write_template_game
+from app.services.storage import delete_game_files, game_dir, save_uploaded_html, write_sdk, write_template_game
 from app.services.topics import ensure_topic_tag
 
 DEMO_QUIZ = {
@@ -211,6 +211,10 @@ def seed_html_pack(db, owner_id) -> None:
 
 def refresh_game_previews(db) -> None:
     for game in db.query(Game).all():
+        try:
+            write_sdk(game_dir(game.id))
+        except FileNotFoundError:
+            pass
         try:
             ensure_game_preview(game)
         except FileNotFoundError:

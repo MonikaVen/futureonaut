@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.models import Game, GameComment, GameLike, GameView
 from app.schemas import GameOut
+from app.services.progress import best_sessions_by_game, progress_from_session
 from app.services.recommendations import game_to_out
 
 
@@ -47,9 +48,11 @@ def _social_maps(
 def enrich_games(db: Session, games: list[Game], user_id: UUID | None = None) -> list[GameOut]:
     ids = [g.id for g in games]
     like_counts, comment_counts, view_counts, liked_ids = _social_maps(db, ids, user_id)
+    progress_by_game = best_sessions_by_game(db, user_id, ids) if user_id else {}
     out: list[GameOut] = []
     for game in games:
         base = game_to_out(game)
+        stats = progress_from_session(progress_by_game.get(game.id))
         out.append(
             base.model_copy(
                 update={
@@ -57,6 +60,10 @@ def enrich_games(db: Session, games: list[Game], user_id: UUID | None = None) ->
                     "comment_count": int(comment_counts.get(game.id, 0)),
                     "view_count": int(view_counts.get(game.id, 0)),
                     "liked_by_me": game.id in liked_ids,
+                    "completed": stats["completed"],
+                    "levels_completed": stats["levels_completed"],
+                    "total_levels": stats["total_levels"],
+                    "progress_pct": stats["progress_pct"],
                 }
             )
         )

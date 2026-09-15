@@ -19,6 +19,12 @@ from app.schemas import (
     ClassroomOut,
     StudentProgressOut,
 )
+from app.services.progress import (
+    best_sessions_by_game,
+    progress_from_session,
+    session_is_solved,
+    summarize_assignment,
+)
 
 router = APIRouter(prefix="/classrooms", tags=["classrooms"])
 
@@ -44,43 +50,27 @@ def _is_member(db: Session, classroom_id: UUID, user_id: UUID) -> bool:
     )
 
 
-def _latest_session(db: Session, user_id: UUID, game_id: UUID) -> PlaySession | None:
-    return (
-        db.query(PlaySession)
-        .filter(PlaySession.user_id == user_id, PlaySession.game_id == game_id)
-        .order_by(PlaySession.started_at.desc())
-        .first()
-    )
+def _best_session(db: Session, user_id: UUID, game_id: UUID) -> PlaySession | None:
+    return best_sessions_by_game(db, user_id, [game_id]).get(game_id)
 
 
-def _progress_from_session(session: PlaySession | None) -> dict:
-    if session is None:
-        return {
-            "completed": False,
-            "points": 0,
-            "accuracy": 0.0,
-            "levels_completed": 0,
-            "total_levels": None,
-        }
-    acc = (session.correct_count / session.attempt_count) if session.attempt_count else 0.0
-    return {
-        "completed": bool(session.ended_at),
-        "points": session.total_points,
-        "accuracy": acc,
-        "levels_completed": session.levels_completed or 0,
-        "total_levels": session.total_levels,
-    }
-
-
-def _assignment_out(db: Session, assignment: ClassroomAssignment, user_id: UUID) -> ClassroomAssignmentOut:
+def _assignment_out(
+    db: Session,
+    assignment: ClassroomAssignment,
+    user_id: UUID,
+    *,
+    class_stats: dict | None = None,
+) -> ClassroomAssignmentOut:
     game = assignment.game or db.get(Game, assignment.game_id)
-    progress = _progress_from_session(_latest_session(db, user_id, assignment.game_id))
+    progress = progress_from_session(_best_session(db, user_id, assignment.game_id))
+    extra = class_stats or {}
     return ClassroomAssignmentOut(
         id=assignment.id,
         game_id=assignment.game_id,
         game_title=game.title if game else "",
         created_at=assignment.created_at,
         **progress,
+        **extra,
     )
 
 
@@ -176,15 +166,17 @@ def classroom_detail(
     )
 
     progress: list[StudentProgressOut] = []
+    member_ids = [m.user_id for m in members]
+    assignment_stats: dict = {}
     if is_teacher:
         game_ids = [a.game_id for a in assignments]
         for member in members:
             for gid in game_ids:
-                session = _latest_session(db, member.user_id, gid)
+                session = _best_session(db, member.user_id, gid)
                 game = db.get(Game, gid)
                 if not game:
                     continue
-                stats = _progress_from_session(session)
+                stats = progress_from_session(session)
                 progress.append(
                     StudentProgressOut(
                         student_id=member.user_id,
@@ -195,6 +187,23 @@ def classroom_detail(
                         **stats,
                     )
                 )
+        for assignment in assignments:
+            per_member = [_best_session(db, mid, assignment.game_id) for mid in member_ids]
+            assignment_stats[assignment.id] = summarize_assignment(per_member, len(member_ids))
+
+    assignment_outs = [
+        _assignment_out(db, a, user.id, class_stats=assignment_stats.get(a.id))
+        for a in assignments
+    ]
+    solved_assignments = sum(1 for a in assignment_outs if a.completed)
+    students_solved_all = 0
+    if is_teacher and assignments:
+        for member in members:
+            if all(
+                session_is_solved(_best_session(db, member.user_id, a.game_id))
+                for a in assignments
+            ):
+                students_solved_all += 1
 
     return ClassroomDetailOut(
         id=classroom.id,
@@ -203,8 +212,11 @@ def classroom_detail(
         teacher_id=classroom.teacher_id,
         is_teacher=is_teacher,
         member_count=len(members),
-        assignments=[_assignment_out(db, a, user.id) for a in assignments],
+        assignments=assignment_outs,
         progress=progress,
+        solved_assignments=solved_assignments,
+        total_assignments=len(assignments),
+        students_solved_all=students_solved_all,
     )
 
 

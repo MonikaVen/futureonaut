@@ -68,6 +68,10 @@ class GameOut(BaseModel):
     comment_count: int = 0
     view_count: int = 0
     liked_by_me: bool = False
+    completed: bool = False
+    levels_completed: int = 0
+    total_levels: int | None = None
+    progress_pct: int | None = None
 
     model_config = {"from_attributes": True}
 
@@ -216,6 +220,17 @@ class SessionOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class GameProgressOut(BaseModel):
+    game_id: uuid.UUID
+    completed: bool
+    levels_completed: int
+    total_levels: int | None
+    points: int
+    accuracy: float
+    progress_pct: int | None = None
+    plays: int = 0
+
+
 class ContinueSessionOut(BaseModel):
     session_id: uuid.UUID
     game_id: uuid.UUID
@@ -261,6 +276,13 @@ class ClassroomAssignmentOut(BaseModel):
     accuracy: float = 0.0
     levels_completed: int = 0
     total_levels: int | None = None
+    progress_pct: int | None = None
+    solved_count: int = 0
+    in_progress_count: int = 0
+    not_started_count: int = 0
+    avg_points: float = 0.0
+    avg_levels: float = 0.0
+    avg_accuracy: float = 0.0
 
 
 class StudentProgressOut(BaseModel):
@@ -274,6 +296,7 @@ class StudentProgressOut(BaseModel):
     accuracy: float
     levels_completed: int
     total_levels: int | None
+    progress_pct: int | None = None
 
 
 class ClassroomDetailOut(BaseModel):
@@ -285,6 +308,9 @@ class ClassroomDetailOut(BaseModel):
     member_count: int
     assignments: list[ClassroomAssignmentOut]
     progress: list[StudentProgressOut]
+    solved_assignments: int = 0
+    total_assignments: int = 0
+    students_solved_all: int = 0
 
 
 class SessionDetail(SessionOut):
@@ -296,6 +322,8 @@ class DashboardStats(BaseModel):
     total_points: int
     avg_accuracy: float
     avg_task_time_ms: float
+    games_solved: int = 0
+    levels_solved: int = 0
     recent_sessions: list[SessionDetail]
     per_game: list[dict[str, Any]]
     by_topic: list[dict[str, Any]]

@@ -82,7 +82,7 @@ async function load() {
     clearTimer();
     if (i >= items.length) {
       panel.innerHTML = `<p>Finished! Score: <b>${score}</b></p>`;
-      if (window.LearnPlay) LearnPlay.complete({ score });
+      if (window.LearnPlay) LearnPlay.complete({ score, levelsCompleted: items.length, totalLevels: items.length });
       return;
     }
     const item = items[i];
@@ -101,7 +101,9 @@ async function load() {
           LearnPlay.taskEnd(item.id);
           LearnPlay.answer({ correct: false, taskId: item.id, points: item.points || 10 });
         }
-        i += 1; next();
+        i += 1;
+        if (window.LearnPlay) LearnPlay.progress({ level: i, totalLevels: items.length });
+        next();
       }
     }, 1000);
     function submit() {
@@ -113,8 +115,10 @@ async function load() {
         LearnPlay.answer({ correct, taskId: item.id, points: item.points || 10 });
         if (correct) LearnPlay.score(item.points || 10);
       }
-      if (correct) { score += item.points || 10; scoreEl.textContent = score; }
-      i += 1; next();
+        if (correct) { score += item.points || 10; scoreEl.textContent = score; }
+      i += 1;
+      if (window.LearnPlay) LearnPlay.progress({ level: i, totalLevels: items.length });
+      next();
     }
     document.getElementById('go').onclick = submit;
     input.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });

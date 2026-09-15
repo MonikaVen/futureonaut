@@ -53,6 +53,9 @@ def dashboard(db: Session = Depends(get_db), user: User = Depends(get_current_us
                 "best_score": 0,
                 "plays": 0,
                 "accuracy": 0.0,
+                "completed": False,
+                "levels_completed": 0,
+                "total_levels": None,
                 "_correct": 0,
                 "_attempts": 0,
             },
@@ -61,6 +64,13 @@ def dashboard(db: Session = Depends(get_db), user: User = Depends(get_current_us
         slot["best_score"] = max(slot["best_score"], s.total_points)
         slot["_correct"] += s.correct_count
         slot["_attempts"] += s.attempt_count
+        slot["levels_completed"] = max(slot["levels_completed"], s.levels_completed or 0)
+        if s.total_levels:
+            slot["total_levels"] = max(slot["total_levels"] or 0, s.total_levels)
+        if s.ended_at is not None or (
+            s.total_levels and (s.levels_completed or 0) >= s.total_levels
+        ):
+            slot["completed"] = True
         for tag in g.topic_tags or []:
             t = topic_map[tag]
             t["attempts"] += s.attempt_count
@@ -98,6 +108,8 @@ def dashboard(db: Session = Depends(get_db), user: User = Depends(get_current_us
             total_time_ms=s.total_time_ms,
             correct_count=s.correct_count,
             attempt_count=s.attempt_count,
+            levels_completed=s.levels_completed or 0,
+            total_levels=s.total_levels,
             game_title=s.game.title if s.game else None,
         )
         for s in sessions[:20]
@@ -108,6 +120,8 @@ def dashboard(db: Session = Depends(get_db), user: User = Depends(get_current_us
         total_points=total_points,
         avg_accuracy=(sum(accuracies) / len(accuracies)) if accuracies else 0.0,
         avg_task_time_ms=(sum(times) / len(times)) if times else 0.0,
+        games_solved=sum(1 for slot in per_game if slot.get("completed")),
+        levels_solved=sum(int(slot.get("levels_completed") or 0) for slot in per_game),
         recent_sessions=recent,
         per_game=per_game,
         by_topic=by_topic,

@@ -25,6 +25,10 @@ export interface Game {
   comment_count?: number;
   view_count?: number;
   liked_by_me?: boolean;
+  completed?: boolean;
+  levels_completed?: number;
+  total_levels?: number | null;
+  progress_pct?: number | null;
 }
 
 export interface Comment {
@@ -53,6 +57,7 @@ export interface Session {
   attempt_count: number;
   levels_completed?: number;
   total_levels?: number | null;
+  completed?: boolean;
   game_title?: string | null;
 }
 
@@ -87,6 +92,13 @@ export interface ClassroomAssignment {
   accuracy?: number;
   levels_completed?: number;
   total_levels?: number | null;
+  progress_pct?: number | null;
+  solved_count?: number;
+  in_progress_count?: number;
+  not_started_count?: number;
+  avg_points?: number;
+  avg_levels?: number;
+  avg_accuracy?: number;
 }
 
 export interface StudentProgress {
@@ -100,6 +112,7 @@ export interface StudentProgress {
   accuracy: number;
   levels_completed: number;
   total_levels: number | null;
+  progress_pct?: number | null;
 }
 
 export interface ClassroomDetail {
@@ -111,6 +124,9 @@ export interface ClassroomDetail {
   member_count: number;
   assignments: ClassroomAssignment[];
   progress: StudentProgress[];
+  solved_assignments?: number;
+  total_assignments?: number;
+  students_solved_all?: number;
 }
 
 export interface PerGameStat {
@@ -119,6 +135,9 @@ export interface PerGameStat {
   best_score: number;
   plays: number;
   accuracy: number;
+  completed?: boolean;
+  levels_completed?: number;
+  total_levels?: number | null;
 }
 
 export interface DashboardStats {
@@ -126,6 +145,8 @@ export interface DashboardStats {
   total_points: number;
   avg_accuracy: number;
   avg_task_time_ms: number;
+  games_solved?: number;
+  levels_solved?: number;
   recent_sessions: Session[];
   per_game: PerGameStat[];
   by_topic: Array<Record<string, unknown>>;

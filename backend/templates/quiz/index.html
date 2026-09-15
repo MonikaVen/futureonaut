@@ -79,9 +79,9 @@ async function load() {
 
   function render() {
     prog.textContent = `${Math.min(i+1, questions.length)}/${questions.length}`;
-    if (i >= questions.length) {
+      if (i >= questions.length) {
       panel.innerHTML = `<p>Done! Final score: <b>${score}</b></p>`;
-      if (window.LearnPlay) LearnPlay.complete({ score });
+      if (window.LearnPlay) LearnPlay.complete({ score, levelsCompleted: questions.length, totalLevels: questions.length });
       return;
     }
     const q = questions[i];
@@ -101,6 +101,7 @@ async function load() {
           if (correct) LearnPlay.score(q.points || 10);
         }
         if (correct) { score += (q.points || 10); scoreEl.textContent = score; }
+        if (window.LearnPlay) LearnPlay.progress({ level: i + 1, totalLevels: questions.length });
         setTimeout(() => { i += 1; render(); }, 550);
       });
     });

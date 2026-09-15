@@ -763,6 +763,16 @@ html[data-theme="dark"] .game-preview.topic-math {
   color: var(--ink);
 }
 
+.game-preview-chip.solved {
+  background: rgba(61, 186, 122, 0.2);
+  color: #237a4b;
+}
+
+.game-preview.is-solved .game-preview-play {
+  background: rgba(61, 186, 122, 0.2);
+  color: #237a4b;
+}
+
 .game-preview-bar {
   display: block;
   height: 3px;
@@ -1577,9 +1587,66 @@ body.play-focus {
   padding: 0;
   margin: 0;
 }
-.assignment-list li {
-  padding: 0.5rem 0;
+.assignment-list li,
+.assignment-row {
+  padding: 0.7rem 0;
   border-bottom: 1px solid var(--line);
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+.assignment-main {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.65rem;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+}
+.assignment-title {
+  font-weight: 600;
+}
+.assignment-bar {
+  display: block;
+  width: 100%;
+  height: 4px;
+  border-radius: 99px;
+  background: var(--fill-subtle);
+  overflow: hidden;
+  flex-basis: 100%;
+}
+.assignment-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+.class-progress-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.85rem;
+  align-items: center;
+  margin: 0.35rem 0 0;
+}
+.status-chip {
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  padding: 0.16rem 0.5rem;
+  border-radius: var(--radius-pill);
+  background: var(--fill-subtle);
+  color: var(--ink);
+}
+.status-chip.solved {
+  background: rgba(61, 186, 122, 0.18);
+  color: #237a4b;
+}
+.status-chip.progress {
+  background: var(--chip-bg);
+  color: var(--accent);
+}
+.status-chip.idle {
+  color: var(--muted);
 }
 
 @keyframes rise {

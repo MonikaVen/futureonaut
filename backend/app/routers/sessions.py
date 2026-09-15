@@ -7,8 +7,16 @@ from sqlalchemy.orm import Session, joinedload
 from app.auth import get_current_user, get_optional_user
 from app.database import get_db
 from app.models import EventType, Game, PlaySession, SessionEvent, User
-from app.schemas import ContinueSessionOut, GuestSessionCreate, SessionCreate, SessionEventIn, SessionOut
+from app.schemas import (
+    ContinueSessionOut,
+    GameProgressOut,
+    GuestSessionCreate,
+    SessionCreate,
+    SessionEventIn,
+    SessionOut,
+)
 from app.services.guest_merge import apply_session_event
+from app.services.progress import best_sessions_by_game, progress_from_session
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
 
@@ -143,6 +151,34 @@ def my_sessions(
         .all()
     )
     return [_session_out(s) for s in sessions]
+
+
+@router.get("/progress", response_model=list[GameProgressOut])
+def my_progress(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> list[GameProgressOut]:
+    plays: dict = {}
+    for session in db.query(PlaySession).filter(PlaySession.user_id == user.id).all():
+        plays[session.game_id] = plays.get(session.game_id, 0) + 1
+    best = best_sessions_by_game(db, user.id)
+    out: list[GameProgressOut] = []
+    for game_id, session in best.items():
+        stats = progress_from_session(session)
+        out.append(
+            GameProgressOut(
+                game_id=game_id,
+                completed=stats["completed"],
+                levels_completed=stats["levels_completed"],
+                total_levels=stats["total_levels"],
+                points=stats["points"],
+                accuracy=stats["accuracy"],
+                progress_pct=stats["progress_pct"],
+                plays=plays.get(game_id, 0),
+            )
+        )
+    out.sort(key=lambda row: (not row.completed, -row.levels_completed, row.game_id.hex))
+    return out
 
 
 @router.post("/{session_id}/events", response_model=SessionOut)

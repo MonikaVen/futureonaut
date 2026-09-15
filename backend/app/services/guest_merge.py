@@ -30,6 +30,17 @@ def apply_session_event(session: PlaySession, event_type: EventType, payload: di
             session.levels_completed = level
         if total > 0:
             session.total_levels = total
+        if payload.get("solved") and total > 0 and level >= total and session.ended_at is None:
+            session.ended_at = datetime.now(timezone.utc)
+    elif event_type == EventType.milestone:
+        level = bounded_int(payload.get("level"), hi=MAX_GAME_LEVEL)
+        total = bounded_int(
+            payload.get("totalLevels") or payload.get("total_levels"), hi=MAX_GAME_LEVEL
+        )
+        if level > session.levels_completed:
+            session.levels_completed = level
+        if total > 0:
+            session.total_levels = total
     elif event_type == EventType.complete:
         session.ended_at = datetime.now(timezone.utc)
         if payload.get("durationMs") and session.total_time_ms == 0:

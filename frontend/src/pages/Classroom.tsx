@@ -220,6 +220,18 @@ export function ClassroomPage() {
                       <> · Join code: <b>{detail.join_code}</b></>
                     ) : null}
                   </p>
+                  {detail.total_assignments ? (
+                    <p className="class-progress-summary">
+                      <span className="status-chip solved">
+                        {detail.solved_assignments ?? 0}/{detail.total_assignments} solved
+                      </span>
+                      {detail.is_teacher ? (
+                        <span className="meta">
+                          {detail.students_solved_all ?? 0}/{detail.member_count} students finished every assignment
+                        </span>
+                      ) : null}
+                    </p>
+                  ) : null}
                 </div>
                 <div className="row" style={{ gap: 8 }}>
                   {user?.id === detail.teacher_id && <span className="tag topic">Teacher</span>}
@@ -238,30 +250,52 @@ export function ClassroomPage() {
               <h3>Assignments</h3>
               {detail.assignments.length === 0 && <p className="meta">No games assigned yet.</p>}
               <ul className="assignment-list">
-                {detail.assignments.map((a) => (
-                  <li key={a.id} className="row" style={{ justifyContent: "space-between", gap: 8 }}>
-                    <span>
-                      {a.game_title}
-                      <span className="meta" style={{ marginLeft: 8 }}>
-                        {a.completed
-                          ? `Done · ${a.points ?? 0} pts`
-                          : a.points
-                            ? `In progress · ${a.points} pts`
-                            : "Not started"}
+                {detail.assignments.map((a) => {
+                  const status = a.completed ? "solved" : a.points || a.levels_completed ? "progress" : "idle";
+                  const statusLabel =
+                    status === "solved" ? "Solved" : status === "progress" ? "In progress" : "Not started";
+                  const pct =
+                    typeof a.progress_pct === "number"
+                      ? a.progress_pct
+                      : a.total_levels
+                        ? Math.round(((a.levels_completed ?? 0) / a.total_levels) * 100)
+                        : a.completed
+                          ? 100
+                          : 0;
+                  return (
+                    <li key={a.id} className="assignment-row">
+                      <div className="assignment-main">
+                        <span className="assignment-title">{a.game_title}</span>
+                        <span className={`status-chip ${status}`}>{statusLabel}</span>
+                        {a.levels_completed || a.total_levels ? (
+                          <span className="meta">
+                            Level {a.levels_completed ?? 0}
+                            {a.total_levels ? `/${a.total_levels}` : ""}
+                          </span>
+                        ) : null}
+                        {a.points ? <span className="meta">{a.points} pts</span> : null}
+                        {detail.is_teacher && a.solved_count != null ? (
+                          <span className="meta">
+                            {a.solved_count}/{detail.member_count} solved
+                          </span>
+                        ) : null}
+                        <span className="assignment-bar" aria-hidden>
+                          <span style={{ width: `${pct}%` }} />
+                        </span>
+                      </div>
+                      <span className="row" style={{ gap: 8 }}>
+                        <Link className="btn accent btn-sm" to={`/play/${a.game_id}`}>
+                          {a.completed ? "Replay" : "Play"}
+                        </Link>
+                        {detail.is_teacher && (
+                          <button className="btn secondary btn-sm" type="button" onClick={() => unassign(a.id)}>
+                            Remove
+                          </button>
+                        )}
                       </span>
-                    </span>
-                    <span className="row" style={{ gap: 8 }}>
-                      <Link className="btn accent btn-sm" to={`/play/${a.game_id}`}>
-                        {a.completed ? "Replay" : "Play"}
-                      </Link>
-                      {detail.is_teacher && (
-                        <button className="btn secondary btn-sm" type="button" onClick={() => unassign(a.id)}>
-                          Remove
-                        </button>
-                      )}
-                    </span>
-                  </li>
-                ))}
+                    </li>
+                  );
+                })}
               </ul>
 
               {detail.is_teacher && (
@@ -303,7 +337,11 @@ export function ClassroomPage() {
                         <tr key={`${p.student_email}-${p.game_id}-${i}`}>
                           <td>{p.student_name}</td>
                           <td>{p.game_title}</td>
-                          <td>{p.completed ? "Done" : p.points ? "In progress" : "Not started"}</td>
+                          <td>
+                            <span className={`status-chip ${p.completed ? "solved" : p.points || p.levels_completed ? "progress" : "idle"}`}>
+                              {p.completed ? "Solved" : p.points || p.levels_completed ? "In progress" : "Not started"}
+                            </span>
+                          </td>
                           <td>{p.points}</td>
                           <td>{(p.accuracy * 100).toFixed(0)}%</td>
                           <td>

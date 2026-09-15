@@ -66,6 +66,34 @@
         totalLevels: Number(totalLevels) || 0,
       });
     },
+    /** Report how far a learner has gotten (solved stages / total). */
+    progress: function (opts) {
+      opts = opts || {};
+      var level = Number(opts.level) || 0;
+      var total = Number(opts.totalLevels || opts.total) || 0;
+      var percent =
+        opts.percent != null
+          ? Number(opts.percent)
+          : total > 0
+            ? Math.round((level / total) * 100)
+            : 0;
+      emit("level_complete", {
+        level: level,
+        totalLevels: total,
+        percent: percent,
+        solved: !!opts.solved,
+      });
+    },
+    /** Named checkpoint inside a game (concept, badge, stage id). */
+    milestone: function (opts) {
+      opts = opts || {};
+      emit("milestone", {
+        id: opts.id || "",
+        label: opts.label || "",
+        level: Number(opts.level) || 0,
+        totalLevels: Number(opts.totalLevels || opts.total) || 0,
+      });
+    },
   };
 
   global.LearnPlay = LearnPlay;

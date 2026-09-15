@@ -12,6 +12,7 @@ type Props = {
   difficulty: number;
   progressLabel?: string;
   progressPct?: number | null;
+  solved?: boolean;
 };
 
 function orbStyle(id: string): CSSProperties {
@@ -33,6 +34,7 @@ export function GamePreview({
   difficulty,
   progressLabel,
   progressPct,
+  solved = false,
 }: Props) {
   const { t } = useLanguage();
   const kind = posterKind(topic);
@@ -40,10 +42,15 @@ export function GamePreview({
   const clampedPct =
     typeof progressPct === "number" ? Math.max(0, Math.min(100, progressPct)) : null;
   const [photoFailed, setPhotoFailed] = useState(false);
+  const statusChip = solved ? (
+    <span className="game-preview-chip solved">{t("solved")}</span>
+  ) : progressLabel ? (
+    <span className="game-preview-chip progress">{progressLabel}</span>
+  ) : null;
 
   return (
     <Link
-      className={`game-preview topic-${kind}${photoFailed ? "" : " has-photo"}`}
+      className={`game-preview topic-${kind}${photoFailed ? "" : " has-photo"}${solved ? " is-solved" : ""}`}
       to={`/play/${gameId}`}
       aria-label={`${t("play")} ${title}`}
       style={orbStyle(gameId)}
@@ -73,13 +80,11 @@ export function GamePreview({
             <span className="game-preview-chip level">
               {t("level")} {difficulty}
             </span>
-            {progressLabel ? <span className="game-preview-chip progress">{progressLabel}</span> : null}
+            {statusChip}
           </span>
         </>
-      ) : progressLabel ? (
-        <span className="game-preview-meta">
-          <span className="game-preview-chip progress">{progressLabel}</span>
-        </span>
+      ) : statusChip ? (
+        <span className="game-preview-meta">{statusChip}</span>
       ) : null}
       {clampedPct !== null ? (
         <span className="game-preview-bar" aria-hidden>

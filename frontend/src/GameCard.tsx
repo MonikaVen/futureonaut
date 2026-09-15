@@ -1,6 +1,7 @@
 import type { Game } from "./api";
 import { GamePreview } from "./GamePreview";
 import { GameSocial } from "./GameSocial";
+import { useLanguage } from "./language";
 
 type Props = {
   game: Game;
@@ -10,6 +11,26 @@ type Props = {
 };
 
 export function GameCard({ game, topic, focusLabels, onUpdate }: Props) {
+  const { t } = useLanguage();
+  const solved = Boolean(game.completed);
+  const levelsDone = game.levels_completed ?? 0;
+  const total = game.total_levels ?? null;
+  const progressLabel = solved
+    ? undefined
+    : total
+      ? `${t("level")} ${levelsDone}/${total}`
+      : levelsDone
+        ? `${t("level")} ${levelsDone}`
+        : undefined;
+  const progressPct =
+    typeof game.progress_pct === "number"
+      ? game.progress_pct
+      : total && total > 0
+        ? Math.round((levelsDone / total) * 100)
+        : solved
+          ? 100
+          : null;
+
   return (
     <article className="game-tile">
       <GamePreview
@@ -18,6 +39,9 @@ export function GameCard({ game, topic, focusLabels, onUpdate }: Props) {
         description={game.description}
         topic={topic}
         difficulty={game.difficulty}
+        solved={solved}
+        progressLabel={progressLabel}
+        progressPct={progressPct}
       />
       <div className="game-tile-body">
         {focusLabels.length > 0 ? (

@@ -26,6 +26,8 @@ export function PlayPage() {
   const [attempts, setAttempts] = useState(0);
   const [timeMs, setTimeMs] = useState(0);
   const [completed, setCompleted] = useState(false);
+  const [levelsCompleted, setLevelsCompleted] = useState(0);
+  const [totalLevels, setTotalLevels] = useState<number | null>(null);
   const [error, setError] = useState("");
   const [ready, setReady] = useState(false);
   const frameRef = useRef<HTMLIFrameElement>(null);
@@ -40,6 +42,8 @@ export function PlayPage() {
     setAttempts(0);
     setTimeMs(0);
     setCompleted(false);
+    setLevelsCompleted(0);
+    setTotalLevels(null);
     (async () => {
       try {
         const g = await api<Game>(`/api/games/${gameId}`);
@@ -61,6 +65,9 @@ export function PlayPage() {
           setCorrect(s.correct_count);
           setAttempts(s.attempt_count);
           setTimeMs(s.total_time_ms);
+          setLevelsCompleted(s.levels_completed ?? 0);
+          setTotalLevels(s.total_levels ?? null);
+          setCompleted(Boolean(s.ended_at));
           setReady(true);
         }
       } catch (err) {
@@ -100,7 +107,13 @@ export function PlayPage() {
           setCorrect(s.correct_count);
           setAttempts(s.attempt_count);
           setTimeMs(s.total_time_ms);
-          if (data.type === "complete" || s.ended_at) setCompleted(true);
+          setLevelsCompleted(s.levels_completed ?? 0);
+          setTotalLevels(s.total_levels ?? null);
+          if (data.type === "complete" || data.type === "level_complete" || data.type === "milestone" || s.ended_at) {
+            setCompleted(Boolean(s.ended_at) || (
+              (s.total_levels ?? 0) > 0 && (s.levels_completed ?? 0) >= (s.total_levels ?? 0)
+            ));
+          }
         })
         .catch(() => {
           /* ignore transient */
@@ -143,6 +156,15 @@ export function PlayPage() {
           <span>
             {t("taskTime")} <b>{(timeMs / 1000).toFixed(1)}s</b>
           </span>
+          {totalLevels || levelsCompleted ? (
+            <span>
+              {t("level")}{" "}
+              <b>
+                {levelsCompleted}
+                {totalLevels ? `/${totalLevels}` : ""}
+              </b>
+            </span>
+          ) : null}
         </div>
       </div>
       {!user && <p className="guest-note">{t("guestPlayNote")}</p>}
