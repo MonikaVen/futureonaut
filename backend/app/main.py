@@ -64,8 +64,28 @@ def ensure_schema() -> None:
         )
         conn.execute(
             text(
-                "CREATE INDEX IF NOT EXISTS ix_play_sessions_visitor_id "
-                "ON play_sessions (visitor_id)"
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS llm_provider VARCHAR(16)"
+            )
+        )
+        conn.execute(
+            text(
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS llm_api_key_hash VARCHAR(64)"
+            )
+        )
+        conn.execute(
+            text(
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS llm_api_key_hint VARCHAR(8)"
+            )
+        )
+        conn.execute(
+            text(
+                """
+                DO $$ BEGIN
+                    ALTER TYPE userrole ADD VALUE 'teacher';
+                EXCEPTION
+                    WHEN duplicate_object THEN NULL;
+                END $$;
+                """
             )
         )
 

@@ -5,9 +5,10 @@ from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Uploa
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
-from app.auth import get_current_user, get_optional_user, require_roles
+from app.auth import get_current_user, get_optional_user, require_game_author
 from app.database import get_db
 from app.models import (
+    Classroom,
     ClassroomAssignment,
     Game,
     GameComment,
@@ -22,9 +23,11 @@ from app.schemas import (
     AIGenerateRequest,
     GameOut,
     GameUpdate,
+    HtmlGenerateRequest,
     TemplateGameCreate,
 )
-from app.services.generate import generate_ai_content, validate_template_content
+from app.services.generate import generate_ai_content, generate_html_game, validate_template_content
+from app.services.llm import normalize_provider, require_api_key, store_llm_key
 from app.services.recommendations import game_to_out
 from app.services.snapshot import write_game_preview
 from app.services.social import enrich_games
@@ -52,7 +55,7 @@ def list_games(
 @router.get("/mine", response_model=list[GameOut])
 def my_games(
     db: Session = Depends(get_db),
-    user: User = Depends(require_roles(UserRole.creator, UserRole.admin)),
+    user: User = Depends(require_game_author),
 ) -> list[GameOut]:
     q = db.query(Game)
     if user.role != UserRole.admin:
@@ -68,7 +71,7 @@ async def upload_game(
     difficulty: int = Form(1),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    user: User = Depends(require_roles(UserRole.creator, UserRole.admin)),
+    user: User = Depends(require_game_author),
 ) -> GameOut:
     if difficulty < 1 or difficulty > 5:
         raise HTTPException(status_code=400, detail="difficulty must be 1-5")
@@ -110,7 +113,7 @@ async def upload_game(
 def create_from_template(
     body: TemplateGameCreate,
     db: Session = Depends(get_db),
-    user: User = Depends(require_roles(UserRole.creator, UserRole.admin)),
+    user: User = Depends(require_game_author),
 ) -> GameOut:
     content = validate_template_content(body.template_type, body.content)
     game_id = uuid4()
@@ -145,14 +148,19 @@ def create_from_template(
 async def generate_game(
     body: AIGenerateRequest,
     db: Session = Depends(get_db),
-    user: User = Depends(require_roles(UserRole.creator, UserRole.admin)),
+    user: User = Depends(require_game_author),
 ) -> GameOut:
+    if body.api_key:
+        store_llm_key(user, body.provider or "openai", body.api_key)
     content = await generate_ai_content(
         topic=body.topic,
         difficulty=body.difficulty,
         template_type=body.template_type,
         description=body.description,
         question_count=body.question_count,
+        api_key=body.api_key,
+        provider=body.provider,
+        model=body.model,
     )
     game_id = uuid4()
     entry = write_template_game(game_id, body.template_type, content)
@@ -175,6 +183,73 @@ async def generate_game(
     db.commit()
     db.refresh(game)
     write_game_preview(game)
+    return game_to_out(game)
+
+
+def _assign_if_requested(db: Session, user: User, game: Game, classroom_id) -> None:
+    if classroom_id is None:
+        return
+    classroom = db.get(Classroom, classroom_id)
+    if classroom is None or classroom.teacher_id != user.id:
+        raise HTTPException(status_code=403, detail="You can only assign games to your own class")
+    exists = (
+        db.query(ClassroomAssignment)
+        .filter(
+            ClassroomAssignment.classroom_id == classroom.id,
+            ClassroomAssignment.game_id == game.id,
+        )
+        .first()
+    )
+    if exists:
+        return
+    db.add(ClassroomAssignment(classroom_id=classroom.id, game_id=game.id))
+    db.commit()
+
+
+@router.post("/generate-html", response_model=GameOut, status_code=status.HTTP_201_CREATED)
+async def generate_html_game_endpoint(
+    body: HtmlGenerateRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_game_author),
+) -> GameOut:
+    provider = normalize_provider(body.provider)
+    api_key = require_api_key(body.api_key)
+    store_llm_key(user, provider, api_key)
+    title = (body.title or "").strip() or f"{body.topic} game"
+    html = await generate_html_game(
+        title=title,
+        topic=body.topic,
+        difficulty=body.difficulty,
+        level_count=body.level_count,
+        levels_brief=body.levels_brief,
+        language=body.language or "en",
+        api_key=api_key,
+        provider=provider,
+        model=body.model,
+    )
+    game_id = uuid4()
+    try:
+        entry = save_uploaded_html(game_id, html, "index.html")
+    except Exception as exc:
+        delete_game_files(game_id)
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    game = Game(
+        id=game_id,
+        title=title[:200],
+        description=body.levels_brief[:500],
+        owner_id=user.id,
+        source=GameSource.ai,
+        topic_tags=ensure_topic_tag([body.topic], title, body.levels_brief),
+        difficulty=body.difficulty,
+        entry_path=entry,
+        source_language=(body.language or "en")[:16],
+    )
+    db.add(game)
+    db.commit()
+    db.refresh(game)
+    write_game_preview(game)
+    _assign_if_requested(db, user, game, body.assign_classroom_id)
+    db.refresh(game)
     return game_to_out(game)
 
 
@@ -216,7 +291,7 @@ def update_game(
     game_id: UUID,
     body: GameUpdate,
     db: Session = Depends(get_db),
-    user: User = Depends(require_roles(UserRole.creator, UserRole.admin)),
+    user: User = Depends(require_game_author),
 ) -> GameOut:
     game = db.get(Game, game_id)
     if game is None:
@@ -242,7 +317,7 @@ def update_game(
 def delete_game(
     game_id: UUID,
     db: Session = Depends(get_db),
-    user: User = Depends(require_roles(UserRole.creator, UserRole.admin)),
+    user: User = Depends(require_game_author),
 ) -> None:
     game = db.get(Game, game_id)
     if game is None:

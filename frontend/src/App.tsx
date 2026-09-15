@@ -26,6 +26,16 @@ function RequireRole({ roles, children }: { roles: string[]; children: ReactNode
   return <>{children}</>;
 }
 
+function RequireAuthor({ children }: { children: ReactNode }) {
+  const { user, loading } = useAuth();
+  if (loading) return null;
+  if (!user) return <Navigate to="/login" replace />;
+  if (!user.can_create_games && user.role !== "creator" && user.role !== "admin" && user.role !== "teacher") {
+    return <Navigate to="/" replace />;
+  }
+  return <>{children}</>;
+}
+
 function ThemeSync() {
   const { theme } = useTheme();
   const location = useLocation();
@@ -72,9 +82,9 @@ export default function App() {
           <Route
             path="/creator"
             element={
-              <RequireRole roles={["creator", "admin"]}>
+              <RequireAuthor>
                 <CreatorPage />
-              </RequireRole>
+              </RequireAuthor>
             }
           />
           <Route

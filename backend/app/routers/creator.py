@@ -3,7 +3,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.auth import require_roles
+from app.auth import require_game_author
 from app.database import get_db
 from app.models import Game, User, UserRole
 from app.schemas import GameAnalyticsDetailOut, GameAnalyticsOut
@@ -15,7 +15,7 @@ router = APIRouter(prefix="/creator", tags=["creator"])
 @router.get("/analytics", response_model=list[GameAnalyticsOut])
 def creator_analytics(
     db: Session = Depends(get_db),
-    user: User = Depends(require_roles(UserRole.creator, UserRole.admin)),
+    user: User = Depends(require_game_author),
 ) -> list[GameAnalyticsOut]:
     owned_ids = {g.id for g in db.query(Game.id).filter(Game.owner_id == user.id).all()}
     all_stats = build_game_analytics(db)
@@ -28,7 +28,7 @@ def creator_analytics(
 def creator_analytics_detail(
     game_id: UUID,
     db: Session = Depends(get_db),
-    user: User = Depends(require_roles(UserRole.creator, UserRole.admin)),
+    user: User = Depends(require_game_author),
 ) -> GameAnalyticsDetailOut:
     game = db.get(Game, game_id)
     if game is None:

@@ -21,6 +21,7 @@ from app.database import Base
 class UserRole(str, enum.Enum):
     admin = "admin"
     creator = "creator"
+    teacher = "teacher"
     learner = "learner"
 
 
@@ -47,6 +48,9 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     display_name: Mapped[str] = mapped_column(String(120), nullable=False, default="")
     role: Mapped[UserRole] = mapped_column(Enum(UserRole), nullable=False, default=UserRole.learner)
+    llm_provider: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    llm_api_key_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    llm_api_key_hint: Mapped[str | None] = mapped_column(String(8), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     games: Mapped[list["Game"]] = relationship(back_populates="owner")

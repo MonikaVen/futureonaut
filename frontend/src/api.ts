@@ -1,4 +1,4 @@
-export type Role = "admin" | "creator" | "learner";
+export type Role = "admin" | "creator" | "teacher" | "learner";
 
 export interface User {
   id: string;
@@ -6,6 +6,10 @@ export interface User {
   display_name: string;
   role: Role;
   created_at: string;
+  can_create_games?: boolean;
+  llm_provider?: string | null;
+  llm_key_configured?: boolean;
+  llm_key_hint?: string | null;
 }
 
 export interface Game {

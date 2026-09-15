@@ -11,11 +11,36 @@ from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.database import get_db
-from app.models import User, UserRole
+from app.models import Classroom, User, UserRole
+from app.schemas import UserOut
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 bearer_scheme = HTTPBearer(auto_error=False)
 settings = get_settings()
+
+AUTHOR_ROLES = {UserRole.admin, UserRole.creator, UserRole.teacher}
+
+
+def can_author_games(user: User, db: Session | None = None) -> bool:
+    if user.role in AUTHOR_ROLES:
+        return True
+    if db is None:
+        return False
+    return db.query(Classroom.id).filter(Classroom.teacher_id == user.id).limit(1).first() is not None
+
+
+def user_to_out(user: User, db: Session | None = None) -> UserOut:
+    return UserOut(
+        id=user.id,
+        email=user.email,
+        display_name=user.display_name,
+        role=user.role,
+        created_at=user.created_at,
+        can_create_games=can_author_games(user, db),
+        llm_provider=user.llm_provider,
+        llm_key_configured=bool(user.llm_api_key_hash),
+        llm_key_hint=user.llm_api_key_hint if user.llm_api_key_hash else None,
+    )
 
 
 def hash_password(password: str) -> str:
@@ -99,3 +124,15 @@ def require_roles(*roles: UserRole):
         return user
 
     return _dep
+
+
+def require_game_author(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> User:
+    if not can_author_games(user, db):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only teachers and creators can generate or deploy games",
+        )
+    return user

@@ -43,6 +43,10 @@ class UserOut(BaseModel):
     display_name: str
     role: UserRole
     created_at: datetime
+    can_create_games: bool = False
+    llm_provider: str | None = None
+    llm_key_configured: bool = False
+    llm_key_hint: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -165,6 +169,33 @@ class AIGenerateRequest(BaseModel):
     template_type: str = Field(default="quiz")
     description: str = ""
     question_count: int = Field(default=5, ge=3, le=12)
+    provider: str | None = Field(default=None, max_length=16)
+    api_key: str | None = Field(default=None, max_length=256)
+    model: str | None = Field(default=None, max_length=80)
+
+
+class HtmlGenerateRequest(BaseModel):
+    topic: str = Field(min_length=2, max_length=200)
+    levels_brief: str = Field(min_length=8, max_length=8000)
+    title: str = Field(default="", max_length=200)
+    difficulty: int = Field(default=2, ge=1, le=5)
+    level_count: int = Field(default=4, ge=2, le=12)
+    language: str = Field(default="en", max_length=8)
+    provider: str = Field(default="openai", max_length=16)
+    api_key: str = Field(min_length=12, max_length=256)
+    model: str | None = Field(default=None, max_length=80)
+    assign_classroom_id: uuid.UUID | None = None
+
+
+class LlmKeyIn(BaseModel):
+    provider: str = Field(min_length=3, max_length=16)
+    api_key: str = Field(min_length=12, max_length=256)
+
+
+class LlmKeyOut(BaseModel):
+    provider: str | None = None
+    configured: bool = False
+    hint: str | None = None
 
 
 class SessionCreate(BaseModel):

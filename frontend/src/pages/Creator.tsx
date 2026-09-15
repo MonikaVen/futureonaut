@@ -1,7 +1,11 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, type Game, type GameAnalytics, type GameAnalyticsDetail } from "../api";
+import { api, type Classroom, type Game, type GameAnalytics, type GameAnalyticsDetail } from "../api";
 import { GameAnalyticsDetailPanel } from "../GameAnalyticsDetail";
+import { useAuth } from "../auth";
+import { useLanguage } from "../language";
+
+const LLM_KEY_STORAGE = "futureonaut_llm_api_key";
 
 const QUIZ_SAMPLE = {
   title: "My Quiz",
@@ -51,6 +55,8 @@ const TEMPLATE_SAMPLES: Record<string, object> = {
 };
 
 export function CreatorPage() {
+  const { user, refreshMe } = useAuth();
+  const { t } = useLanguage();
   const [games, setGames] = useState<Game[]>([]);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -73,6 +79,19 @@ export function CreatorPage() {
   const [aiCount, setAiCount] = useState(5);
   const [analytics, setAnalytics] = useState<GameAnalytics[]>([]);
 
+  const [provider, setProvider] = useState(user?.llm_provider || "openai");
+  const [apiKey, setApiKey] = useState(() => sessionStorage.getItem(LLM_KEY_STORAGE) || "");
+  const [model, setModel] = useState("");
+  const [genTitle, setGenTitle] = useState("");
+  const [genTopic, setGenTopic] = useState("neural networks");
+  const [genDiff, setGenDiff] = useState(2);
+  const [levelCount, setLevelCount] = useState(4);
+  const [levelsBrief, setLevelsBrief] = useState(
+    "Level 1: warm-up identifying the idea.\nLevel 2: practice with feedback.\nLevel 3: apply it in a short challenge.\nLevel 4: boss check that uses everything."
+  );
+  const [assignClassId, setAssignClassId] = useState("");
+  const [classrooms, setClassrooms] = useState<Classroom[]>([]);
+
   async function reload() {
     const list = await api<Game[]>("/api/games/mine");
     setGames(list);
@@ -82,11 +101,22 @@ export function CreatorPage() {
     } catch {
       setAnalytics([]);
     }
+    try {
+      const mine = await api<Classroom[]>("/api/classrooms/mine");
+      setClassrooms(mine.filter((c) => c.teacher_id === user?.id));
+    } catch {
+      setClassrooms([]);
+    }
   }
 
   useEffect(() => {
     reload().catch((err) => setError(err.message));
   }, []);
+
+  useEffect(() => {
+    if (apiKey) sessionStorage.setItem(LLM_KEY_STORAGE, apiKey);
+    else sessionStorage.removeItem(LLM_KEY_STORAGE);
+  }, [apiKey]);
 
   async function upload(e: FormEvent) {
     e.preventDefault();
@@ -146,12 +176,77 @@ export function CreatorPage() {
           difficulty: aiDiff,
           template_type: aiType,
           question_count: aiCount,
+          provider,
+          api_key: apiKey || undefined,
         }),
       });
       setMessage("AI game generated.");
       await reload();
     } catch (err) {
       setError(err instanceof Error ? err.message : "AI generate failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveKey() {
+    setBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      await api("/api/auth/llm-key", {
+        method: "POST",
+        body: JSON.stringify({ provider, api_key: apiKey }),
+      });
+      await refreshMe();
+      setMessage(t("apiKeySaved"));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("saveApiKey"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function clearKey() {
+    setBusy(true);
+    setError("");
+    try {
+      await api("/api/auth/llm-key", { method: "DELETE" });
+      setApiKey("");
+      await refreshMe();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("clearApiKey"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function generateHtml(e: FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      const game = await api<Game>("/api/games/generate-html", {
+        method: "POST",
+        body: JSON.stringify({
+          title: genTitle,
+          topic: genTopic,
+          difficulty: genDiff,
+          level_count: levelCount,
+          levels_brief: levelsBrief,
+          language: document.documentElement.lang || "en",
+          provider,
+          api_key: apiKey,
+          model: model || undefined,
+          assign_classroom_id: assignClassId || null,
+        }),
+      });
+      setMessage(`${t("gameDeployed")} ${game.title}`);
+      await refreshMe();
+      await reload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("generateAndDeploy"));
     } finally {
       setBusy(false);
     }
@@ -166,11 +261,107 @@ export function CreatorPage() {
   return (
     <div>
       <section className="hero">
-        <h1>Creator studio</h1>
-        <p>Upload HTML games, build from templates, or generate with AI. Tracking is added automatically.</p>
+        <h1>{t("generateGame")}</h1>
+        <p>{t("generateGameLede")}</p>
       </section>
       {error && <div className="error">{error}</div>}
       {message && <div className="panel" style={{ marginBottom: 12 }}>{message}</div>}
+
+      <div className="panel" style={{ marginBottom: 16 }}>
+        <h2 style={{ fontFamily: "var(--font-display)", marginTop: 0 }}>{t("generateGame")}</h2>
+        <form className="form" onSubmit={generateHtml} style={{ maxWidth: "100%" }}>
+          <label>
+            {t("llmProvider")}
+            <select value={provider} onChange={(e) => setProvider(e.target.value)}>
+              <option value="openai">{t("openai")}</option>
+              <option value="claude">{t("claude")}</option>
+              <option value="grok">{t("grok")}</option>
+            </select>
+          </label>
+          <label>
+            {t("apiKey")}
+            <input
+              type="password"
+              autoComplete="off"
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              required
+            />
+          </label>
+          <p className="meta">
+            {t("apiKeyHelp")}
+            {user?.llm_key_configured ? ` ${t("apiKeySaved")}${user.llm_key_hint ? ` ••••${user.llm_key_hint}` : ""}.` : ""}
+          </p>
+          <div className="form-actions">
+            <button className="btn secondary" type="button" disabled={busy || !apiKey} onClick={saveKey}>
+              {t("saveApiKey")}
+            </button>
+            {user?.llm_key_configured ? (
+              <button className="btn secondary" type="button" disabled={busy} onClick={clearKey}>
+                {t("clearApiKey")}
+              </button>
+            ) : null}
+          </div>
+          <label>
+            {t("modelOptional")}
+            <input value={model} onChange={(e) => setModel(e.target.value)} placeholder="gpt-4o-mini" />
+          </label>
+          <label>
+            Title
+            <input value={genTitle} onChange={(e) => setGenTitle(e.target.value)} placeholder={genTopic} />
+          </label>
+          <label>
+            Topic
+            <input value={genTopic} onChange={(e) => setGenTopic(e.target.value)} required />
+          </label>
+          <label>
+            Difficulty
+            <input
+              type="number"
+              min={1}
+              max={5}
+              value={genDiff}
+              onChange={(e) => setGenDiff(Number(e.target.value))}
+            />
+          </label>
+          <label>
+            {t("levelCount")}
+            <input
+              type="number"
+              min={2}
+              max={12}
+              value={levelCount}
+              onChange={(e) => setLevelCount(Number(e.target.value))}
+            />
+          </label>
+          <label>
+            {t("levelsBrief")}
+            <textarea
+              value={levelsBrief}
+              onChange={(e) => setLevelsBrief(e.target.value)}
+              rows={6}
+              required
+            />
+          </label>
+          <p className="meta">{t("levelsBriefHint")}</p>
+          {classrooms.length > 0 && (
+            <label>
+              {t("assignToClass")}
+              <select value={assignClassId} onChange={(e) => setAssignClassId(e.target.value)}>
+                <option value="">{t("none")}</option>
+                {classrooms.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          <button className="btn accent" disabled={busy} type="submit">
+            {busy ? t("generatingGame") : t("generateAndDeploy")}
+          </button>
+        </form>
+      </div>
 
       {analytics.length > 0 && (
         <div className="panel" style={{ marginBottom: 16 }}>
@@ -334,7 +525,7 @@ export function CreatorPage() {
           <button className="btn accent" disabled={busy} type="submit">
             Generate with AI
           </button>
-          <p className="meta">Requires OPENAI_API_KEY in the backend environment.</p>
+          <p className="meta">{t("apiKeyHelp")}</p>
         </form>
       </div>
 

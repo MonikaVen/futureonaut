@@ -9,12 +9,24 @@ from app.auth import (
     decode_token,
     get_current_user,
     hash_password,
+    require_game_author,
+    user_to_out,
     verify_password,
 )
 from app.database import get_db
 from app.models import User, UserRole
-from app.schemas import TokenPair, TokenRefresh, UserCreate, UserLogin, UserOut, GuestMergeIn
+from app.schemas import (
+    GuestMergeIn,
+    LlmKeyIn,
+    LlmKeyOut,
+    TokenPair,
+    TokenRefresh,
+    UserCreate,
+    UserLogin,
+    UserOut,
+)
 from app.services.guest_merge import merge_guest_sessions
+from app.services.llm import store_llm_key
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -34,7 +46,7 @@ def register(body: UserCreate, db: Session = Depends(get_db)) -> User:
     db.refresh(user)
     if body.visitor_id:
         merge_guest_sessions(db, user.id, body.visitor_id)
-    return user
+    return user_to_out(user, db)
 
 
 @router.post("/login", response_model=TokenPair)
@@ -75,5 +87,28 @@ def refresh(body: TokenRefresh, db: Session = Depends(get_db)) -> TokenPair:
 
 
 @router.get("/me", response_model=UserOut)
-def me(user: User = Depends(get_current_user)) -> User:
-    return user
+def me(db: Session = Depends(get_db), user: User = Depends(get_current_user)) -> UserOut:
+    return user_to_out(user, db)
+
+
+@router.post("/llm-key", response_model=LlmKeyOut)
+def save_llm_key(
+    body: LlmKeyIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_game_author),
+) -> LlmKeyOut:
+    store_llm_key(user, body.provider, body.api_key)
+    db.commit()
+    return LlmKeyOut(provider=user.llm_provider, configured=True, hint=user.llm_api_key_hint)
+
+
+@router.delete("/llm-key", response_model=LlmKeyOut)
+def clear_llm_key(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_game_author),
+) -> LlmKeyOut:
+    user.llm_provider = None
+    user.llm_api_key_hash = None
+    user.llm_api_key_hint = None
+    db.commit()
+    return LlmKeyOut(provider=None, configured=False, hint=None)

@@ -4,7 +4,7 @@ import { api, type Classroom, type ClassroomDetail, type Game } from "../api";
 import { useAuth } from "../auth";
 
 export function ClassroomPage() {
-  const { user } = useAuth();
+  const { user, refreshMe } = useAuth();
   const [classrooms, setClassrooms] = useState<Classroom[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<ClassroomDetail | null>(null);
@@ -49,6 +49,7 @@ export function ClassroomPage() {
       });
       setNewName("");
       setMessage(`Class "${c.name}" created. Share code: ${c.join_code}`);
+      await refreshMe();
       await loadClassrooms();
       setSelectedId(c.id);
     } catch (err) {

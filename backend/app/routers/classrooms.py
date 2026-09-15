@@ -80,7 +80,7 @@ def create_classroom(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> Classroom:
-    if user.role not in (UserRole.creator, UserRole.admin, UserRole.learner):
+    if user.role not in (UserRole.creator, UserRole.admin, UserRole.learner, UserRole.teacher):
         raise HTTPException(status_code=403, detail="Cannot create classroom")
     code = _gen_code()
     while db.query(Classroom).filter(Classroom.join_code == code).first():

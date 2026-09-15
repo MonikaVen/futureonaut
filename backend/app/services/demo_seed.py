@@ -112,7 +112,7 @@ def seed_demo_games() -> None:
 
 
 def prune_games_to_manifest(db) -> None:
-    """Keep only games listed in the seed manifest (titles)."""
+    """Drop obsolete seed titles. Never delete teacher, creator, or AI games."""
     manifest_path = _seed_dir() / "manifest.json"
     if not manifest_path.exists():
         return
@@ -120,9 +120,18 @@ def prune_games_to_manifest(db) -> None:
         (item.get("title") or item["file"])
         for item in json.loads(manifest_path.read_text(encoding="utf-8"))
     }
+    admin = db.query(User).filter(User.role == UserRole.admin).first()
     removed = 0
     for game in db.query(Game).all():
         if game.title in keep:
+            continue
+        if game.source == GameSource.ai:
+            continue
+        if admin is None or game.owner_id != admin.id:
+            continue
+        if db.query(PlaySession).filter(PlaySession.game_id == game.id).first():
+            continue
+        if game.source != GameSource.upload:
             continue
         for session in db.query(PlaySession).filter(PlaySession.game_id == game.id).all():
             db.delete(session)

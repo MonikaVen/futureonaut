@@ -323,6 +323,7 @@ export function AdminPage() {
                     onChange={(e) => setRole(u.id, e.target.value as Role)}
                   >
                     <option value="learner">learner</option>
+                    <option value="teacher">teacher</option>
                     <option value="creator">creator</option>
                     <option value="admin">admin</option>
                   </select>
