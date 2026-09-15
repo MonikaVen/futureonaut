@@ -267,6 +267,14 @@ def serve_game_file(
         raise HTTPException(status_code=404, detail="Game not found")
     base = game_dir(game_id).resolve()
     target = (base / file_path).resolve()
-    if not str(target).startswith(str(base)) or not target.is_file():
+    if not target.is_file() or not target.is_relative_to(base):
         raise HTTPException(status_code=404, detail="File not found")
-    return FileResponse(target)
+    return FileResponse(
+        target,
+        headers={
+            # Opaque sandboxed play iframes fetch sibling assets with Origin: null.
+            "Access-Control-Allow-Origin": "*",
+            "Cross-Origin-Resource-Policy": "cross-origin",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )

@@ -5,22 +5,27 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
+from app.limits import MAX_DURATION_MS, MAX_GAME_LEVEL, MAX_SCORE_DELTA, bounded_int
 from app.models import EventType, PlaySession
 
 
 def apply_session_event(session: PlaySession, event_type: EventType, payload: dict) -> None:
     if event_type == EventType.score:
-        session.total_points += int(payload.get("delta") or 0)
+        session.total_points += bounded_int(
+            payload.get("delta"), lo=-MAX_SCORE_DELTA, hi=MAX_SCORE_DELTA
+        )
     elif event_type == EventType.answer:
         session.attempt_count += 1
         if payload.get("correct"):
             session.correct_count += 1
     elif event_type == EventType.task_time:
         if payload.get("phase") == "end":
-            session.total_time_ms += int(payload.get("durationMs") or 0)
+            session.total_time_ms += bounded_int(payload.get("durationMs"), hi=MAX_DURATION_MS)
     elif event_type == EventType.level_complete:
-        level = int(payload.get("level") or 0)
-        total = int(payload.get("totalLevels") or payload.get("total_levels") or 0)
+        level = bounded_int(payload.get("level"), hi=MAX_GAME_LEVEL)
+        total = bounded_int(
+            payload.get("totalLevels") or payload.get("total_levels"), hi=MAX_GAME_LEVEL
+        )
         if level > session.levels_completed:
             session.levels_completed = level
         if total > 0:
@@ -28,15 +33,20 @@ def apply_session_event(session: PlaySession, event_type: EventType, payload: di
     elif event_type == EventType.complete:
         session.ended_at = datetime.now(timezone.utc)
         if payload.get("durationMs") and session.total_time_ms == 0:
-            session.total_time_ms = int(payload["durationMs"])
-        levels_done = int(payload.get("levelsCompleted") or payload.get("levels_completed") or 0)
-        total = int(payload.get("totalLevels") or payload.get("total_levels") or 0)
+            session.total_time_ms = bounded_int(payload.get("durationMs"), hi=MAX_DURATION_MS)
+        levels_done = bounded_int(
+            payload.get("levelsCompleted") or payload.get("levels_completed"),
+            hi=MAX_GAME_LEVEL,
+        )
+        total = bounded_int(
+            payload.get("totalLevels") or payload.get("total_levels"), hi=MAX_GAME_LEVEL
+        )
         if levels_done > session.levels_completed:
             session.levels_completed = levels_done
         if total > 0:
             session.total_levels = total
         elif session.levels_completed > 0 and session.total_levels is None:
-            session.total_levels = session.levels_completed
+            session.total_levels = min(session.levels_completed, MAX_GAME_LEVEL)
 
 
 def merge_guest_sessions(db: Session, user_id: UUID, visitor_id: str) -> int:

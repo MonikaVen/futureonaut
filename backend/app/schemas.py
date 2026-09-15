@@ -1,9 +1,16 @@
+import json
 import uuid
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
+from app.limits import (
+    MAX_EVENT_PAYLOAD_BYTES,
+    MAX_EVENT_PAYLOAD_KEY_LEN,
+    MAX_EVENT_PAYLOAD_KEYS,
+    cap_event_payload,
+)
 from app.models import EventType, GameSource, UserRole
 
 
@@ -172,6 +179,24 @@ class GuestMergeIn(BaseModel):
 class SessionEventIn(BaseModel):
     type: EventType
     payload: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("payload")
+    @classmethod
+    def validate_payload(cls, payload: dict[str, Any]) -> dict[str, Any]:
+        if not isinstance(payload, dict):
+            raise ValueError("payload must be an object")
+        if len(payload) > MAX_EVENT_PAYLOAD_KEYS:
+            raise ValueError("payload has too many keys")
+        for key in payload:
+            if not isinstance(key, str) or not key or len(key) > MAX_EVENT_PAYLOAD_KEY_LEN:
+                raise ValueError("payload keys are invalid")
+        try:
+            raw = json.dumps(payload, default=str)
+        except TypeError as exc:
+            raise ValueError("payload is not JSON-serializable") from exc
+        if len(raw.encode("utf-8")) > MAX_EVENT_PAYLOAD_BYTES:
+            raise ValueError("payload too large")
+        return cap_event_payload(payload)
 
 
 class SessionOut(BaseModel):

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, type Game, type Session } from "../api";
 import { useAuth } from "../auth";
@@ -28,6 +28,7 @@ export function PlayPage() {
   const [completed, setCompleted] = useState(false);
   const [error, setError] = useState("");
   const [ready, setReady] = useState(false);
+  const frameRef = useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
     if (!gameId) return;
@@ -73,6 +74,7 @@ export function PlayPage() {
 
   useEffect(() => {
     function onMessage(ev: MessageEvent<SdkMessage>) {
+      if (ev.source !== frameRef.current?.contentWindow) return;
       const data = ev.data;
       if (!data || data.source !== "learnplay-sdk" || !data.type) return;
       const payload = data.payload || {};
@@ -145,10 +147,12 @@ export function PlayPage() {
       </div>
       {!user && <p className="guest-note">{t("guestPlayNote")}</p>}
       <iframe
+        ref={frameRef}
         className="frame"
         title={game.title}
         src={src}
-        sandbox="allow-scripts allow-same-origin allow-forms"
+        sandbox="allow-scripts allow-forms"
+        referrerPolicy="no-referrer"
       />
       {completed && session && (
         <div className="player-after">

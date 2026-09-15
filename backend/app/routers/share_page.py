@@ -4,23 +4,12 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse, Response
 from sqlalchemy.orm import Session, joinedload
 
-from app.config import get_settings
 from app.database import get_db
 from app.models import Game, PlaySession
+from app.public_url import public_base_url
 from app.services.og import og_description, og_image_svg, score_card_svg, share_html
 
 router = APIRouter(tags=["share"])
-
-
-def _public_base(request: Request) -> str:
-    settings = get_settings()
-    if settings.public_base_url:
-        return settings.public_base_url.rstrip("/")
-    forwarded_proto = request.headers.get("x-forwarded-proto")
-    forwarded_host = request.headers.get("x-forwarded-host") or request.headers.get("host")
-    if forwarded_proto and forwarded_host:
-        return f"{forwarded_proto}://{forwarded_host}".rstrip("/")
-    return str(request.base_url).rstrip("/")
 
 
 @router.get("/share/{game_id}", response_class=HTMLResponse)
@@ -28,7 +17,7 @@ def share_page(game_id: UUID, request: Request, db: Session = Depends(get_db)) -
     game = db.get(Game, game_id)
     if game is None:
         raise HTTPException(status_code=404, detail="Game not found")
-    base = _public_base(request)
+    base = public_base_url(request)
     share_url = f"{base}/share/{game.id}"
     play_url = f"{base}/play/{game.id}"
     image_url = f"{base}/share/{game.id}/card.svg"

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import html
-import json
 import textwrap
 from xml.sax.saxutils import escape
 
@@ -97,7 +96,6 @@ def share_html(
 </head>
 <body style="font-family:system-ui,sans-serif;background:#050810;color:#e8f4ff;padding:2rem;">
   <p>Opening <a href="{safe_play}" style="color:#00d4ff;">{safe_title}</a>…</p>
-  <script>location.replace({json.dumps(play_url)});</script>
 </body>
 </html>"""
 

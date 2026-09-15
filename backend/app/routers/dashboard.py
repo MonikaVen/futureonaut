@@ -184,7 +184,7 @@ def game_analytics_detail(
     db: Session = Depends(get_db),
     user: User = Depends(require_roles(UserRole.admin)),
 ) -> GameAnalyticsDetailOut:
-    return build_game_analytics_detail(db, game_id)
+    return build_game_analytics_detail(db, game_id, include_player_emails=True)
 
 
 @admin_router.get("/comments", response_model=list[CommentOut])

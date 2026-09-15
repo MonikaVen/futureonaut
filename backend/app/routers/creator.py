@@ -35,4 +35,4 @@ def creator_analytics_detail(
         raise HTTPException(status_code=404, detail="Game not found")
     if user.role != UserRole.admin and game.owner_id != user.id:
         raise HTTPException(status_code=403, detail="Not your game")
-    return build_game_analytics_detail(db, game_id)
+    return build_game_analytics_detail(db, game_id, include_player_emails=user.role == UserRole.admin)

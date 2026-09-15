@@ -8,10 +8,12 @@ server {
         proxy_pass ${BACKEND_UPSTREAM}/api/;
         proxy_http_version 1.1;
         proxy_ssl_server_name on;
+        ${PROXY_SSL_VERIFY}
         proxy_set_header Host $proxy_host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $host;
         proxy_read_timeout 300s;
         client_max_body_size 50m;
     }
@@ -20,10 +22,12 @@ server {
         proxy_pass ${BACKEND_UPSTREAM}/share/;
         proxy_http_version 1.1;
         proxy_ssl_server_name on;
+        ${PROXY_SSL_VERIFY}
         proxy_set_header Host $proxy_host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $host;
     }
 
     location / {

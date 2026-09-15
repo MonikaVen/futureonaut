@@ -7,6 +7,7 @@ from uuid import UUID
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
+from app.limits import MAX_DURATION_MS, MAX_GAME_LEVEL, MAX_TASK_ID_LEN, bounded_int
 from app.models import EventType, Game, GameView, PlaySession, SessionEvent, User
 from app.schemas import (
     DailyViewsOut,
@@ -121,21 +122,25 @@ def _level_funnel(sessions: list[PlaySession], events: list[SessionEvent]) -> li
     max_level = 0
     session_peak: dict[UUID, int] = {}
     for session in sessions:
-        peak = session.levels_completed or 0
+        peak = bounded_int(session.levels_completed, hi=MAX_GAME_LEVEL)
         session_peak[session.id] = peak
         if session.total_levels:
-            max_level = max(max_level, session.total_levels)
+            max_level = max(max_level, bounded_int(session.total_levels, hi=MAX_GAME_LEVEL))
         max_level = max(max_level, peak)
 
     for event in events:
         if event.type != EventType.level_complete:
             continue
-        level = int(event.payload.get("level") or 0)
-        total = int(event.payload.get("totalLevels") or event.payload.get("total_levels") or 0)
+        level = bounded_int((event.payload or {}).get("level"), hi=MAX_GAME_LEVEL)
+        total = bounded_int(
+            (event.payload or {}).get("totalLevels") or (event.payload or {}).get("total_levels"),
+            hi=MAX_GAME_LEVEL,
+        )
         if level > session_peak.get(event.session_id, 0):
             session_peak[event.session_id] = level
         max_level = max(max_level, level, total)
 
+    max_level = min(max_level, MAX_GAME_LEVEL)
     if max_level <= 0 and sessions:
         max_level = 1
 
@@ -160,9 +165,9 @@ def _task_stats(events: list[SessionEvent]) -> list[TaskStatOut]:
             continue
         if event.payload.get("phase") != "end":
             continue
-        task_id = str(event.payload.get("taskId") or "default")
+        task_id = str(event.payload.get("taskId") or "default")[:MAX_TASK_ID_LEN]
         buckets[task_id]["count"] += 1
-        buckets[task_id]["duration"] += float(event.payload.get("durationMs") or 0)
+        buckets[task_id]["duration"] += bounded_int(event.payload.get("durationMs"), hi=MAX_DURATION_MS)
 
     rows = []
     for task_id, data in buckets.items():
@@ -192,7 +197,9 @@ def _daily_views(views: list[GameView], days: int = 14) -> list[DailyViewsOut]:
     ]
 
 
-def build_game_analytics_detail(db: Session, game_id: UUID) -> GameAnalyticsDetailOut:
+def build_game_analytics_detail(
+    db: Session, game_id: UUID, *, include_player_emails: bool = False
+) -> GameAnalyticsDetailOut:
     game = db.get(Game, game_id)
     if game is None:
         from fastapi import HTTPException
@@ -238,7 +245,7 @@ def build_game_analytics_detail(db: Session, game_id: UUID) -> GameAnalyticsDeta
         recent.append(
             RecentSessionOut(
                 session_id=session.id,
-                user_email=user.email if user else "unknown",
+                user_email=(user.email if user else "guest") if include_player_emails else ("player" if user else "guest"),
                 started_at=session.started_at,
                 duration_ms=session.total_time_ms or 0,
                 levels_completed=session.levels_completed or 0,
