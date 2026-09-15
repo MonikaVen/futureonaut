@@ -650,9 +650,9 @@ button, input, select, textarea {
 .game-preview.has-photo::after {
   background: linear-gradient(
     180deg,
-    rgba(8, 12, 22, 0.08) 0%,
-    rgba(8, 12, 22, 0.04) 58%,
-    rgba(8, 12, 22, 0.45) 100%
+    transparent 0%,
+    transparent 72%,
+    rgba(8, 12, 22, 0.16) 100%
   );
 }
 
