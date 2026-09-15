@@ -299,6 +299,10 @@ def update_game(
     if user.role != UserRole.admin and game.owner_id != user.id:
         raise HTTPException(status_code=403, detail="Not your game")
     data = body.model_dump(exclude_unset=True)
+    if "title" in data:
+        data["title"] = (data["title"] or "").strip()
+        if not data["title"]:
+            raise HTTPException(status_code=400, detail="Title is required")
     if "topic_tags" in data and data["topic_tags"] is not None:
         data["topic_tags"] = ensure_topic_tag(
             data["topic_tags"],

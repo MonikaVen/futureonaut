@@ -69,6 +69,7 @@ class Game(Base):
     difficulty: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     entry_path: Mapped[str] = mapped_column(String(500), nullable=False, default="index.html")
     template_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    seed_file: Mapped[str | None] = mapped_column(String(200), nullable=True)
     source_language: Mapped[str] = mapped_column(String(16), nullable=False, default="en")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

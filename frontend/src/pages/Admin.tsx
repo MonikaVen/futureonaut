@@ -39,6 +39,8 @@ export function AdminPage() {
   const [sortKey, setSortKey] = useState<SortKey>("views");
   const [detailId, setDetailId] = useState<string | null>(null);
   const [detail, setDetail] = useState<GameAnalyticsDetail | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState("");
 
   async function load() {
     const [u, s, g, a, c] = await Promise.all([
@@ -90,6 +92,33 @@ export function AdminPage() {
     }
   }
 
+  function startRename(game: Game) {
+    setEditingId(game.id);
+    setEditTitle(game.title);
+  }
+
+  async function saveTitle(game: Game) {
+    const title = editTitle.trim();
+    if (!title) {
+      setError("Title is required");
+      return;
+    }
+    setBusyId(game.id);
+    setError("");
+    try {
+      await api(`/api/games/${game.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ title }),
+      });
+      setEditingId(null);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Rename failed");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   async function deleteComment(comment: Comment) {
     if (!confirm("Delete this comment?")) return;
     setBusyId(comment.id);
@@ -110,7 +139,7 @@ export function AdminPage() {
     <div>
       <section className="hero">
         <h1>Admin</h1>
-        <p>Manage roles, review activity, and delete games.</p>
+        <p>Curate the catalog stored in the database. Rename or delete games — the seed pack is not restored on redeploy.</p>
       </section>
       {error && <div className="error">{error}</div>}
       {stats && (
@@ -235,7 +264,44 @@ export function AdminPage() {
               .map((g) => (
                 <tr key={g.id}>
                   <td>
-                    <Link to={`/play/${g.id}`}>{g.title}</Link>
+                    {editingId === g.id ? (
+                      <form
+                        className="admin-rename"
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          void saveTitle(g);
+                        }}
+                      >
+                        <input
+                          value={editTitle}
+                          onChange={(e) => setEditTitle(e.target.value)}
+                          maxLength={200}
+                          autoFocus
+                          aria-label="Game title"
+                        />
+                        <button className="btn accent btn-sm" type="submit" disabled={busyId === g.id}>
+                          Save
+                        </button>
+                        <button
+                          className="btn secondary btn-sm"
+                          type="button"
+                          onClick={() => setEditingId(null)}
+                        >
+                          Cancel
+                        </button>
+                      </form>
+                    ) : (
+                      <>
+                        <Link to={`/play/${g.id}`}>{g.title}</Link>
+                        <button
+                          className="btn secondary btn-sm"
+                          type="button"
+                          onClick={() => startRename(g)}
+                        >
+                          Rename
+                        </button>
+                      </>
+                    )}
                   </td>
                   <td>{primaryTopic(g)}</td>
                   <td>{g.difficulty}</td>

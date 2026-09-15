@@ -7,9 +7,9 @@ from pathlib import Path
 from uuid import uuid4
 
 from app.database import SessionLocal
-from app.models import Game, GameSource, GameView, PlaySession, User, UserRole
+from app.models import Game, GameSource, User, UserRole
 from app.services.snapshot import ensure_game_preview, write_game_preview
-from app.services.storage import delete_game_files, ensure_sdk_injected, game_dir, save_uploaded_html, write_sdk, write_template_game
+from app.services.storage import ensure_sdk_injected, game_dir, save_uploaded_html, write_sdk, write_template_game
 from app.services.topics import ensure_topic_tag
 
 DEMO_QUIZ = {
@@ -72,6 +72,7 @@ def _seed_dir() -> Path:
 
 
 def seed_demo_games() -> None:
+    """Load files and previews for the DB catalog. Do not rebuild the list from seed."""
     db = SessionLocal()
     try:
         admin = db.query(User).filter(User.role == UserRole.admin).first()
@@ -96,112 +97,104 @@ def seed_demo_games() -> None:
                         difficulty=content["difficulty"],
                         entry_path=entry,
                         template_type=template_type,
+                        seed_file=f"template:{template_type}",
                     )
                 )
             db.commit()
+            seed_html_pack(db, admin.id)
 
-        seed_html_pack(db, admin.id)
-        prune_games_to_manifest(db)
+        backfill_seed_files(db)
         normalize_game_topics(db)
         restore_missing_game_files(db)
-        refresh_seed_html(db)
-        refresh_template_html(db)
+        restore_missing_template_html(db)
         refresh_game_previews(db)
     finally:
         db.close()
 
 
 def prune_games_to_manifest(db) -> None:
-    """Drop obsolete seed titles. Never delete teacher, creator, or AI games."""
-    manifest_path = _seed_dir() / "manifest.json"
-    if not manifest_path.exists():
-        return
-    keep = {
-        (item.get("title") or item["file"])
-        for item in json.loads(manifest_path.read_text(encoding="utf-8"))
-    }
-    admin = db.query(User).filter(User.role == UserRole.admin).first()
-    removed = 0
-    for game in db.query(Game).all():
-        if game.title in keep:
-            continue
-        if game.source == GameSource.ai:
-            continue
-        if admin is None or game.owner_id != admin.id:
-            continue
-        if db.query(PlaySession).filter(PlaySession.game_id == game.id).first():
-            continue
-        if game.source != GameSource.upload:
-            continue
-        for session in db.query(PlaySession).filter(PlaySession.game_id == game.id).all():
-            db.delete(session)
-        db.query(GameView).filter(GameView.game_id == game.id).delete()
-        delete_game_files(game.id)
-        db.delete(game)
-        removed += 1
-    if removed:
-        db.commit()
+    """Unused on boot. Catalog membership is curated in Postgres by admins."""
+    return
 
 
 def restore_missing_game_files(db) -> None:
-    """Rehydrate game HTML from seed pack when the volume is empty (e.g. Azure ephemeral disk)."""
+    """Rehydrate HTML for existing catalog rows if the game volume is empty."""
     manifest_path = _seed_dir() / "manifest.json"
     if not manifest_path.exists():
         return
-    by_title = {
-        (item.get("title") or item["file"]): item
-        for item in json.loads(manifest_path.read_text(encoding="utf-8"))
-    }
+    items = json.loads(manifest_path.read_text(encoding="utf-8"))
+    by_file = {item["file"]: item for item in items if item.get("file")}
+    by_title = {(item.get("title") or item["file"]): item for item in items}
     for game in db.query(Game).all():
         target = game_dir(game.id) / (game.entry_path or "index.html")
         if target.exists():
             continue
-        item = by_title.get(game.title)
-        if item:
-            src = _seed_dir() / item["file"]
-            if src.exists():
-                html = src.read_text(encoding="utf-8", errors="replace")
-                save_uploaded_html(game.id, html, "index.html")
-                write_game_preview(game)
-                continue
-        if game.template_type:
-            # cannot rebuild without content.json; skip
-            continue
-
-
-def refresh_seed_html(db) -> None:
-    """Rewrite seed-pack HTML so existing game dirs pick up progress hooks."""
-    manifest_path = _seed_dir() / "manifest.json"
-    if not manifest_path.exists():
-        return
-    by_title = {
-        (item.get("title") or item["file"]): item
-        for item in json.loads(manifest_path.read_text(encoding="utf-8"))
-    }
-    for game in db.query(Game).all():
-        item = by_title.get(game.title)
+        item = None
+        if game.seed_file and not str(game.seed_file).startswith("template:"):
+            item = by_file.get(game.seed_file)
+        if item is None:
+            item = by_title.get(game.title)
         if not item:
             continue
         src = _seed_dir() / item["file"]
-        if not src.exists():
-            continue
-        html = src.read_text(encoding="utf-8", errors="replace")
-        save_uploaded_html(game.id, html, game.entry_path or "index.html")
+        if src.exists():
+            html = src.read_text(encoding="utf-8", errors="replace")
+            save_uploaded_html(game.id, html, "index.html")
+            write_game_preview(game)
 
 
-def refresh_template_html(db) -> None:
-    """Rewrite template index.html so existing quiz/match games pick up progress hooks."""
+def refresh_seed_html(db) -> None:
+    """No longer rewrites catalog HTML from the seed pack on boot."""
+    return
+
+
+def restore_missing_template_html(db) -> None:
+    """Write template HTML only when the game folder is missing its entry file."""
     template_root = Path(__file__).resolve().parents[2] / "templates"
     for game in db.query(Game).all():
         kind = (game.template_type or "").strip()
         if not kind:
             continue
+        dest = game_dir(game.id)
+        target = dest / (game.entry_path or "index.html")
+        if target.exists():
+            continue
         src = template_root / kind / "index.html"
         if not src.exists():
             continue
-        dest = game_dir(game.id)
-        (dest / "index.html").write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
-        ensure_sdk_injected(dest, "index.html")
+        dest.mkdir(parents=True, exist_ok=True)
+        target.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
+        ensure_sdk_injected(dest, game.entry_path or "index.html")
+
+
+def refresh_template_html(db) -> None:
+    restore_missing_template_html(db)
+
+
+def backfill_seed_files(db) -> None:
+    """Remember the original seed file so a renamed game can still restore files."""
+    manifest_path = _seed_dir() / "manifest.json"
+    if not manifest_path.exists():
+        return
+    by_title = {
+        (item.get("title") or item["file"]): item["file"]
+        for item in json.loads(manifest_path.read_text(encoding="utf-8"))
+        if item.get("file")
+    }
+    changed = False
+    for game in db.query(Game).all():
+        if game.seed_file:
+            continue
+        if game.template_type:
+            game.seed_file = f"template:{game.template_type}"
+            changed = True
+            continue
+        origin = by_title.get(game.title)
+        if origin:
+            game.seed_file = origin
+            changed = True
+    if changed:
+        db.commit()
 
 
 def normalize_game_topics(db) -> None:
@@ -216,15 +209,18 @@ def normalize_game_topics(db) -> None:
 
 
 def seed_html_pack(db, owner_id) -> None:
+    """Insert the seed pack once, when the catalog is empty."""
     manifest_path = _seed_dir() / "manifest.json"
     if not manifest_path.exists():
         return
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    existing_files = {g.seed_file for g in db.query(Game).all() if g.seed_file}
     existing_titles = {g.title for g in db.query(Game.title).all()}
     added = 0
     for item in manifest:
         title = item.get("title") or item["file"]
-        if title in existing_titles:
+        seed_file = item.get("file")
+        if seed_file in existing_files or title in existing_titles:
             continue
         src = _seed_dir() / item["file"]
         if not src.exists():
@@ -247,8 +243,10 @@ def seed_html_pack(db, owner_id) -> None:
                 topic_tags=tags,
                 difficulty=int(item.get("difficulty") or 1),
                 entry_path=entry,
+                seed_file=seed_file,
             )
         )
+        existing_files.add(seed_file)
         existing_titles.add(title)
         added += 1
     if added:

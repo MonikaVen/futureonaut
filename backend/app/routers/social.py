@@ -48,7 +48,10 @@ def add_comment(
     game = db.get(Game, game_id)
     if game is None:
         raise HTTPException(status_code=404, detail="Game not found")
-    comment = GameComment(game_id=game.id, user_id=user.id, body=body.body.strip())
+    text = body.body.strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="Comment cannot be empty")
+    comment = GameComment(game_id=game.id, user_id=user.id, body=text)
     db.add(comment)
     db.commit()
     db.refresh(comment)

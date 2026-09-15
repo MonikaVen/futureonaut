@@ -260,21 +260,21 @@ export function PlayPage() {
             levelsCompleted={session.levels_completed}
             totalLevels={session.total_levels}
           />
-          <div className="row player-tools">
-            <GameSocial
-              game={{
-                ...game,
-                like_count: game.like_count ?? 0,
-                comment_count: game.comment_count ?? 0,
-                liked_by_me: game.liked_by_me ?? false,
-              }}
-              showComments
-              onUpdate={(patch) => setGame((g) => (g ? { ...g, ...patch } : g))}
-            />
-            <GameShare gameId={game.id} title={game.title} description={game.description} />
-          </div>
         </div>
       )}
+      <div className="row player-tools">
+        <GameSocial
+          game={{
+            ...game,
+            like_count: game.like_count ?? 0,
+            comment_count: game.comment_count ?? 0,
+            liked_by_me: game.liked_by_me ?? false,
+          }}
+          showComments
+          onUpdate={(patch) => setGame((g) => (g ? { ...g, ...patch } : g))}
+        />
+        <GameShare gameId={game.id} title={game.title} description={game.description} />
+      </div>
     </div>
   );
 }

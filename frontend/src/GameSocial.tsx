@@ -42,14 +42,19 @@ export function GameSocial({
   const [body, setBody] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [open, setOpen] = useState(showComments);
   const showShare = Boolean(shareTitle);
 
   useEffect(() => {
-    if (!showComments) return;
+    setOpen(showComments);
+  }, [showComments]);
+
+  useEffect(() => {
+    if (!open) return;
     api<Comment[]>(`/api/games/${game.id}/comments`)
       .then(setComments)
       .catch(() => setComments([]));
-  }, [game.id, showComments, game.comment_count]);
+  }, [game.id, open, game.comment_count]);
 
   async function toggleFavourite() {
     if (!user) return;
@@ -86,7 +91,7 @@ export function GameSocial({
   }
 
   return (
-    <div className={`social${compact ? " compact" : ""}${showComments ? " with-comments" : ""}`}>
+    <div className={`social${compact ? " compact" : ""}${open ? " with-comments" : ""}`}>
       <div className={`social-actions${showShare ? " social-actions-row" : ""}`}>
         <div className="social-actions-left">
           {user ? (
@@ -111,10 +116,16 @@ export function GameSocial({
               <span>{t("favourite")}</span>
             </Link>
           )}
-          <span className="social-chip" title={t("comments")}>
+          <button
+            type="button"
+            className={`social-chip${open ? " active" : ""}`}
+            title={t("comments")}
+            aria-pressed={open}
+            onClick={() => setOpen((value) => !value)}
+          >
             <CommentIcon />
             <span>{game.comment_count ?? 0}</span>
-          </span>
+          </button>
           {!compact && (game.like_count ?? 0) > 0 && (
             <span className="social-count meta" title={t("favourite")}>
               {game.like_count} {t("saved")}
@@ -147,7 +158,7 @@ export function GameSocial({
         )}
       </div>
 
-      {showComments && (
+      {open && (
         <div className="comments-panel">
           <h3 className="comments-title">{t("comments")}</h3>
           {error && <div className="error">{error}</div>}

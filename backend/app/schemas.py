@@ -101,7 +101,7 @@ class LikeToggleOut(BaseModel):
 
 
 class GameUpdate(BaseModel):
-    title: str | None = Field(default=None, max_length=200)
+    title: str | None = Field(default=None, min_length=1, max_length=200)
     description: str | None = None
     topic_tags: list[str] | None = None
     difficulty: int | None = Field(default=None, ge=1, le=5)

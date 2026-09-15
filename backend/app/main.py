@@ -79,6 +79,11 @@ def ensure_schema() -> None:
         )
         conn.execute(
             text(
+                "ALTER TABLE games ADD COLUMN IF NOT EXISTS seed_file VARCHAR(200)"
+            )
+        )
+        conn.execute(
+            text(
                 """
                 DO $$ BEGIN
                     ALTER TYPE userrole ADD VALUE 'teacher';
