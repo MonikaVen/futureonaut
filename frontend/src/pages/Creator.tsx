@@ -67,6 +67,7 @@ export function CreatorPage() {
   const [tags, setTags] = useState("ML");
   const [difficulty, setDifficulty] = useState(1);
   const [file, setFile] = useState<File | null>(null);
+  const [icon, setIcon] = useState<File | null>(null);
 
   const [templateType, setTemplateType] = useState("quiz");
   const [templateJson, setTemplateJson] = useState(JSON.stringify(QUIZ_SAMPLE, null, 2));
@@ -131,10 +132,12 @@ export function CreatorPage() {
       form.append("topic_tags", tags);
       form.append("difficulty", String(difficulty));
       form.append("file", file);
+      if (icon) form.append("icon", icon);
       await api<Game>("/api/games/upload", { method: "POST", body: form });
       setMessage("Upload complete — SDK metrics injected.");
       setTitle("");
       setFile(null);
+      setIcon(null);
       await reload();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
@@ -451,6 +454,14 @@ export function CreatorPage() {
               accept=".html,.htm,.zip"
               onChange={(e) => setFile(e.target.files?.[0] || null)}
               required
+            />
+          </label>
+          <label>
+            Game icon (optional)
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif,.png,.jpg,.jpeg,.webp,.gif"
+              onChange={(e) => setIcon(e.target.files?.[0] || null)}
             />
           </label>
           <button className="btn accent" disabled={busy} type="submit">

@@ -14,8 +14,29 @@ from app.services.topics import normalize_topic
 
 logger = logging.getLogger(__name__)
 
-PREVIEW_FILENAME = "preview.png"
+PREVIEW_FILENAME = "preview-v2.png"
+ICON_FILENAME = "icon.png"
 OG_SIZE = (1200, 630)
+MAX_ICON_BYTES = 8 * 1024 * 1024
+_ICON_CANDIDATES = (
+    ICON_FILENAME,
+    "icon.jpg",
+    "icon.jpeg",
+    "icon.webp",
+    "icon.gif",
+    "poster.png",
+    "poster.jpg",
+    "poster.jpeg",
+    "poster.webp",
+    "cover.png",
+    "cover.jpg",
+    "cover.jpeg",
+    "cover.webp",
+    "logo.png",
+    "logo.jpg",
+    "logo.jpeg",
+    "logo.webp",
+)
 
 _TOPIC_ACCENT = {
     "AI": (62, 200, 232),
@@ -52,16 +73,69 @@ def ensure_game_preview(game) -> Path:
     return written
 
 
+def cover_crop(image: Image.Image, size: tuple[int, int] = OG_SIZE) -> Image.Image:
+    target_w, target_h = size
+    src = image.convert("RGB")
+    src_w, src_h = src.size
+    if src_w < 1 or src_h < 1:
+        raise ValueError("Invalid image")
+    scale = max(target_w / src_w, target_h / src_h)
+    new_w = max(target_w, round(src_w * scale))
+    new_h = max(target_h, round(src_h * scale))
+    resized = src.resize((new_w, new_h), Image.Resampling.LANCZOS)
+    left = max(0, (new_w - target_w) // 2)
+    top = max(0, (new_h - target_h) // 2)
+    return resized.crop((left, top, left + target_w, top + target_h))
+
+
+def save_game_icon(dest: Path, data: bytes) -> Path:
+    if len(data) > MAX_ICON_BYTES:
+        raise ValueError("Icon is too large (max 8MB)")
+    if len(data) < 32:
+        raise ValueError("Icon file is empty")
+    try:
+        image = Image.open(io.BytesIO(data))
+        image.load()
+    except Exception as exc:
+        raise ValueError("Icon must be a PNG, JPEG, WebP, or GIF image") from exc
+    dest.mkdir(parents=True, exist_ok=True)
+    path = dest / ICON_FILENAME
+    cover_crop(image).save(path, format="PNG", optimize=True)
+    return path
+
+
+def promote_pack_icon(dest: Path) -> Path | None:
+    seen: list[Path] = []
+    names = {name.lower() for name in _ICON_CANDIDATES}
+    for name in _ICON_CANDIDATES:
+        path = dest / name
+        if path.is_file():
+            seen.append(path)
+    if not seen:
+        for path in dest.rglob("*"):
+            if path.is_file() and path.name.lower() in names:
+                seen.append(path)
+    skip = {PREVIEW_FILENAME.lower(), "preview.png"}
+    for path in seen:
+        if path.name.lower() in skip:
+            continue
+        try:
+            return save_game_icon(dest, path.read_bytes())
+        except (OSError, ValueError):
+            continue
+    return None
+
+
 def render_preview_png(game) -> bytes:
     dest = game_dir(game.id)
     palette = _palette(game, dest)
     img = Image.new("RGB", OG_SIZE, palette["bg"])
     draw = ImageDraw.Draw(img)
-    _paint_stage(draw, palette)
     photo = _embedded_photo(dest)
     if photo is not None:
-        _paste_photo(img, photo, palette)
+        img.paste(cover_crop(photo), (0, 0))
     else:
+        _paint_stage(draw, palette)
         content = _content_json(dest)
         kind = (getattr(game, "template_type", None) or "").strip()
         if kind == "quiz" or (content and content.get("questions")):
@@ -72,7 +146,6 @@ def render_preview_png(game) -> bytes:
             _paint_timed(draw, game, content or {}, palette)
         else:
             _paint_html_game(draw, game, dest, palette)
-    _paint_chrome(draw, game, palette)
     buf = io.BytesIO()
     img.save(buf, format="PNG", optimize=True)
     return buf.getvalue()
@@ -224,9 +297,10 @@ def _palette(game, dest: Path) -> dict[str, tuple[int, int, int]]:
 
 
 def _embedded_photo(dest: Path) -> Image.Image | None:
-    for name in ("snapshot.png", "screenshot.png", "poster.png", "cover.png", "og.png"):
+    skip = {PREVIEW_FILENAME.lower(), "preview.png"}
+    for name in (ICON_FILENAME, "snapshot.png", "screenshot.png", "poster.png", "cover.png", "og.png"):
         path = dest / name
-        if not path.is_file():
+        if not path.is_file() or path.name.lower() in skip:
             continue
         try:
             return Image.open(path).convert("RGB")
@@ -234,7 +308,7 @@ def _embedded_photo(dest: Path) -> Image.Image | None:
             continue
     images: list[Path] = []
     for pattern in ("*.png", "*.jpg", "*.jpeg", "*.webp"):
-        images.extend(p for p in dest.glob(pattern) if p.name != PREVIEW_FILENAME)
+        images.extend(p for p in dest.glob(pattern) if p.name.lower() not in skip)
     images.sort(key=lambda p: p.stat().st_size, reverse=True)
     for path in images[:6]:
         if path.stat().st_size < 8_000:
@@ -244,18 +318,6 @@ def _embedded_photo(dest: Path) -> Image.Image | None:
         except OSError:
             continue
     return None
-
-
-def _paste_photo(base: Image.Image, photo: Image.Image, palette: dict) -> None:
-    frame = (48, 78, 1152, 548)
-    box_w, box_h = frame[2] - frame[0], frame[3] - frame[1]
-    scaled = photo.copy()
-    scaled.thumbnail((box_w, box_h), Image.Resampling.LANCZOS)
-    canvas = Image.new("RGB", (box_w, box_h), palette["card"])
-    canvas.paste(scaled, ((box_w - scaled.width) // 2, (box_h - scaled.height) // 2))
-    mask = Image.new("L", (box_w, box_h), 0)
-    ImageDraw.Draw(mask).rounded_rectangle((0, 0, box_w - 1, box_h - 1), 22, fill=255)
-    base.paste(canvas, (frame[0], frame[1]), mask)
 
 
 def _paint_stage(draw: ImageDraw.ImageDraw, palette: dict) -> None:

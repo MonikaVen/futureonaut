@@ -71,21 +71,15 @@ export function GamePreview({
           <PlayIcon size={14} />
         </span>
       </span>
-      {photoFailed ? (
-        <>
-          <h3 className="game-preview-title">{title}</h3>
-          {lede ? <p className="game-preview-lede">{lede}</p> : null}
-          <span className="game-preview-meta">
-            <span className="game-preview-chip">{topic}</span>
-            <span className="game-preview-chip level">
-              {t("level")} {difficulty}
-            </span>
-            {statusChip}
-          </span>
-        </>
-      ) : statusChip ? (
-        <span className="game-preview-meta">{statusChip}</span>
-      ) : null}
+      <h3 className="game-preview-title">{title}</h3>
+      {lede ? <p className="game-preview-lede">{lede}</p> : null}
+      <span className="game-preview-meta">
+        <span className="game-preview-chip">{topic}</span>
+        <span className="game-preview-chip level">
+          {t("level")} {difficulty}
+        </span>
+        {statusChip}
+      </span>
       {clampedPct !== null ? (
         <span className="game-preview-bar" aria-hidden>
           <span style={{ width: `${clampedPct}%` }} />

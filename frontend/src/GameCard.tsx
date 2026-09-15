@@ -44,7 +44,6 @@ export function GameCard({ game, topic, focusLabels, onUpdate }: Props) {
         progressPct={progressPct}
       />
       <div className="game-tile-body">
-        <h3 className="game-tile-title">{game.title}</h3>
         {focusLabels.length > 0 ? (
           <div className="tags">
             {focusLabels.map((label) => (

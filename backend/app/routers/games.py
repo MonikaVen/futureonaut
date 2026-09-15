@@ -29,7 +29,7 @@ from app.schemas import (
 from app.services.generate import generate_ai_content, generate_html_game, validate_template_content
 from app.services.llm import normalize_provider, require_api_key, store_llm_key
 from app.services.recommendations import game_to_out
-from app.services.snapshot import write_game_preview
+from app.services.snapshot import promote_pack_icon, save_game_icon, write_game_preview
 from app.services.social import enrich_games
 from app.services.storage import (
     delete_game_files,
@@ -70,6 +70,7 @@ async def upload_game(
     topic_tags: str = Form(""),
     difficulty: int = Form(1),
     file: UploadFile = File(...),
+    icon: UploadFile | None = File(default=None),
     db: Session = Depends(get_db),
     user: User = Depends(require_game_author),
 ) -> GameOut:
@@ -83,6 +84,13 @@ async def upload_game(
             entry = save_uploaded_zip(game_id, raw)
         else:
             entry = save_uploaded_html(game_id, raw.decode("utf-8", errors="replace"), filename)
+        dest = game_dir(game_id)
+        if icon is not None and (icon.filename or "").strip():
+            raw_icon = await icon.read()
+            if raw_icon:
+                save_game_icon(dest, raw_icon)
+        else:
+            promote_pack_icon(dest)
     except Exception as exc:
         delete_game_files(game_id)
         raise HTTPException(status_code=400, detail=str(exc)) from exc

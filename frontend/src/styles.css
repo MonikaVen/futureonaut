@@ -580,15 +580,6 @@ button, input, select, textarea {
   flex: 1;
 }
 
-.game-tile-title {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: 1.02rem;
-  font-weight: 700;
-  line-height: 1.3;
-  color: var(--ink);
-}
-
 .game-tile-body .social {
   margin-top: auto;
   padding-top: 0.75rem;
@@ -662,10 +653,20 @@ button, input, select, textarea {
 .game-preview.has-photo::after {
   background: linear-gradient(
     180deg,
-    transparent 0%,
-    transparent 72%,
-    rgba(8, 12, 22, 0.16) 100%
+    rgba(8, 12, 22, 0.18) 0%,
+    transparent 32%,
+    rgba(8, 12, 22, 0.42) 58%,
+    rgba(8, 12, 22, 0.88) 100%
   );
+}
+
+.game-preview.has-photo .game-preview-title {
+  text-shadow: 0 1px 10px rgba(8, 12, 22, 0.75);
+}
+
+.game-preview.has-photo .game-preview-lede {
+  color: rgba(238, 244, 251, 0.88);
+  text-shadow: 0 1px 8px rgba(8, 12, 22, 0.7);
 }
 
 .game-preview.has-photo .game-preview-play {
@@ -673,9 +674,24 @@ button, input, select, textarea {
   color: #7ee8ff;
 }
 
+.game-preview.has-photo .game-preview-chip {
+  background: rgba(12, 18, 32, 0.58);
+  color: #eef4fb;
+}
+
+.game-preview.has-photo .game-preview-chip.level {
+  background: rgba(126, 232, 255, 0.22);
+  color: #eef4fb;
+}
+
 .game-preview.has-photo .game-preview-chip.progress {
   background: rgba(12, 18, 32, 0.55);
   color: #eef4fb;
+}
+
+.game-preview.has-photo .game-preview-chip.solved {
+  background: rgba(61, 186, 122, 0.32);
+  color: #b6f0ce;
 }
 
 .game-preview.topic-ai {
@@ -803,6 +819,11 @@ html[data-theme="dark"] .game-preview.topic-math {
 .game-preview:hover,
 .game-preview:focus-visible {
   color: var(--ink);
+}
+
+.game-preview.has-photo:hover,
+.game-preview.has-photo:focus-visible {
+  color: #eef4fb;
 }
 
 .game-preview:hover .game-preview-play,
