@@ -305,6 +305,7 @@ button, input, select, textarea {
 }
 
 .platform-cover-light img {
+  object-fit: contain;
   object-position: center center;
 }
 
