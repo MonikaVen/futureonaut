@@ -125,6 +125,12 @@
       if (extra.points) {
         this.score(Number(extra.points) || 0);
       }
+      if (extra.correct != null || extra.points) {
+        this.answer({
+          correct: extra.correct != null ? !!extra.correct : true,
+          taskId: extra.id || extra.label || null,
+        });
+      }
       if (extra.complete) {
         this.complete({
           levelsCompleted: extra.levelsCompleted != null ? extra.levelsCompleted : level,

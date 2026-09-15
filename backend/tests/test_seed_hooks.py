@@ -74,6 +74,7 @@ console.log(JSON.stringify(events.map(e => ({{ type: e.type, payload: e.payload 
         self.assertIn("level_complete", types)
         self.assertIn("milestone", types)
         self.assertIn("score", types)
+        self.assertIn("answer", types)
         self.assertIn("complete", types)
         self.assertEqual(types.count("complete"), 1)
         complete = next(e for e in events if e["type"] == "complete")

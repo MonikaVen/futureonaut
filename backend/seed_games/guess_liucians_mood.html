@@ -186,7 +186,7 @@ document.getElementById('reveal').onclick=()=>{
  if(played===5)document.getElementById('challengeFeedback').textContent=correct>=4?'🏆 Challenge complete! '+correct+'/5 correct.':'You got '+correct+'/5. Try another round.';
  if(window.LearnPlay){
    const passed=played===5 && correct>=4;
-   LearnPlay.stage(passed?5:correct,5,{complete:passed,points:choice===actual?10:0,label:'Mood round '+played,id:'mood-'+played});
+   LearnPlay.stage(passed?5:correct,5,{complete:passed,points:choice===actual?10:0,correct:choice===actual,label:'Mood round '+played,id:'mood-'+played});
  }
 };
 document.getElementById('next').onclick=()=>{
