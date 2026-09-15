@@ -75,7 +75,9 @@ export function Shell() {
             </div>
           ) : (
             <div className="nav-auth">
-              <Link to="/login">{t("signIn")}</Link>
+              <Link className="btn secondary btn-sm" to="/login">
+                {t("signIn")}
+              </Link>
               <Link className="btn accent btn-sm" to="/register">
                 {t("signUp")}
               </Link>

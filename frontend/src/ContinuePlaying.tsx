@@ -54,7 +54,7 @@ export function ContinuePlaying() {
                   {item.total_points} {t("pts")}
                   {progressLabel ? ` · ${progressLabel}` : ""}
                 </p>
-                <Link className="btn accent" to={`/play/${item.game_id}`}>
+                <Link className="btn accent btn-sm" to={`/play/${item.game_id}`}>
                   {t("continue")}
                 </Link>
               </div>

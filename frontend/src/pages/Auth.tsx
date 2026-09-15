@@ -57,11 +57,13 @@ export function LoginPage() {
             />
           </label>
           {error && <div className="error">{error}</div>}
-          <div className="row">
+          <div className="form-actions">
             <button className="btn accent" disabled={busy} type="submit">
               {busy ? t("signingIn") : t("signIn")}
             </button>
-            <Link to="/register">{t("createAccount")}</Link>
+            <Link className="btn secondary" to="/register">
+              {t("createAccount")}
+            </Link>
           </div>
         </form>
       </div>
@@ -126,11 +128,13 @@ export function RegisterPage() {
             />
           </label>
           {error && <div className="error">{error}</div>}
-          <div className="row">
+          <div className="form-actions">
             <button className="btn accent" disabled={busy} type="submit">
               {busy ? t("creating") : t("createAccount")}
             </button>
-            <Link to="/login">{t("backToSignIn")}</Link>
+            <Link className="btn secondary" to="/login">
+              {t("backToSignIn")}
+            </Link>
           </div>
         </form>
       </div>
