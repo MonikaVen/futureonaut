@@ -254,6 +254,7 @@
       score++;
       document.getElementById('score').textContent=score;
       document.getElementById('feedback').textContent=`⭐ Correct! The neuron output is ${z.toFixed(2)}, so Liucian chooses ${decision}.`;
+      if(window.LearnPlay) LearnPlay.stage(Math.min(score,4),4,{complete:score>=4,points:10,label:challenges[challengeIndex].text,id:'neuron-'+challengeIndex});
     }else{
       document.getElementById('feedback').textContent=`Not yet. The neuron output is ${z.toFixed(2)}, so Liucian chooses ${decision}. Adjust the weights or bias.`;
     }

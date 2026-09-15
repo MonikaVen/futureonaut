@@ -256,6 +256,7 @@
     if(answer === CAT_VOLUME){
       catFeedback.textContent = `⭐ Correct! 4 × 3 × 2 = ${CAT_VOLUME} cubic units.`;
       unlock();
+      if(window.LearnPlay) LearnPlay.stage(1,2,{points:10,label:'Cat volume',id:'box-volume'});
     } else if(!catAnswer.value){
       catFeedback.textContent = 'Enter your calculated volume first.';
     } else {
@@ -333,6 +334,7 @@
 
     if(volume===CAT_VOLUME && l===CAT.l && w===CAT.w && h===CAT.h){
       boxFeedback.textContent='🎉 Perfect! 4 × 3 × 2 = 24 units³. This is the smallest rectangular box that fits Liucian exactly.';
+      if(window.LearnPlay) LearnPlay.stage(2,2,{complete:true,points:10,label:'Minimum box',id:'box-fit'});
     } else {
       boxFeedback.textContent=`✅ Liucian fits, but your box is ${volume} units³. Reduce it to ${CAT_VOLUME} units³ while keeping length ≥ 4, width ≥ 3, and height ≥ 2.`;
     }

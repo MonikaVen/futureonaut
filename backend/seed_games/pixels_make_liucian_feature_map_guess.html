@@ -463,6 +463,7 @@ $('checkAnimal').addEventListener('click',()=>{
   }
   if(animalChoice==='cat'){
     $('animalFeedback').innerHTML='<span class="good">⭐ Correct — the feature map belongs to Liucian the cat!</span>';
+    if(window.LearnPlay) LearnPlay.stage(1,1,{complete:true,points:10,label:'Feature map',id:'feature-map-cat'});
   }else{
     $('animalFeedback').textContent='Not quite. Look for the ears, face outline, and body edges, then try again.';
   }

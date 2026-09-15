@@ -181,6 +181,10 @@ document.getElementById('modelAccuracy').textContent=`${correctModel} / ${creatu
 document.getElementById('thresholdFeedback').textContent=correctModel>=4
 ?`🎉 Good threshold! The classifier gets ${correctModel}/5 examples correct.`
 :`The classifier gets ${correctModel}/5 correct. Try moving the threshold.`;
+if(window.LearnPlay){
+  const passed=correctModel>=4;
+  LearnPlay.stage(passed?1:0,1,{complete:passed,points:passed?10:0,label:'Threshold',id:'cat-threshold'});
+}
 });
 render();
 })();

@@ -439,12 +439,20 @@
   const qs = s => document.querySelector(s);
   const qsa = s => [...document.querySelectorAll(s)];
 
+  const seenSections = new Set(['pipeline']);
+  if (window.LearnPlay) LearnPlay.stage(1, 11, {label: 'Pipeline', id: 'xf-pipeline'});
   qsa('.nav button').forEach(btn => {
     btn.addEventListener('click', () => {
       qsa('.nav button').forEach(b => b.classList.remove('active'));
       qsa('.section').forEach(s => s.classList.remove('active'));
       btn.classList.add('active');
       qs('#' + btn.dataset.section).classList.add('active');
+      seenSections.add(btn.dataset.section);
+      if (window.LearnPlay) LearnPlay.stage(seenSections.size, 11, {
+        complete: seenSections.size >= 11,
+        label: btn.textContent.trim(),
+        id: 'xf-' + btn.dataset.section
+      });
     });
   });
 

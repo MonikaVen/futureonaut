@@ -285,7 +285,11 @@ $('edgePlay').addEventListener('click',()=>{
   $('edgePlay').textContent='⏸ Pause Layer 1';
   edgeTimer=setInterval(()=>{
     renderEdge();
-    if(edgePos>=143){clearInterval(edgeTimer);edgeTimer=null;$('edgePlay').textContent='⏩ Play Layer 1';return}
+    if(edgePos>=143){
+      clearInterval(edgeTimer);edgeTimer=null;$('edgePlay').textContent='⏩ Play Layer 1';
+      if(window.LearnPlay) LearnPlay.stage(1,2,{label:'Layer 1',id:'cnn-layer-1'});
+      return;
+    }
     edgePos++;
   },65);
 });
@@ -295,7 +299,11 @@ $('earPlay').addEventListener('click',()=>{
   $('earPlay').textContent='⏸ Pause Layer 2';
   earTimer=setInterval(()=>{
     renderEar();
-    if(earPos>=99){clearInterval(earTimer);earTimer=null;$('earPlay').textContent='⏩ Play Layer 2';return}
+    if(earPos>=99){
+      clearInterval(earTimer);earTimer=null;$('earPlay').textContent='⏩ Play Layer 2';
+      if(window.LearnPlay) LearnPlay.stage(2,2,{complete:true,label:'Layer 2',id:'cnn-layer-2'});
+      return;
+    }
     earPos++;
   },85);
 });

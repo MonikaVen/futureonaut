@@ -209,10 +209,14 @@ function reward(){
  const firstTime=!state.completed.includes(state.level);
  if(firstTime){state.completed.push(state.level);state.stars+=100;state.badges+=1}
  if(window.LearnPlay){
-   LearnPlay.progress({level:state.completed.length,totalLevels:10});
-   LearnPlay.milestone({id:"level-"+state.level,label:levels[state.level].title,level:state.completed.length,totalLevels:10});
-   if(firstTime) LearnPlay.score(100);
-   if(firstTime && state.completed.length>=10) LearnPlay.complete({levelsCompleted:10,totalLevels:10,score:state.stars});
+   LearnPlay.stage(state.completed.length,10,{
+     complete:firstTime && state.completed.length>=10,
+     points:firstTime?100:0,
+     label:levels[state.level].title,
+     id:"level-"+state.level,
+     score:state.stars,
+     levelsCompleted:state.completed.length
+   });
  }
  feedback.className="feedback ok";feedback.textContent="Correct! +100 ⭐  Badge unlocked 🏆";
  luciaStatus.textContent="Level complete ✓";levelMeter.style.width="100%";luciaExplain.textContent="Great work. Lucia learned this concept.";

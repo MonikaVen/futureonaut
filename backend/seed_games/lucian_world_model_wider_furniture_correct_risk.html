@@ -627,6 +627,7 @@ function commit(){
     gameOver = true;
     document.getElementById('message').innerHTML =
       '<b>Mouse caught!</b> Lucian successfully planned and moved <b>' + chosenName + '</b>.';
+    if(window.LearnPlay) LearnPlay.stage(1,1,{complete:true,points:12,label:'Mouse caught',id:'world-mouse'});
   } else {
     document.getElementById('message').innerHTML =
       'Move committed: <b>' + chosenName + '</b>. Re-imagine from Lucian’s new position.';

@@ -57,6 +57,30 @@ class ProgressTests(unittest.TestCase):
         self.assertEqual(session.levels_completed, 3)
         self.assertEqual(session.total_levels, 10)
 
+    def test_stage_progress_does_not_solve_until_complete(self) -> None:
+        session = _session()
+        apply_session_event(
+            session,  # type: ignore[arg-type]
+            EventType.level_complete,
+            {"level": 4, "totalLevels": 5, "percent": 80, "solved": False},
+        )
+        self.assertEqual(session.levels_completed, 4)
+        self.assertEqual(session.total_levels, 5)
+        self.assertIsNone(session.ended_at)
+        self.assertFalse(session_is_solved(session))
+
+    def test_complete_event_marks_solved(self) -> None:
+        session = _session(levels_completed=4, total_levels=5)
+        apply_session_event(
+            session,  # type: ignore[arg-type]
+            EventType.complete,
+            {"levelsCompleted": 5, "totalLevels": 5, "score": 50},
+        )
+        self.assertEqual(session.levels_completed, 5)
+        self.assertEqual(session.total_levels, 5)
+        self.assertIsNotNone(session.ended_at)
+        self.assertTrue(session_is_solved(session))
+
 
 if __name__ == "__main__":
     unittest.main()

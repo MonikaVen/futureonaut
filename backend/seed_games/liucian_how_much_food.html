@@ -274,6 +274,10 @@
       e<500
       ? `🎉 Challenge complete! Total squared error = ${e.toFixed(0)}.`
       : `Not yet. Error = ${e.toFixed(0)}. Adjust the coefficients and bias.`;
+    if(window.LearnPlay){
+      const passed=e<500;
+      LearnPlay.stage(passed?1:0,1,{complete:passed,points:passed?10:0,label:'Food model',id:'food-fit'});
+    }
   });
 
   document.getElementById('trainBtn').addEventListener('click',()=>{

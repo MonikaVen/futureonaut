@@ -507,13 +507,15 @@
     const target=challenges[challengeIndex].target;
 
     if(decision===target){
-      if(!currentChallengeSolved){
+      const first=!currentChallengeSolved;
+      if(first){
         score++;
         currentChallengeSolved = true;
         document.getElementById('score').textContent=score;
       }
       document.getElementById('feedback').textContent=
         `⭐ Correct! The neuron output is ${z.toFixed(2)}, so Liucian chooses ${decision}.`;
+      if(window.LearnPlay) LearnPlay.stage(Math.min(score,4),5,{complete:false,points:first?10:0,label:challenges[challengeIndex].text,id:'neuron-train-'+challengeIndex});
     }else{
       document.getElementById('feedback').textContent=
         `Not yet. The neuron output is ${z.toFixed(2)}, so Liucian chooses ${decision}. Adjust the weights or bias.`;
@@ -565,6 +567,7 @@
     if(correct === 3){
       feedback.textContent =
         '🎉 Boss challenge complete! One neuron now handles all three situations correctly. You trained a tiny classifier.';
+      if(window.LearnPlay) LearnPlay.stage(5,5,{complete:true,points:20,label:'Boss challenge',id:'neuron-boss'});
     } else {
       feedback.textContent =
         `${correct}/3 correct. Keep the same weights and bias, then adjust them until all three cases work at once.`;

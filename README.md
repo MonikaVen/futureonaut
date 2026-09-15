@@ -61,6 +61,9 @@ Every uploaded or generated game gets `learnplay-sdk.js` injected. Games can cal
 - `LearnPlay.answer({ correct, taskId, points })`
 - `LearnPlay.taskStart(taskId)` / `LearnPlay.taskEnd(taskId)`
 - `LearnPlay.levelComplete(level, totalLevels)`
+- `LearnPlay.progress({ level, totalLevels })`
+- `LearnPlay.milestone({ id, label, level, totalLevels })`
+- `LearnPlay.stage(done, total, { complete, points, label })`
 - `LearnPlay.complete()`
 
 The play page listens via `postMessage` and posts events to `/api/sessions/{id}/events`.

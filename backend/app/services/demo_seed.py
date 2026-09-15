@@ -9,7 +9,7 @@ from uuid import uuid4
 from app.database import SessionLocal
 from app.models import Game, GameSource, GameView, PlaySession, User, UserRole
 from app.services.snapshot import ensure_game_preview, write_game_preview
-from app.services.storage import delete_game_files, game_dir, save_uploaded_html, write_sdk, write_template_game
+from app.services.storage import delete_game_files, ensure_sdk_injected, game_dir, save_uploaded_html, write_sdk, write_template_game
 from app.services.topics import ensure_topic_tag
 
 DEMO_QUIZ = {
@@ -104,6 +104,8 @@ def seed_demo_games() -> None:
         prune_games_to_manifest(db)
         normalize_game_topics(db)
         restore_missing_game_files(db)
+        refresh_seed_html(db)
+        refresh_template_html(db)
         refresh_game_previews(db)
     finally:
         db.close()
@@ -156,6 +158,41 @@ def restore_missing_game_files(db) -> None:
         if game.template_type:
             # cannot rebuild without content.json; skip
             continue
+
+
+def refresh_seed_html(db) -> None:
+    """Rewrite seed-pack HTML so existing game dirs pick up progress hooks."""
+    manifest_path = _seed_dir() / "manifest.json"
+    if not manifest_path.exists():
+        return
+    by_title = {
+        (item.get("title") or item["file"]): item
+        for item in json.loads(manifest_path.read_text(encoding="utf-8"))
+    }
+    for game in db.query(Game).all():
+        item = by_title.get(game.title)
+        if not item:
+            continue
+        src = _seed_dir() / item["file"]
+        if not src.exists():
+            continue
+        html = src.read_text(encoding="utf-8", errors="replace")
+        save_uploaded_html(game.id, html, game.entry_path or "index.html")
+
+
+def refresh_template_html(db) -> None:
+    """Rewrite template index.html so existing quiz/match games pick up progress hooks."""
+    template_root = Path(__file__).resolve().parents[2] / "templates"
+    for game in db.query(Game).all():
+        kind = (game.template_type or "").strip()
+        if not kind:
+            continue
+        src = template_root / kind / "index.html"
+        if not src.exists():
+            continue
+        dest = game_dir(game.id)
+        (dest / "index.html").write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
+        ensure_sdk_injected(dest, "index.html")
 
 
 def normalize_game_topics(db) -> None:

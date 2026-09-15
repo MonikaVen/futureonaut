@@ -25,6 +25,8 @@
     }
   }
 
+  var sessionClosed = false;
+
   var LearnPlay = {
     score: function (delta) {
       var value = Number(delta) || 0;
@@ -58,6 +60,10 @@
       return durationMs;
     },
     complete: function (extra) {
+      if (sessionClosed) {
+        return;
+      }
+      sessionClosed = true;
       emit("complete", Object.assign({ durationMs: Date.now() - sessionStart }, extra || {}));
     },
     levelComplete: function (level, totalLevels) {
@@ -93,6 +99,39 @@
         level: Number(opts.level) || 0,
         totalLevels: Number(opts.totalLevels || opts.total) || 0,
       });
+    },
+    /**
+     * Report a solved stage. Pass {complete:true} when the learner finishes the game.
+     * Does not mark the session solved unless complete is set (so a failed final
+     * attempt can still show Level 4/5 instead of Solved).
+     */
+    stage: function (done, total, extra) {
+      extra = extra || {};
+      var level = Number(done) || 0;
+      var tot = Number(total) || 0;
+      this.progress({
+        level: level,
+        totalLevels: tot,
+        percent: extra.percent,
+      });
+      if (extra.label || extra.id) {
+        this.milestone({
+          id: extra.id || String(extra.label || "stage"),
+          label: extra.label || extra.id || "",
+          level: level,
+          totalLevels: tot,
+        });
+      }
+      if (extra.points) {
+        this.score(Number(extra.points) || 0);
+      }
+      if (extra.complete) {
+        this.complete({
+          levelsCompleted: extra.levelsCompleted != null ? extra.levelsCompleted : level,
+          totalLevels: tot,
+          score: extra.score,
+        });
+      }
     },
   };
 

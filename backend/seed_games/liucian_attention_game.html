@@ -316,6 +316,7 @@ svg{display:block;width:100%;height:auto}
       ? '<span class="good">🏆 Correct! “salmon” and “wants” receive the strongest attention.</span>'
       : '<span class="bad">Try making “salmon” and “wants” the two strongest attention targets.</span>';
     document.getElementById('reward').classList.toggle('show',ok);
+    if(ok && window.LearnPlay) LearnPlay.stage(1,1,{complete:true,points:10,label:'Attention challenge',id:'attention'});
     renderAll();
   });
 

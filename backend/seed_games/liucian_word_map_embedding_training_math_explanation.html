@@ -662,6 +662,7 @@ input[type=range]{width:100%}
     document.getElementById('feedback').innerHTML=answer===n.w
       ? `<span class="good">⭐ Correct — ${n.w} is closest to ${selected}, distance ${n.d.toFixed(2)}.</span>`
       : `<span class="bad">Not quite. Compare distances on the map.</span>`;
+    if(answer===n.w && window.LearnPlay) LearnPlay.stage(1,2,{points:10,label:'Nearest word',id:'embed-nearest'});
   });
 
   const steps=['0 — Token ID','1 — Vector lookup','2 — Place vector','3 — Compare word','4 — Calculate distance','5 — Semantic neighborhood'];
@@ -687,6 +688,7 @@ input[type=range]{width:100%}
       ? `<span class="good">🏆 Great placement! Tuna is near salmon and food, and far from sleep.</span>`
       : `<span class="bad">Try moving tuna closer to salmon and food and farther from sleep.</span>`;
     document.getElementById('reward').classList.toggle('show',good);
+    if(good && window.LearnPlay) LearnPlay.stage(2,2,{complete:true,points:10,label:'Place tuna',id:'embed-place'});
   });
 
   buildTrainingFlow();

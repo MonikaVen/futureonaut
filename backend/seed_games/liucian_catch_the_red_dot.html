@@ -257,6 +257,10 @@
       document.getElementById('feedback').textContent=`🙀 Big miss! Notice how squaring makes the loss grow quickly.`;
     }
 
+    if(window.LearnPlay){
+      const passed=round===5 && avg<4;
+      LearnPlay.stage(passed?5:Math.min(round,4),5,{complete:passed,points:error<=0.5?10:0,label:'Round '+round,id:'red-dot-'+round});
+    }
     if(round===5){
       const c=document.getElementById('challengeFeedback');
       if(avg<4){

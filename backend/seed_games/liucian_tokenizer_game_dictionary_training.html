@@ -433,6 +433,7 @@ button.primary{background:var(--accent);color:#fff}
     if (correct === c.tokens.length) {
       feedback.innerHTML = `<span class="good">🏆 Correct! You identified all ${correct} token IDs in the new sentence.</span>`;
       document.getElementById('reward').classList.add('show');
+      if (window.LearnPlay) LearnPlay.stage(1, 1, {complete:true, points:10, label:'Token IDs', id:'tokenizer'});
     } else {
       feedback.innerHTML = `<span class="bad">${correct}/${c.tokens.length} correct. Check the vocabulary from step 5 and try again.</span>`;
       document.getElementById('reward').classList.remove('show');
