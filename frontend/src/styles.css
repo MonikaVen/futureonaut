@@ -314,26 +314,12 @@ button, input, select, textarea {
   inset: 0;
   z-index: 1;
   pointer-events: none;
-  background:
-    linear-gradient(180deg, var(--cover-top) 0%, transparent 22%),
-    linear-gradient(0deg, var(--cover-bottom) 0%, var(--cover-bottom-soft) 12%, transparent 48%),
-    linear-gradient(90deg, var(--cover-side) 0%, transparent 10%, transparent 90%, var(--cover-side) 100%);
+  background: linear-gradient(0deg, var(--cover-bottom) 0%, transparent 10%);
 }
 
 .platform-cover-dark img {
-  object-position: center top;
-  mask-image: linear-gradient(
-    to bottom,
-    black 0%,
-    black 72%,
-    transparent 100%
-  );
-  -webkit-mask-image: linear-gradient(
-    to bottom,
-    black 0%,
-    black 72%,
-    transparent 100%
-  );
+  object-fit: contain;
+  object-position: center center;
 }
 
 .auth-brand {
@@ -1734,10 +1720,6 @@ body.play-focus {
 
   .platform-cover {
     margin-bottom: 1.25rem;
-  }
-
-  .platform-cover-dark img {
-    aspect-ratio: 16 / 9;
   }
 
   .player-bar {
