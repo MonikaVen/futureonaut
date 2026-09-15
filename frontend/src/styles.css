@@ -175,8 +175,6 @@ button, input, select, textarea {
 }
 
 .topnav {
-  display: grid;
-  gap: 0.75rem;
   margin-bottom: 0.75rem;
   padding: 0.5rem 0 1rem;
   border-bottom: 1px solid var(--line);
@@ -186,8 +184,8 @@ button, input, select, textarea {
 .topnav-bar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 1rem;
+  flex-wrap: wrap;
 }
 
 .nav-toggle {
@@ -348,11 +346,28 @@ button, input, select, textarea {
 
 .nav-links {
   display: flex;
+  flex: 1;
+  min-width: 0;
   flex-wrap: wrap;
   gap: 0.25rem 1.1rem;
   align-items: center;
   color: var(--muted);
   font-size: 0.92rem;
+}
+
+.nav-pages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.1rem;
+  align-items: center;
+}
+
+.nav-end {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin-left: auto;
+  flex-shrink: 0;
 }
 
 .nav-links a:not(.btn) {
@@ -428,13 +443,14 @@ button, input, select, textarea {
 }
 
 .auth-lang-select {
-  justify-self: start;
+  justify-self: end;
 }
 
 .auth-toolbar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
   gap: 0.75rem 1rem;
 }
 
@@ -1674,6 +1690,7 @@ body.play-focus {
 @media (max-width: 768px) {
   .nav-toggle {
     display: inline-flex;
+    margin-left: auto;
   }
 
   .nav-links {
@@ -1681,6 +1698,7 @@ body.play-focus {
     flex-direction: column;
     align-items: stretch;
     gap: 0.15rem;
+    flex: 1 1 100%;
     width: 100%;
     padding: 0.75rem;
     border: 1px solid var(--line);
@@ -1691,6 +1709,20 @@ body.play-focus {
 
   .nav-links.open {
     display: flex;
+  }
+
+  .nav-pages {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.15rem;
+  }
+
+  .nav-end {
+    margin-left: 0;
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
   }
 
   .nav-links a:not(.btn) {
