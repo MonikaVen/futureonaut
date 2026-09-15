@@ -22,6 +22,8 @@ services:
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production-learnplay-secret}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin12345}
+      TEACHER_EMAIL: ${TEACHER_EMAIL:-teacher@example.com}
+      TEACHER_PASSWORD: ${TEACHER_PASSWORD:-teacher12345}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}

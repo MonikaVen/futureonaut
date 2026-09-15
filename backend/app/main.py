@@ -10,7 +10,7 @@ from app.database import Base, engine
 from app.routers import auth, classrooms, creator, games, sessions, social
 from app.routers.dashboard import admin_router, router as dashboard_router
 from app.routers.share_page import router as share_page_router
-from app.seed import seed_admin
+from app.seed import seed_admin, seed_teacher
 from app.services.demo_seed import seed_demo_games
 
 
@@ -97,6 +97,7 @@ async def lifespan(_: FastAPI):
     Base.metadata.create_all(bind=engine)
     ensure_schema()
     seed_admin()
+    seed_teacher()
     seed_demo_games()
     yield
 

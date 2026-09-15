@@ -1,5 +1,5 @@
 from app.database import SessionLocal
-from app.models import User, UserRole
+from app.models import Classroom, User, UserRole
 from app.auth import hash_password
 from app.config import get_settings
 
@@ -29,5 +29,59 @@ def seed_admin() -> None:
         )
         db.add(admin)
         db.commit()
+    finally:
+        db.close()
+
+
+DEMO_TEACHER_CLASS = "Example class"
+DEMO_TEACHER_JOIN_CODE = "TEACH01"
+
+
+def seed_teacher() -> None:
+    """Create a demo teacher login and one classroom if they do not exist."""
+    settings = get_settings()
+    if not settings.teacher_email or not settings.teacher_password:
+        return
+    db = SessionLocal()
+    try:
+        teacher = db.query(User).filter(User.email == settings.teacher_email).first()
+        password_hash = hash_password(settings.teacher_password)
+        if teacher is None:
+            teacher = User(
+                email=settings.teacher_email,
+                password_hash=password_hash,
+                display_name="Example Teacher",
+                role=UserRole.teacher,
+            )
+            db.add(teacher)
+            db.commit()
+            db.refresh(teacher)
+        else:
+            changed = False
+            if teacher.role != UserRole.teacher:
+                teacher.role = UserRole.teacher
+                changed = True
+            if teacher.password_hash != password_hash:
+                teacher.password_hash = password_hash
+                changed = True
+            if not teacher.display_name:
+                teacher.display_name = "Example Teacher"
+                changed = True
+            if changed:
+                db.commit()
+
+        has_class = db.query(Classroom).filter(Classroom.teacher_id == teacher.id).first()
+        if has_class is None:
+            taken = db.query(Classroom).filter(Classroom.join_code == DEMO_TEACHER_JOIN_CODE).first()
+            join_code = DEMO_TEACHER_JOIN_CODE if taken is None else "TEACH02"
+            if db.query(Classroom).filter(Classroom.join_code == join_code).first() is None:
+                db.add(
+                    Classroom(
+                        name=DEMO_TEACHER_CLASS,
+                        join_code=join_code,
+                        teacher_id=teacher.id,
+                    )
+                )
+                db.commit()
     finally:
         db.close()

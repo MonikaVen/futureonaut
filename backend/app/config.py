@@ -13,6 +13,8 @@ class Settings(BaseSettings):
     refresh_token_expire_days: int = 14
     admin_email: str = "admin@example.com"
     admin_password: str = "admin12345"
+    teacher_email: str = "teacher@example.com"
+    teacher_password: str = "teacher12345"
     openai_api_key: str = ""
     openai_base_url: str = "https://api.openai.com/v1"
     openai_model: str = "gpt-4o-mini"
