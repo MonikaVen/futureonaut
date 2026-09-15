@@ -3,6 +3,7 @@ import { NavLink, Outlet, Link, useLocation } from "react-router-dom";
 import { useAuth } from "./auth";
 import { BrandLogo } from "./BrandLogo";
 import { LanguageSelect, useLanguage } from "./language";
+import { ThemeToggle } from "./theme";
 
 export function Shell() {
   const { user, logout, loading } = useAuth();
@@ -61,6 +62,7 @@ export function Shell() {
           )}
           {user?.role === "admin" && <NavLink to="/admin">{t("admin")}</NavLink>}
           <LanguageSelect />
+          <ThemeToggle />
           {user ? (
             <div className="nav-user">
               <span className="nav-user-meta">

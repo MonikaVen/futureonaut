@@ -89,6 +89,9 @@ const COPY: Record<LangCode, Record<string, string>> = {
     coverAlt: "Futureonaut — Grow with AI, ready for a changing world",
     openMenu: "Open menu",
     closeMenu: "Close menu",
+    theme: "Appearance",
+    lightMode: "Light",
+    darkMode: "Dark",
   },
   lt: {
     games: "Žaidimai",
@@ -156,6 +159,9 @@ const COPY: Record<LangCode, Record<string, string>> = {
     coverAlt: "Futureonaut — Augk su DI, pasiruošęs kintančiam pasauliui",
     openMenu: "Atidaryti meniu",
     closeMenu: "Uždaryti meniu",
+    theme: "Išvaizda",
+    lightMode: "Šviesi",
+    darkMode: "Tamsi",
   },
   lv: {
     games: "Spēles",
@@ -223,6 +229,9 @@ const COPY: Record<LangCode, Record<string, string>> = {
     coverAlt: "Futureonaut — Aug ar MI, gatavs mainīgajai pasaulei",
     openMenu: "Atvērt izvēlni",
     closeMenu: "Aizvērt izvēlni",
+    theme: "Izskats",
+    lightMode: "Gaišs",
+    darkMode: "Tumšs",
   },
   et: {
     games: "Mängud",
@@ -290,6 +299,9 @@ const COPY: Record<LangCode, Record<string, string>> = {
     coverAlt: "Futureonaut — Kasva tehisintellektiga, valmis muutuvaks maailmaks",
     openMenu: "Ava menüü",
     closeMenu: "Sulge menüü",
+    theme: "Välimus",
+    lightMode: "Hele",
+    darkMode: "Tume",
   },
   fi: {
     games: "Pelit",
@@ -357,6 +369,9 @@ const COPY: Record<LangCode, Record<string, string>> = {
     coverAlt: "Futureonaut — Kasva tekoälyn kanssa, valmiina muuttuvaan maailmaan",
     openMenu: "Avaa valikko",
     closeMenu: "Sulje valikko",
+    theme: "Ulkoasu",
+    lightMode: "Vaalea",
+    darkMode: "Tumma",
   },
   sv: {
     games: "Spel",
@@ -424,6 +439,9 @@ const COPY: Record<LangCode, Record<string, string>> = {
     coverAlt: "Futureonaut — Väx med AI, redo för en föränderlig värld",
     openMenu: "Öppna meny",
     closeMenu: "Stäng meny",
+    theme: "Utseende",
+    lightMode: "Ljust",
+    darkMode: "Mörkt",
   },
   no: {
     games: "Spill",
@@ -491,6 +509,9 @@ const COPY: Record<LangCode, Record<string, string>> = {
     coverAlt: "Futureonaut — Voks med AI, klar for en verden i endring",
     openMenu: "Åpne meny",
     closeMenu: "Lukk meny",
+    theme: "Utseende",
+    lightMode: "Lyst",
+    darkMode: "Mørkt",
   },
 };
 

@@ -3,6 +3,7 @@ import { Link, Navigate, useNavigate } from "react-router-dom";
 import { BrandLogo } from "../BrandLogo";
 import { useAuth } from "../auth";
 import { LanguageSelect, useLanguage } from "../language";
+import { ThemeToggle } from "../theme";
 
 export function LoginPage() {
   const { user, login, loading } = useAuth();
@@ -35,7 +36,10 @@ export function LoginPage() {
         <BrandLogo className="auth-brand-logo" />
         <p className="lede">{t("loginLede")}</p>
       </div>
-      <LanguageSelect className="auth-lang-select" />
+      <div className="auth-toolbar">
+        <LanguageSelect className="auth-lang-select" />
+        <ThemeToggle />
+      </div>
       <div className="panel">
         <form className="form" onSubmit={onSubmit}>
           <label>
@@ -97,7 +101,10 @@ export function RegisterPage() {
         <BrandLogo className="auth-brand-logo" />
         <p className="lede">{t("registerLede")}</p>
       </div>
-      <LanguageSelect className="auth-lang-select" />
+      <div className="auth-toolbar">
+        <LanguageSelect className="auth-lang-select" />
+        <ThemeToggle />
+      </div>
       <div className="panel">
         <form className="form" onSubmit={onSubmit}>
           <label>
