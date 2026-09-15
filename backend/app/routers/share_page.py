@@ -1,13 +1,14 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import HTMLResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, Response
 from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
 from app.models import Game, PlaySession
 from app.public_url import public_base_url
 from app.services.og import og_description, og_image_svg, score_card_svg, share_html
+from app.services.snapshot import ensure_game_preview
 
 router = APIRouter(tags=["share"])
 
@@ -20,7 +21,7 @@ def share_page(game_id: UUID, request: Request, db: Session = Depends(get_db)) -
     base = public_base_url(request)
     share_url = f"{base}/share/{game.id}"
     play_url = f"{base}/play/{game.id}"
-    image_url = f"{base}/share/{game.id}/card.svg"
+    image_url = f"{base}/share/{game.id}/card.png"
     html = share_html(
         title=game.title,
         description=og_description(game),
@@ -29,6 +30,25 @@ def share_page(game_id: UUID, request: Request, db: Session = Depends(get_db)) -
         image_url=image_url,
     )
     return HTMLResponse(content=html)
+
+
+@router.get("/share/{game_id}/card.png")
+def share_card_png(game_id: UUID, db: Session = Depends(get_db)) -> FileResponse:
+    game = db.get(Game, game_id)
+    if game is None:
+        raise HTTPException(status_code=404, detail="Game not found")
+    try:
+        path = ensure_game_preview(game)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Preview not found") from exc
+    return FileResponse(
+        path,
+        media_type="image/png",
+        headers={
+            "Cache-Control": "public, max-age=3600",
+            "Content-Disposition": 'inline; filename="card.png"',
+        },
+    )
 
 
 @router.get("/share/{game_id}/card.svg")

@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import { useState, type CSSProperties } from "react";
 import { Link } from "react-router-dom";
 import { PlayIcon } from "./Icons";
 import { posterKind } from "./gameMeta";
@@ -39,29 +39,48 @@ export function GamePreview({
   const lede = description?.trim();
   const clampedPct =
     typeof progressPct === "number" ? Math.max(0, Math.min(100, progressPct)) : null;
+  const [photoFailed, setPhotoFailed] = useState(false);
 
   return (
     <Link
-      className={`game-preview topic-${kind}`}
+      className={`game-preview topic-${kind}${photoFailed ? "" : " has-photo"}`}
       to={`/play/${gameId}`}
       aria-label={`${t("play")} ${title}`}
       style={orbStyle(gameId)}
     >
+      {!photoFailed ? (
+        <img
+          className="game-preview-photo"
+          src={`/share/${gameId}/card.png`}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          onError={() => setPhotoFailed(true)}
+        />
+      ) : null}
       <span className="game-preview-top">
-        <span className="game-preview-brand">Futureonaut</span>
+        {photoFailed ? <span className="game-preview-brand">Futureonaut</span> : <span />}
         <span className="game-preview-play" aria-hidden>
           <PlayIcon size={14} />
         </span>
       </span>
-      <h3 className="game-preview-title">{title}</h3>
-      {lede ? <p className="game-preview-lede">{lede}</p> : null}
-      <span className="game-preview-meta">
-        <span className="game-preview-chip">{topic}</span>
-        <span className="game-preview-chip level">
-          {t("level")} {difficulty}
+      {photoFailed ? (
+        <>
+          <h3 className="game-preview-title">{title}</h3>
+          {lede ? <p className="game-preview-lede">{lede}</p> : null}
+          <span className="game-preview-meta">
+            <span className="game-preview-chip">{topic}</span>
+            <span className="game-preview-chip level">
+              {t("level")} {difficulty}
+            </span>
+            {progressLabel ? <span className="game-preview-chip progress">{progressLabel}</span> : null}
+          </span>
+        </>
+      ) : progressLabel ? (
+        <span className="game-preview-meta">
+          <span className="game-preview-chip progress">{progressLabel}</span>
         </span>
-        {progressLabel ? <span className="game-preview-chip progress">{progressLabel}</span> : null}
-      </span>
+      ) : null}
       {clampedPct !== null ? (
         <span className="game-preview-bar" aria-hidden>
           <span style={{ width: `${clampedPct}%` }} />

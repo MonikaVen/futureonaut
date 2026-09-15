@@ -86,12 +86,15 @@ def share_html(
   <meta property="og:description" content="{safe_desc}" />
   <meta property="og:url" content="{safe_share}" />
   <meta property="og:image" content="{safe_image}" />
+  <meta property="og:image:type" content="image/png" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="{safe_title}" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="{safe_title}" />
   <meta name="twitter:description" content="{safe_desc}" />
   <meta name="twitter:image" content="{safe_image}" />
+  <meta name="twitter:image:alt" content="{safe_title}" />
   <meta http-equiv="refresh" content="0;url={safe_play}" />
 </head>
 <body style="font-family:system-ui,sans-serif;background:#050810;color:#e8f4ff;padding:2rem;">

@@ -8,6 +8,7 @@ from uuid import uuid4
 
 from app.database import SessionLocal
 from app.models import Game, GameSource, GameView, PlaySession, User, UserRole
+from app.services.snapshot import ensure_game_preview, write_game_preview
 from app.services.storage import delete_game_files, game_dir, save_uploaded_html, write_template_game
 from app.services.topics import ensure_topic_tag
 
@@ -103,6 +104,7 @@ def seed_demo_games() -> None:
         prune_games_to_manifest(db)
         normalize_game_topics(db)
         restore_missing_game_files(db)
+        refresh_game_previews(db)
     finally:
         db.close()
 
@@ -149,6 +151,7 @@ def restore_missing_game_files(db) -> None:
             if src.exists():
                 html = src.read_text(encoding="utf-8", errors="replace")
                 save_uploaded_html(game.id, html, "index.html")
+                write_game_preview(game)
                 continue
         if game.template_type:
             # cannot rebuild without content.json; skip
@@ -204,3 +207,11 @@ def seed_html_pack(db, owner_id) -> None:
         added += 1
     if added:
         db.commit()
+
+
+def refresh_game_previews(db) -> None:
+    for game in db.query(Game).all():
+        try:
+            ensure_game_preview(game)
+        except FileNotFoundError:
+            continue

@@ -79,10 +79,11 @@ class ShareHtmlTests(unittest.TestCase):
             description="Play now",
             share_url="https://app.example/share/1",
             play_url="https://app.example/play/1</script><script>alert(1)",
-            image_url="https://app.example/card.svg",
+            image_url="https://app.example/card.png",
         )
         self.assertNotIn("<script>", html)
         self.assertIn("https://app.example/play/1", html)
+        self.assertIn('property="og:image:type" content="image/png"', html)
 
 
 class EventLimitTests(unittest.TestCase):

@@ -26,6 +26,7 @@ from app.schemas import (
 )
 from app.services.generate import generate_ai_content, validate_template_content
 from app.services.recommendations import game_to_out
+from app.services.snapshot import write_game_preview
 from app.services.social import enrich_games
 from app.services.storage import (
     delete_game_files,
@@ -101,6 +102,7 @@ async def upload_game(
     db.add(game)
     db.commit()
     db.refresh(game)
+    write_game_preview(game)
     return game_to_out(game)
 
 
@@ -135,6 +137,7 @@ def create_from_template(
     db.add(game)
     db.commit()
     db.refresh(game)
+    write_game_preview(game)
     return game_to_out(game)
 
 
@@ -171,6 +174,7 @@ async def generate_game(
     db.add(game)
     db.commit()
     db.refresh(game)
+    write_game_preview(game)
     return game_to_out(game)
 
 
@@ -230,6 +234,7 @@ def update_game(
         setattr(game, key, value)
     db.commit()
     db.refresh(game)
+    write_game_preview(game)
     return game_to_out(game)
 
 
