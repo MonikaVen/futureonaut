@@ -2,6 +2,7 @@ import {
   createContext,
   createElement,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -42,6 +43,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     applyTheme(initial);
     return initial;
   });
+
+  useEffect(() => {
+    applyTheme(theme);
+  }, [theme]);
 
   const setTheme = (next: Theme) => {
     localStorage.setItem(THEME_STORAGE_KEY, next);
