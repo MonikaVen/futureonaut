@@ -213,8 +213,18 @@ class GameDraftOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class DraftChatRequest(BaseModel):
+    message: str = Field(min_length=2, max_length=8000)
+    provider: str = Field(default="openai", max_length=16)
+    api_key: str = Field(min_length=12, max_length=256)
+    model: str | None = Field(default=None, max_length=80)
+    draft_id: uuid.UUID | None = None
+    language: str = Field(default="en", max_length=8)
+    assign_classroom_id: uuid.UUID | None = None
+
+
 class DraftReviseRequest(BaseModel):
-    message: str = Field(min_length=2, max_length=4000)
+    message: str = Field(min_length=2, max_length=8000)
     provider: str = Field(default="openai", max_length=16)
     api_key: str = Field(min_length=12, max_length=256)
     model: str | None = Field(default=None, max_length=80)

@@ -7,8 +7,16 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 from app.models import GameDraft, GameSource, UserRole
-from app.routers.games import _draft_to_out, generate_html_game_endpoint, publish_draft
-from app.schemas import DraftPublishRequest, GameDraftOut, HtmlGenerateRequest
+from app.routers.games import (
+    GAME_FRAME_CSP,
+    GAME_IFRAME_SANDBOX,
+    _draft_to_out,
+    chat_draft,
+    game_file_headers,
+    generate_html_game_endpoint,
+    publish_draft,
+)
+from app.schemas import DraftChatRequest, DraftPublishRequest, GameDraftOut, HtmlGenerateRequest
 
 
 class DraftEndpointTests(unittest.IsolatedAsyncioTestCase):
@@ -91,6 +99,44 @@ class DraftEndpointTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(draft.published_game_id, created["game"].id)
         self.assertEqual(out.title, "Neurons")
 
+    async def test_chat_creates_draft_from_message(self) -> None:
+        html = "<!DOCTYPE html><html><title>Gravity Lab</title><body>ok</body></html>"
+        db = MagicMock()
+        captured: dict = {}
+
+        def add(obj):
+            captured["obj"] = obj
+            if isinstance(obj, GameDraft):
+                obj.id = uuid4()
+                obj.created_at = datetime.now(timezone.utc)
+                obj.updated_at = obj.created_at
+
+        db.add.side_effect = add
+        user = SimpleNamespace(
+            id=uuid4(),
+            role=UserRole.teacher,
+            llm_provider=None,
+            llm_api_key_hash=None,
+            llm_api_key_hint=None,
+        )
+        body = DraftChatRequest(
+            message="Make 4 levels about gravity",
+            api_key="sk-test-1234567890",
+            provider="openai",
+        )
+        with (
+            patch(
+                "app.routers.games.generate_html_from_chat",
+                AsyncMock(return_value=(html, [], "Gravity Lab", 4)),
+            ),
+            patch("app.routers.games._write_draft_preview"),
+        ):
+            out = await chat_draft(body, db, user)
+        self.assertIsInstance(captured["obj"], GameDraft)
+        self.assertEqual(captured["obj"].messages[0]["role"], "user")
+        self.assertEqual(out.title, "Gravity Lab")
+        self.assertNotIn("html", out.model_dump())
+
 
 class DraftOutTests(unittest.TestCase):
     def test_draft_payload_omits_html(self) -> None:
@@ -117,6 +163,32 @@ class DraftOutTests(unittest.TestCase):
         dumped = out.model_dump()
         self.assertNotIn("html", dumped)
         self.assertEqual(out.messages[0].content, "Draft ready.")
+
+
+class FrameIsolationTests(unittest.TestCase):
+    def test_game_files_send_restrictive_csp(self) -> None:
+        headers = game_file_headers()
+        self.assertIn("connect-src 'none'", headers["Content-Security-Policy"])
+        self.assertEqual(headers["Content-Security-Policy"], GAME_FRAME_CSP)
+        self.assertEqual(GAME_IFRAME_SANDBOX, "allow-scripts allow-forms")
+        self.assertNotIn("allow-same-origin", GAME_IFRAME_SANDBOX)
+
+    def test_play_and_creator_iframes_are_opaque(self) -> None:
+        from pathlib import Path
+
+        root = Path(__file__).resolve().parents[2]
+        play = (root / "frontend/src/pages/Play.tsx").read_text(encoding="utf-8")
+        frame = (root / "frontend/src/GameFrame.tsx").read_text(encoding="utf-8")
+        creator = (root / "frontend/src/pages/Creator.tsx").read_text(encoding="utf-8")
+        studio = (root / "frontend/src/CreatorDraftStudio.tsx").read_text(encoding="utf-8")
+        self.assertIn("GameFrame", play)
+        self.assertNotIn("allow-same-origin", play)
+        self.assertNotIn("allow-same-origin", frame)
+        self.assertIn("allow-scripts allow-forms", frame)
+        self.assertIn("connect-src 'none'", frame)
+        self.assertNotIn("Upload game", creator)
+        self.assertIn("/api/games/drafts/chat", creator)
+        self.assertIn("GameFrame", studio)
 
 
 if __name__ == "__main__":

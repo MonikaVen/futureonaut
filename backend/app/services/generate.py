@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from typing import Any
 
 from fastapi import HTTPException, status
@@ -249,3 +250,46 @@ async def revise_html_game(
     )
     next_html = assert_html_safe(extract_html(raw))
     return next_html, html_contract_warnings(next_html, level_count)
+
+
+def infer_level_count(text: str) -> int:
+    match = re.search(r"\b([2-9]|1[0-2])\s*-?\s*(?:levels?|lyg)", text, re.I)
+    if match:
+        return int(match.group(1))
+    return 4
+
+
+def infer_title_from_html(html: str, fallback: str) -> str:
+    title = re.search(r"<title[^>]*>([^<]+)</title>", html, flags=re.I)
+    if title and title.group(1).strip():
+        return title.group(1).strip()[:200]
+    heading = re.search(r"<h1[^>]*>([^<]+)</h1>", html, flags=re.I)
+    if heading and heading.group(1).strip():
+        return heading.group(1).strip()[:200]
+    line = (fallback or "").strip().splitlines()[0].strip()
+    return (line or "Class game")[:80]
+
+
+async def generate_html_from_chat(
+    *,
+    message: str,
+    language: str,
+    api_key: str,
+    provider: str,
+    model: str | None = None,
+) -> tuple[str, list[str], str, int]:
+    level_count = infer_level_count(message)
+    seed_title = infer_title_from_html("", message)
+    html, warnings = await generate_html_game(
+        title=seed_title,
+        topic=seed_title,
+        difficulty=2,
+        level_count=level_count,
+        levels_brief=message,
+        language=language,
+        api_key=api_key,
+        provider=provider,
+        model=model,
+    )
+    title = infer_title_from_html(html, seed_title)
+    return html, warnings, title, level_count

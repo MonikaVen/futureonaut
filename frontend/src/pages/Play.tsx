@@ -8,6 +8,7 @@ import { ScoreCard } from "../ScoreCard";
 import { UI_LANGS, useLanguage, type LangCode } from "../language";
 import { useTheme, type Theme } from "../theme";
 import { getVisitorId } from "../visitor";
+import { GameFrame } from "../GameFrame";
 
 type SdkMessage = {
   source?: string;
@@ -251,15 +252,13 @@ export function PlayPage() {
         />
         <GameShare gameId={game.id} title={game.title} description={game.description} />
       </div>
-      <iframe
+      <GameFrame
         ref={frameRef}
         className="frame"
         title={game.title}
         src={src}
         onLoad={() => postPrefs()}
         style={frameHeight ? { height: frameHeight, minHeight: frameHeight } : undefined}
-        sandbox="allow-scripts allow-forms"
-        referrerPolicy="no-referrer"
       />
       {completed && session && (
         <div className="player-after">

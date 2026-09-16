@@ -2019,10 +2019,29 @@ body.play-focus {
   margin: 0 0 0.35rem;
 }
 
-.draft-frame {
+.draft-frame,
+.draft-frame-empty {
   min-height: 28rem;
   height: min(70dvh, 40rem);
   flex: none;
+}
+
+.draft-frame-empty {
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+  color: var(--muted);
+  text-align: center;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+  background: var(--frame-bg);
+}
+
+.creator-llm-bar {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: 0.85rem;
+  max-width: 100%;
 }
 
 .draft-warnings {
@@ -2093,7 +2112,8 @@ body.play-focus {
     grid-template-columns: 1fr;
   }
 
-  .draft-frame {
+  .draft-frame,
+  .draft-frame-empty {
     min-height: 22rem;
     height: 55dvh;
   }

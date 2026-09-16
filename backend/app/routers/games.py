@@ -22,6 +22,7 @@ from app.models import (
 )
 from app.schemas import (
     AIGenerateRequest,
+    DraftChatRequest,
     DraftPublishRequest,
     DraftReviseRequest,
     GameDraftOut,
@@ -32,6 +33,7 @@ from app.schemas import (
 )
 from app.services.generate import (
     generate_ai_content,
+    generate_html_from_chat,
     generate_html_game,
     revise_html_game,
     validate_template_content,
@@ -51,6 +53,29 @@ from app.services.storage import (
     write_template_game,
 )
 from app.services.topics import ensure_topic_tag
+
+GAME_FRAME_CSP = (
+    "default-src 'self' 'unsafe-inline'; "
+    "connect-src 'none'; "
+    "object-src 'none'; "
+    "frame-src 'none'; "
+    "base-uri 'none'"
+)
+GAME_IFRAME_SANDBOX = "allow-scripts allow-forms"
+
+
+def game_file_headers(*, store: bool = False) -> dict[str, str]:
+    return {
+        # Opaque sandboxed play iframes fetch sibling assets with Origin: null.
+        "Access-Control-Allow-Origin": "*",
+        "Cross-Origin-Resource-Policy": "cross-origin",
+        "X-Content-Type-Options": "nosniff",
+        "Content-Security-Policy": GAME_FRAME_CSP,
+        "Referrer-Policy": "no-referrer",
+        "X-Frame-Options": "SAMEORIGIN",
+        "Cache-Control": "public, max-age=60" if store else "no-store",
+    }
+
 
 router = APIRouter(prefix="/games", tags=["games"])
 
@@ -340,6 +365,87 @@ def list_drafts(
     return [_draft_to_out(d) for d in drafts]
 
 
+@router.post("/drafts/chat", response_model=GameDraftOut)
+async def chat_draft(
+    body: DraftChatRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_game_author),
+) -> GameDraftOut:
+    provider = normalize_provider(body.provider)
+    api_key = require_api_key(body.api_key)
+    store_llm_key(user, provider, api_key)
+    db.add(user)
+    note = body.message.strip()
+    if body.draft_id is not None:
+        draft = _owned_draft(db, user, body.draft_id)
+        if draft.published_game_id is not None:
+            raise HTTPException(status_code=400, detail="This draft is already published")
+        html, warnings = await revise_html_game(
+            html=draft.html,
+            message=note,
+            level_count=draft.level_count,
+            title=draft.title,
+            api_key=api_key,
+            provider=provider,
+            model=body.model or draft.model,
+            history=_draft_messages(draft.messages),
+        )
+        messages = _draft_messages(draft.messages)
+        messages.append({"role": "user", "content": note})
+        messages.append({"role": "assistant", "content": "Updated the game from your note."})
+        draft.html = html
+        draft.warnings = warnings
+        draft.messages = messages[-24:]
+        draft.provider = provider
+        if body.model:
+            draft.model = body.model
+        draft.updated_at = datetime.now(timezone.utc)
+        db.commit()
+        db.refresh(draft)
+        _write_draft_preview(draft)
+        return _draft_to_out(draft)
+
+    html, warnings, title, level_count = await generate_html_from_chat(
+        message=note,
+        language=body.language or "en",
+        api_key=api_key,
+        provider=provider,
+        model=body.model,
+    )
+    draft = GameDraft(
+        title=title[:200],
+        topic=title[:200],
+        description=note[:8000],
+        owner_id=user.id,
+        difficulty=2,
+        level_count=level_count,
+        language=(body.language or "en")[:16],
+        provider=provider,
+        model=(body.model or None),
+        html=html,
+        warnings=warnings,
+        messages=[
+            {"role": "user", "content": note},
+            {
+                "role": "assistant",
+                "content": "Here's a playable draft. Chat to change it, then deploy when it's ready.",
+            },
+        ],
+        assign_classroom_id=body.assign_classroom_id,
+    )
+    db.add(draft)
+    db.commit()
+    db.refresh(draft)
+    try:
+        _write_draft_preview(draft)
+    except Exception as exc:
+        delete_draft_files(draft.id)
+        db.delete(draft)
+        db.commit()
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return _draft_to_out(draft)
+
+
 @router.get("/drafts/{draft_id}", response_model=GameDraftOut)
 def get_draft(
     draft_id: UUID,
@@ -460,12 +566,7 @@ def serve_draft_file(
         raise HTTPException(status_code=404, detail="File not found")
     return FileResponse(
         target,
-        headers={
-            "Access-Control-Allow-Origin": "*",
-            "Cross-Origin-Resource-Policy": "cross-origin",
-            "X-Content-Type-Options": "nosniff",
-            "Cache-Control": "no-store",
-        },
+        headers=game_file_headers(),
     )
 
 
@@ -571,10 +672,5 @@ def serve_game_file(
         raise HTTPException(status_code=404, detail="File not found")
     return FileResponse(
         target,
-        headers={
-            # Opaque sandboxed play iframes fetch sibling assets with Origin: null.
-            "Access-Control-Allow-Origin": "*",
-            "Cross-Origin-Resource-Policy": "cross-origin",
-            "X-Content-Type-Options": "nosniff",
-        },
+        headers=game_file_headers(store=True),
     )

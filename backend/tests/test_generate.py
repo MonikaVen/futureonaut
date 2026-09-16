@@ -9,7 +9,14 @@ from fastapi import HTTPException
 
 from app.auth import can_author_games
 from app.models import UserRole
-from app.services.generate import html_game_prompt, html_revise_prompt, generate_html_game, revise_html_game
+from app.services.generate import (
+    html_game_prompt,
+    html_revise_prompt,
+    generate_html_game,
+    infer_level_count,
+    infer_title_from_html,
+    revise_html_game,
+)
 from app.services.llm import (
     STAGE_INSTRUCTIONS,
     api_key_hint,
@@ -160,6 +167,16 @@ class HtmlDraftLoopTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertIn("LearnPlay.stage", system)
         self.assertIn("nudge", user)
+
+
+class ChatPromptTests(unittest.TestCase):
+    def test_infers_level_count_and_title(self) -> None:
+        self.assertEqual(infer_level_count("Make 5 levels about gravity"), 5)
+        self.assertEqual(infer_level_count("a short quiz"), 4)
+        self.assertEqual(
+            infer_title_from_html("<html><title> Gravity Lab </title></html>", "fallback"),
+            "Gravity Lab",
+        )
 
 
 class ChatCompleteTests(unittest.IsolatedAsyncioTestCase):
