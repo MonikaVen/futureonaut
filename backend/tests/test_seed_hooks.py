@@ -131,14 +131,18 @@ console.log(JSON.stringify(events.filter(e => e.type === 'resize').map(e => e.pa
 
         html = "<html><head><title>G</title></head><body></body></html>"
         out = inject_sdk_into_html(html)
-        self.assertIn("learnplay-i18n.js", out)
-        self.assertIn("learnplay-sdk.js", out)
-        self.assertLess(out.index("learnplay-i18n.js"), out.index("learnplay-sdk.js"))
+        self.assertIn("LEARNPLAY_I18N", out)
+        self.assertIn('source: "learnplay-sdk"', out)
+        self.assertNotIn('src="./learnplay-sdk.js"', out)
+        self.assertLess(out.index("LEARNPLAY_I18N"), out.index('source: "learnplay-sdk"'))
 
         already = inject_sdk_into_html('<head><script src="./learnplay-sdk.js"></script></head>')
-        self.assertIn("learnplay-i18n.js", already)
-        self.assertLess(already.index("learnplay-i18n.js"), already.index("learnplay-sdk.js"))
-        self.assertEqual(already.count("learnplay-sdk.js"), 1)
+        self.assertIn("LEARNPLAY_I18N", already)
+        self.assertIn('source: "learnplay-sdk"', already)
+        self.assertNotIn('src="./learnplay-sdk.js"', already)
+        self.assertEqual(already.count('source: "learnplay-sdk"'), 1)
+        again = inject_sdk_into_html(already)
+        self.assertEqual(again.count('source: "learnplay-sdk"'), 1)
 
     def test_sdk_translates_and_applies_prefs(self) -> None:
         i18n_path = SDK_PATH.parent / "learnplay-i18n.js"

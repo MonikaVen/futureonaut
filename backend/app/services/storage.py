@@ -33,19 +33,25 @@ def game_dir(game_id: UUID) -> Path:
     return path
 
 
+def _inline_script(path: Path) -> str:
+    source = path.read_text(encoding="utf-8")
+    source = source.replace("</", "<\\/")
+    return f"<script>\n{source}\n</script>"
+
+
 def inject_sdk_into_html(html: str) -> str:
-    if I18N_MARKER not in html and SDK_MARKER in html:
-        html = html.replace(
-            f'<script src="./{SDK_MARKER}"></script>',
-            f'<script src="./{I18N_MARKER}"></script>\n  <script src="./{SDK_MARKER}"></script>',
-            1,
-        )
-        return html
+    html = re.sub(
+        r"<script[^>]+src=['\"][^'\"]*learnplay-(?:i18n|sdk)\.js['\"][^>]*>\s*</script>\s*",
+        "",
+        html,
+        flags=re.IGNORECASE,
+    )
     tags = []
-    if I18N_MARKER not in html:
-        tags.append(f'<script src="./{I18N_MARKER}"></script>')
-    if SDK_MARKER not in html:
-        tags.append(f'<script src="./{SDK_MARKER}"></script>')
+    i18n = i18n_source_path()
+    if i18n.exists() and "LEARNPLAY_I18N" not in html:
+        tags.append(_inline_script(i18n))
+    if 'source: "learnplay-sdk"' not in html:
+        tags.append(_inline_script(sdk_source_path()))
     if not tags:
         return html
     block = "  " + "\n  ".join(tags) + "\n"

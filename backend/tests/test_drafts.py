@@ -172,12 +172,14 @@ class DraftOutTests(unittest.TestCase):
 class FrameIsolationTests(unittest.TestCase):
     def test_game_files_send_restrictive_csp(self) -> None:
         headers = game_file_headers()
-        self.assertIn("connect-src 'none'", headers["Content-Security-Policy"])
-        self.assertNotIn("sandbox", headers["Content-Security-Policy"])
-        self.assertNotIn("frame-ancestors", headers["Content-Security-Policy"])
+        csp = headers["Content-Security-Policy"]
+        self.assertIn("connect-src 'none'", csp)
+        self.assertIn("sandbox allow-scripts allow-forms", csp)
+        self.assertIn("form-action 'none'", csp)
+        self.assertNotIn("frame-ancestors", csp)
         self.assertNotIn("X-Frame-Options", headers)
-        self.assertNotIn("allow-same-origin", headers["Content-Security-Policy"])
-        self.assertEqual(headers["Content-Security-Policy"], GAME_FRAME_CSP)
+        self.assertNotIn("allow-same-origin", csp)
+        self.assertEqual(csp, GAME_FRAME_CSP)
         self.assertEqual(GAME_IFRAME_SANDBOX, "allow-scripts allow-forms")
         self.assertNotIn("allow-same-origin", GAME_IFRAME_SANDBOX)
 
@@ -194,9 +196,11 @@ class FrameIsolationTests(unittest.TestCase):
         self.assertNotIn("allow-same-origin", frame)
         self.assertIn("allow-scripts allow-forms", frame)
         self.assertIn("connect-src 'none'", frame)
+        self.assertIn("form-action 'none'", frame)
         self.assertIn("sandbox={GAME_IFRAME_SANDBOX}", frame)
+        self.assertIn("sandbox allow-scripts allow-forms", frame)
         self.assertNotIn("frame-ancestors", frame)
-        self.assertNotIn("sandbox allow-scripts", frame)
+        self.assertNotIn("allow-same-origin", frame)
         self.assertNotIn("Upload game", creator)
         self.assertIn("/api/games/drafts/chat", creator)
         self.assertIn("GameFrame", studio)

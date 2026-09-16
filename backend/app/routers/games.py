@@ -55,14 +55,17 @@ from app.services.storage import (
 from app.services.demo_seed import restore_game_html_files
 from app.services.topics import ensure_topic_tag
 
-# Isolation comes from the play iframe sandbox attribute (no allow-same-origin).
-# Do not put CSP sandbox or X-Frame-Options on the document: those make the
-# framed game a unique origin, which Chrome then blocks as "This content is blocked".
+# Document CSP sandbox (no allow-same-origin) makes game HTML a unique origin even
+# if opened top-level or framed without the Play UI sandbox, so it cannot read SPA
+# localStorage tokens. Do not add X-Frame-Options or frame-ancestors: Chrome then
+# treats the unique origin as a framing violation ("This content is blocked").
 GAME_FRAME_CSP = (
-    "default-src 'self' 'unsafe-inline'; "
+    "sandbox allow-scripts allow-forms; "
+    "default-src 'unsafe-inline'; "
     "connect-src 'none'; "
     "object-src 'none'; "
     "frame-src 'none'; "
+    "form-action 'none'; "
     "base-uri 'none'"
 )
 GAME_IFRAME_SANDBOX = "allow-scripts allow-forms"
