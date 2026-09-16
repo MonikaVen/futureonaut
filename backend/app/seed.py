@@ -10,16 +10,6 @@ def seed_admin() -> None:
     try:
         existing = db.query(User).filter(User.email == settings.admin_email).first()
         if existing:
-            changed = False
-            if existing.role != UserRole.admin:
-                existing.role = UserRole.admin
-                changed = True
-            new_hash = hash_password(settings.admin_password)
-            if existing.password_hash != new_hash:
-                existing.password_hash = new_hash
-                changed = True
-            if changed:
-                db.commit()
             return
         admin = User(
             email=settings.admin_email,
@@ -45,30 +35,16 @@ def seed_teacher() -> None:
     db = SessionLocal()
     try:
         teacher = db.query(User).filter(User.email == settings.teacher_email).first()
-        password_hash = hash_password(settings.teacher_password)
         if teacher is None:
             teacher = User(
                 email=settings.teacher_email,
-                password_hash=password_hash,
+                password_hash=hash_password(settings.teacher_password),
                 display_name="Example Teacher",
                 role=UserRole.teacher,
             )
             db.add(teacher)
             db.commit()
             db.refresh(teacher)
-        else:
-            changed = False
-            if teacher.role != UserRole.teacher:
-                teacher.role = UserRole.teacher
-                changed = True
-            if teacher.password_hash != password_hash:
-                teacher.password_hash = password_hash
-                changed = True
-            if not teacher.display_name:
-                teacher.display_name = "Example Teacher"
-                changed = True
-            if changed:
-                db.commit()
 
         has_class = db.query(Classroom).filter(Classroom.teacher_id == teacher.id).first()
         if has_class is None:

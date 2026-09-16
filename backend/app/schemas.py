@@ -171,7 +171,7 @@ class AIGenerateRequest(BaseModel):
     description: str = ""
     question_count: int = Field(default=5, ge=3, le=12)
     provider: str | None = Field(default=None, max_length=16)
-    api_key: str | None = Field(default=None, max_length=256)
+    api_key: str = Field(min_length=12, max_length=256)
     model: str | None = Field(default=None, max_length=80)
 
 
@@ -206,6 +206,7 @@ class GameDraftOut(BaseModel):
     warnings: list[str] = Field(default_factory=list)
     messages: list[DraftMessage] = Field(default_factory=list)
     preview_path: str = "index.html"
+    preview_token: str = ""
     published_game_id: uuid.UUID | None = None
     created_at: datetime
     updated_at: datetime

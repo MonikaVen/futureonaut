@@ -2,14 +2,14 @@ from __future__ import annotations
 
 import unittest
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
 from pydantic import ValidationError
 from starlette.requests import Request
 
 from app.limits import MAX_GAME_LEVEL, bounded_int, cap_event_payload
-from app.models import EventType
+from app.models import EventType, UserRole
 from app.public_url import public_base_url, safe_host, safe_proto
 from app.schemas import SessionEventIn
 from app.services.guest_merge import apply_session_event
@@ -147,7 +147,6 @@ class FunnelCapTests(unittest.TestCase):
 class JwtTests(unittest.TestCase):
     def test_access_token_roundtrip(self) -> None:
         from app.auth import create_access_token, decode_token
-        from app.models import UserRole
 
         user_id = uuid4()
         token = create_access_token(user_id, UserRole.learner)
@@ -155,6 +154,19 @@ class JwtTests(unittest.TestCase):
         self.assertEqual(payload["sub"], str(user_id))
         self.assertEqual(payload["type"], "access")
         self.assertEqual(payload["role"], UserRole.learner.value)
+
+
+class ClassroomPrivilegeTests(unittest.TestCase):
+    def test_learner_cannot_create_classroom(self) -> None:
+        from fastapi import HTTPException
+
+        from app.routers.classrooms import create_classroom
+        from app.schemas import ClassroomCreate
+
+        user = SimpleNamespace(id=uuid4(), role=UserRole.learner)
+        with self.assertRaises(HTTPException) as ctx:
+            create_classroom(ClassroomCreate(name="Mine"), MagicMock(), user)
+        self.assertEqual(ctx.exception.status_code, 403)
 
 
 if __name__ == "__main__":

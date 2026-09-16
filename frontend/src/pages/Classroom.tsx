@@ -181,6 +181,7 @@ export function ClassroomPage() {
             ))}
           </ul>
 
+          {user && (user.role === "teacher" || user.role === "admin" || user.role === "creator") ? (
           <form className="form" onSubmit={createClass}>
             <label>
               New class name
@@ -190,6 +191,7 @@ export function ClassroomPage() {
               Create class
             </button>
           </form>
+          ) : null}
 
           <form className="form" onSubmit={joinClass} style={{ marginTop: 16 }}>
             <label>

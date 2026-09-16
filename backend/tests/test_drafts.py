@@ -6,6 +6,8 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
+from fastapi import HTTPException
+
 from app.models import GameDraft, GameSource, UserRole
 from app.routers.games import (
     GAME_FRAME_CSP,
@@ -155,6 +157,7 @@ class DraftOutTests(unittest.TestCase):
                 warnings=["Missing LearnPlay.stage level markers"],
                 messages=[{"role": "assistant", "content": "Draft ready."}],
                 published_game_id=None,
+                owner_id=uuid4(),
                 created_at=now,
                 updated_at=now,
                 html="<html>secret</html>",
@@ -162,6 +165,7 @@ class DraftOutTests(unittest.TestCase):
         )
         dumped = out.model_dump()
         self.assertNotIn("html", dumped)
+        self.assertTrue(out.preview_token)
         self.assertEqual(out.messages[0].content, "Draft ready.")
 
 
@@ -169,6 +173,8 @@ class FrameIsolationTests(unittest.TestCase):
     def test_game_files_send_restrictive_csp(self) -> None:
         headers = game_file_headers()
         self.assertIn("connect-src 'none'", headers["Content-Security-Policy"])
+        self.assertIn("sandbox allow-scripts allow-forms", headers["Content-Security-Policy"])
+        self.assertNotIn("allow-same-origin", headers["Content-Security-Policy"])
         self.assertEqual(headers["Content-Security-Policy"], GAME_FRAME_CSP)
         self.assertEqual(GAME_IFRAME_SANDBOX, "allow-scripts allow-forms")
         self.assertNotIn("allow-same-origin", GAME_IFRAME_SANDBOX)
@@ -186,9 +192,64 @@ class FrameIsolationTests(unittest.TestCase):
         self.assertNotIn("allow-same-origin", frame)
         self.assertIn("allow-scripts allow-forms", frame)
         self.assertIn("connect-src 'none'", frame)
+        self.assertIn("sandbox allow-scripts allow-forms", frame)
         self.assertNotIn("Upload game", creator)
         self.assertIn("/api/games/drafts/chat", creator)
         self.assertIn("GameFrame", studio)
+        self.assertIn("/t/", studio)
+        self.assertNotIn("/files/", studio)
+
+
+class DraftFileTokenTests(unittest.TestCase):
+    def test_token_is_bound_to_draft(self) -> None:
+        from app.auth import create_draft_file_token, decode_draft_file_token
+
+        draft_id = uuid4()
+        owner_id = uuid4()
+        token = create_draft_file_token(draft_id, owner_id)
+        self.assertEqual(decode_draft_file_token(token, draft_id), owner_id)
+        with self.assertRaises(HTTPException):
+            decode_draft_file_token(token, uuid4())
+
+    def test_serve_draft_file_rejects_wrong_owner(self) -> None:
+        from app.auth import create_draft_file_token
+        from app.routers.games import serve_draft_file
+
+        draft_id = uuid4()
+        token = create_draft_file_token(draft_id, uuid4())
+        db = MagicMock()
+        db.get.return_value = SimpleNamespace(
+            id=draft_id,
+            owner_id=uuid4(),
+            published_game_id=None,
+        )
+        with self.assertRaises(HTTPException) as ctx:
+            serve_draft_file(draft_id, token, "index.html", db)
+        self.assertEqual(ctx.exception.status_code, 403)
+
+
+class ViewCapTests(unittest.TestCase):
+    def test_view_without_identity_is_ignored(self) -> None:
+        from app.routers.games import record_game_view
+
+        game_id = uuid4()
+        db = MagicMock()
+        db.get.return_value = SimpleNamespace(id=game_id)
+        record_game_view(game_id, db, None, None)
+        db.add.assert_not_called()
+
+    def test_view_dedupes_same_visitor(self) -> None:
+        from app.routers.games import record_game_view
+
+        game_id = uuid4()
+        db = MagicMock()
+        db.get.return_value = SimpleNamespace(id=game_id)
+        query = MagicMock()
+        query.filter.return_value = query
+        query.first.return_value = object()
+        db.query.return_value = query
+        record_game_view(game_id, db, None, "visitor-abc")
+        db.add.assert_not_called()
 
 
 if __name__ == "__main__":

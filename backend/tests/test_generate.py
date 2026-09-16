@@ -72,10 +72,28 @@ class AuthorAccessTests(unittest.TestCase):
         self.assertTrue(can_author_games(SimpleNamespace(role=UserRole.admin)))
         self.assertFalse(can_author_games(SimpleNamespace(role=UserRole.learner)))
 
-    def test_classroom_teacher_can_author(self) -> None:
+
+class CallerLlmKeyTests(unittest.TestCase):
+    def test_template_generate_requires_caller_key(self) -> None:
+        from pydantic import ValidationError
+
+        from app.schemas import AIGenerateRequest
+        from app.services.generate import _require_caller_llm_key
+
+        with self.assertRaises(HTTPException):
+            _require_caller_llm_key(None, "openai")
+        with self.assertRaises(HTTPException):
+            _require_caller_llm_key("", "openai")
+        with self.assertRaises(ValidationError):
+            AIGenerateRequest(topic="neurons", template_type="quiz")
+        provider, key = _require_caller_llm_key("sk-test-1234567890", "openai")
+        self.assertEqual(provider, "openai")
+        self.assertEqual(key, "sk-test-1234567890")
+
+    def test_classroom_owner_does_not_become_author(self) -> None:
         db = MagicMock()
         db.query.return_value.filter.return_value.limit.return_value.first.return_value = (1,)
-        self.assertTrue(can_author_games(SimpleNamespace(role=UserRole.learner, id="u1"), db))
+        self.assertFalse(can_author_games(SimpleNamespace(role=UserRole.learner, id="u1"), db))
 
 
 class HtmlExtractTests(unittest.TestCase):

@@ -1,11 +1,11 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
-from app.auth import get_optional_user, require_game_author
+from app.auth import create_draft_file_token, decode_draft_file_token, get_optional_user, require_game_author
 from app.database import get_db
 from app.models import (
     Classroom,
@@ -55,13 +55,18 @@ from app.services.storage import (
 from app.services.topics import ensure_topic_tag
 
 GAME_FRAME_CSP = (
+    "sandbox allow-scripts allow-forms; "
     "default-src 'self' 'unsafe-inline'; "
     "connect-src 'none'; "
     "object-src 'none'; "
     "frame-src 'none'; "
-    "base-uri 'none'"
+    "base-uri 'none'; "
+    "frame-ancestors 'self'"
 )
 GAME_IFRAME_SANDBOX = "allow-scripts allow-forms"
+VIEW_DEDUP_WINDOW = timedelta(hours=1)
+VIEW_BURST_WINDOW = timedelta(minutes=10)
+VIEW_BURST_MAX = 60
 
 
 def game_file_headers(*, store: bool = False) -> dict[str, str]:
@@ -195,15 +200,16 @@ async def generate_game(
     db: Session = Depends(get_db),
     user: User = Depends(require_game_author),
 ) -> GameOut:
-    if body.api_key:
-        store_llm_key(user, body.provider or "openai", body.api_key)
+    api_key = require_api_key(body.api_key)
+    store_llm_key(user, body.provider or "openai", api_key)
+    db.add(user)
     content = await generate_ai_content(
         topic=body.topic,
         difficulty=body.difficulty,
         template_type=body.template_type,
         description=body.description,
         question_count=body.question_count,
-        api_key=body.api_key,
+        api_key=api_key,
         provider=body.provider,
         model=body.model,
     )
@@ -279,6 +285,7 @@ def _draft_to_out(draft: GameDraft) -> GameDraftOut:
             {"role": m["role"], "content": m["content"]} for m in _draft_messages(draft.messages)
         ],
         preview_path="index.html",
+        preview_token=create_draft_file_token(draft.id, draft.owner_id),
         published_game_id=draft.published_game_id,
         created_at=draft.created_at,
         updated_at=draft.updated_at,
@@ -551,15 +558,19 @@ def delete_draft(
     db.commit()
 
 
-@router.get("/drafts/{draft_id}/files/{file_path:path}")
+@router.get("/drafts/{draft_id}/t/{token}/{file_path:path}")
 def serve_draft_file(
     draft_id: UUID,
+    token: str,
     file_path: str,
     db: Session = Depends(get_db),
 ):
+    owner_id = decode_draft_file_token(token, draft_id)
     draft = db.get(GameDraft, draft_id)
     if draft is None or draft.published_game_id is not None:
         raise HTTPException(status_code=404, detail="Draft not found")
+    if draft.owner_id != owner_id:
+        raise HTTPException(status_code=403, detail="Not your draft")
     base = draft_dir(draft_id).resolve()
     target = (base / file_path).resolve()
     if not target.is_file() or not target.is_relative_to(base):
@@ -593,6 +604,26 @@ def record_game_view(
     if game is None:
         raise HTTPException(status_code=404, detail="Game not found")
     visitor = (x_visitor_id or "").strip()[:64] or None
+    if user is None and not visitor:
+        return
+    now = datetime.now(timezone.utc)
+    recent = db.query(GameView).filter(
+        GameView.game_id == game.id,
+        GameView.viewed_at >= now - VIEW_DEDUP_WINDOW,
+    )
+    if user is not None:
+        recent = recent.filter(GameView.user_id == user.id)
+    else:
+        recent = recent.filter(GameView.visitor_id == visitor)
+    if recent.first() is not None:
+        return
+    burst = (
+        db.query(GameView)
+        .filter(GameView.game_id == game.id, GameView.viewed_at >= now - VIEW_BURST_WINDOW)
+        .count()
+    )
+    if burst >= VIEW_BURST_MAX:
+        return
     db.add(
         GameView(
             game_id=game.id,

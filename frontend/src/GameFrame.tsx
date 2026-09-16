@@ -2,7 +2,7 @@ import { forwardRef, type CSSProperties, type ReactEventHandler } from "react";
 
 export const GAME_IFRAME_SANDBOX = "allow-scripts allow-forms";
 export const GAME_IFRAME_CSP =
-  "default-src 'self' 'unsafe-inline'; connect-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'";
+  "sandbox allow-scripts allow-forms; default-src 'self' 'unsafe-inline'; connect-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; frame-ancestors 'self'";
 
 type Props = {
   title: string;

@@ -4,10 +4,9 @@ import json
 import re
 from typing import Any
 
-from fastapi import HTTPException, status
+from fastapi import HTTPException
 from pydantic import ValidationError
 
-from app.config import get_settings
 from app.schemas import DragMatchContent, QuizContent, TimedChallengeContent
 from app.services.llm import (
     STAGE_INSTRUCTIONS,
@@ -36,17 +35,9 @@ def validate_template_content(template_type: str, content: dict[str, Any]) -> di
         raise HTTPException(status_code=400, detail=exc.errors()) from exc
 
 
-def _resolve_openai_fallback(api_key: str | None, provider: str | None) -> tuple[str, str]:
-    settings = get_settings()
-    chosen_provider = normalize_provider(provider or "openai") if provider else "openai"
-    if api_key:
-        return chosen_provider, require_api_key(api_key)
-    if chosen_provider == "openai" and settings.openai_api_key:
-        return "openai", settings.openai_api_key.strip()
-    raise HTTPException(
-        status_code=status.HTTP_400_BAD_REQUEST,
-        detail="Enter an API key for the selected provider",
-    )
+def _require_caller_llm_key(api_key: str | None, provider: str | None) -> tuple[str, str]:
+    chosen_provider = normalize_provider(provider or "openai")
+    return chosen_provider, require_api_key(api_key or "")
 
 
 async def generate_ai_content(
@@ -63,7 +54,7 @@ async def generate_ai_content(
     if template_type not in TEMPLATE_SCHEMAS:
         raise HTTPException(status_code=400, detail=f"Unknown template_type: {template_type}")
 
-    chosen_provider, key = _resolve_openai_fallback(api_key, provider)
+    chosen_provider, key = _require_caller_llm_key(api_key, provider)
     schema_hint = TEMPLATE_SCHEMAS[template_type].model_json_schema()
     system = (
         "You generate educational mini-game content as strict JSON only. "

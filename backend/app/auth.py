@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.database import get_db
-from app.models import Classroom, User, UserRole
+from app.models import User, UserRole
 from app.schemas import UserOut
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -22,11 +22,7 @@ AUTHOR_ROLES = {UserRole.admin, UserRole.creator, UserRole.teacher}
 
 
 def can_author_games(user: User, db: Session | None = None) -> bool:
-    if user.role in AUTHOR_ROLES:
-        return True
-    if db is None:
-        return False
-    return db.query(Classroom.id).filter(Classroom.teacher_id == user.id).limit(1).first() is not None
+    return user.role in AUTHOR_ROLES
 
 
 def user_to_out(user: User, db: Session | None = None) -> UserOut:
@@ -136,3 +132,25 @@ def require_game_author(
             detail="Only teachers and creators can generate or deploy games",
         )
     return user
+
+
+def create_draft_file_token(draft_id: UUID, owner_id: UUID) -> str:
+    now = datetime.now(timezone.utc)
+    payload: dict[str, Any] = {
+        "sub": str(owner_id),
+        "draft": str(draft_id),
+        "type": "draft_file",
+        "iat": now,
+        "exp": now + timedelta(hours=2),
+    }
+    return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
+
+
+def decode_draft_file_token(token: str, draft_id: UUID) -> UUID:
+    payload = decode_token(token)
+    if payload.get("type") != "draft_file" or payload.get("draft") != str(draft_id):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid preview token")
+    try:
+        return UUID(str(payload.get("sub")))
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid preview token") from exc

@@ -54,6 +54,7 @@ export interface GameDraft {
   warnings: string[];
   messages: DraftMessage[];
   preview_path: string;
+  preview_token?: string;
   published_game_id?: string | null;
   created_at: string;
   updated_at: string;

@@ -33,7 +33,9 @@ export function CreatorDraftStudio({
       lang,
       r: draft.updated_at,
     });
-    return `/api/games/drafts/${draft.id}/files/${draft.preview_path || "index.html"}?${params.toString()}`;
+    const file = draft.preview_path || "index.html";
+    if (!draft.preview_token) return "";
+    return `/api/games/drafts/${draft.id}/t/${encodeURIComponent(draft.preview_token)}/${file}?${params.toString()}`;
   }, [draft, theme, lang]);
 
   async function send(e: FormEvent) {
