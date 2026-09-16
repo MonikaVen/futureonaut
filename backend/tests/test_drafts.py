@@ -173,7 +173,9 @@ class FrameIsolationTests(unittest.TestCase):
     def test_game_files_send_restrictive_csp(self) -> None:
         headers = game_file_headers()
         self.assertIn("connect-src 'none'", headers["Content-Security-Policy"])
-        self.assertIn("sandbox allow-scripts allow-forms", headers["Content-Security-Policy"])
+        self.assertNotIn("sandbox", headers["Content-Security-Policy"])
+        self.assertNotIn("frame-ancestors", headers["Content-Security-Policy"])
+        self.assertNotIn("X-Frame-Options", headers)
         self.assertNotIn("allow-same-origin", headers["Content-Security-Policy"])
         self.assertEqual(headers["Content-Security-Policy"], GAME_FRAME_CSP)
         self.assertEqual(GAME_IFRAME_SANDBOX, "allow-scripts allow-forms")
@@ -192,12 +194,15 @@ class FrameIsolationTests(unittest.TestCase):
         self.assertNotIn("allow-same-origin", frame)
         self.assertIn("allow-scripts allow-forms", frame)
         self.assertIn("connect-src 'none'", frame)
-        self.assertIn("sandbox allow-scripts allow-forms", frame)
+        self.assertIn("sandbox={GAME_IFRAME_SANDBOX}", frame)
+        self.assertNotIn("frame-ancestors", frame)
+        self.assertNotIn("sandbox allow-scripts", frame)
         self.assertNotIn("Upload game", creator)
         self.assertIn("/api/games/drafts/chat", creator)
         self.assertIn("GameFrame", studio)
         self.assertIn("/t/", studio)
         self.assertIn("tryExampleChat", studio)
+        self.assertIn("onSend(example)", studio)
         self.assertNotIn("/files/", studio)
 
 
@@ -227,6 +232,39 @@ class DraftFileTokenTests(unittest.TestCase):
         with self.assertRaises(HTTPException) as ctx:
             serve_draft_file(draft_id, token, "index.html", db)
         self.assertEqual(ctx.exception.status_code, 403)
+
+    def test_serve_draft_file_restores_html(self) -> None:
+        from pathlib import Path
+        import tempfile
+
+        from app.auth import create_draft_file_token
+        from app.routers.games import serve_draft_file
+
+        draft_id = uuid4()
+        owner_id = uuid4()
+        token = create_draft_file_token(draft_id, owner_id)
+        db = MagicMock()
+        db.get.return_value = SimpleNamespace(
+            id=draft_id,
+            owner_id=owner_id,
+            published_game_id=None,
+            html="<!DOCTYPE html><html><body>draft ok</body></html>",
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            dest = Path(tmp) / str(draft_id)
+            dest.mkdir()
+            with (
+                patch("app.routers.games.draft_dir", return_value=dest),
+                patch("app.routers.games.save_draft_html") as save,
+            ):
+                def write(_id, html):
+                    (dest / "index.html").write_text(html, encoding="utf-8")
+                    return "index.html"
+
+                save.side_effect = write
+                resp = serve_draft_file(draft_id, token, "index.html", db)
+        save.assert_called_once()
+        self.assertTrue(Path(resp.path).name == "index.html")
 
 
 class ViewCapTests(unittest.TestCase):

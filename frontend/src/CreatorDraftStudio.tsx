@@ -97,7 +97,13 @@ export function CreatorDraftStudio({
                 className="btn secondary"
                 type="button"
                 disabled={busy}
-                onClick={() => setNote(t("exampleChatPrompt"))}
+                onClick={() => {
+                  const example = t("exampleChatPrompt");
+                  setNote(example);
+                  if (apiKey.trim()) {
+                    void onSend(example).then(() => setNote(""));
+                  }
+                }}
               >
                 {t("tryExampleChat")}
               </button>

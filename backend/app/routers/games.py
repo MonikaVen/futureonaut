@@ -55,8 +55,10 @@ from app.services.storage import (
 from app.services.demo_seed import restore_game_html_files
 from app.services.topics import ensure_topic_tag
 
+# Isolation comes from the play iframe sandbox attribute (no allow-same-origin).
+# Do not put CSP sandbox or X-Frame-Options on the document: those make the
+# framed game a unique origin, which Chrome then blocks as "This content is blocked".
 GAME_FRAME_CSP = (
-    "sandbox allow-scripts allow-forms; "
     "default-src 'self' 'unsafe-inline'; "
     "connect-src 'none'; "
     "object-src 'none'; "
@@ -77,7 +79,6 @@ def game_file_headers(*, store: bool = False) -> dict[str, str]:
         "X-Content-Type-Options": "nosniff",
         "Content-Security-Policy": GAME_FRAME_CSP,
         "Referrer-Policy": "no-referrer",
-        "X-Frame-Options": "SAMEORIGIN",
         "Cache-Control": "public, max-age=60" if store else "no-store",
     }
 
@@ -574,6 +575,9 @@ def serve_draft_file(
         raise HTTPException(status_code=403, detail="Not your draft")
     base = draft_dir(draft_id).resolve()
     target = (base / file_path).resolve()
+    if (not target.is_file() or not target.is_relative_to(base)) and draft.html:
+        save_draft_html(draft.id, draft.html)
+        target = (base / file_path).resolve()
     if not target.is_file() or not target.is_relative_to(base):
         raise HTTPException(status_code=404, detail="File not found")
     return FileResponse(
