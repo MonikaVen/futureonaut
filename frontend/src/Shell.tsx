@@ -92,11 +92,15 @@ export function Shell() {
       </header>
 
       {!isPlay && (
-        <section className={`platform-cover platform-cover-${theme}`} aria-label="Futureonaut">
+        <section className={`platform-cover platform-cover-${theme}`} aria-label={t("coverAlt")}>
           <img
             src={theme === "dark" ? "/cover-dark.png" : "/cover.png"}
-            alt={t("coverAlt")}
+            alt=""
           />
+          <div className="platform-cover-copy">
+            <p className="platform-cover-brand">{t("coverBrand")}</p>
+            <p className="platform-cover-tagline">{t("coverTagline")}</p>
+          </div>
         </section>
       )}
 

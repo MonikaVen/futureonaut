@@ -292,35 +292,61 @@ button, input, select, textarea {
   width: 100%;
   height: auto;
   aspect-ratio: 8 / 3;
-  object-fit: cover;
-}
-
-.platform-cover-light::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  pointer-events: none;
-  background: linear-gradient(0deg, var(--cover-bottom) 0%, transparent 8%);
-}
-
-.platform-cover-light img {
   object-fit: contain;
   object-position: center center;
 }
 
+.platform-cover-light::after,
 .platform-cover-dark::after {
   content: "";
   position: absolute;
   inset: 0;
   z-index: 1;
   pointer-events: none;
-  background: linear-gradient(0deg, var(--cover-bottom) 0%, transparent 10%);
+  background: linear-gradient(0deg, var(--cover-bottom) 0%, transparent 12%);
 }
 
-.platform-cover-dark img {
-  object-fit: contain;
-  object-position: center center;
+.platform-cover-copy {
+  position: absolute;
+  left: 14.2%;
+  top: 40.5%;
+  z-index: 2;
+  transform: translateY(-50%);
+  max-width: min(46%, 32rem);
+  padding: 0.55rem 1.05rem 0.7rem 0.95rem;
+  border-radius: 1.15rem;
+  color: #f4f7ff;
+  background: rgba(8, 12, 24, 0.42);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.platform-cover-brand {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.05rem, 3.15vw, 2.05rem);
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  line-height: 1.12;
+  text-transform: uppercase;
+}
+
+.platform-cover-tagline {
+  margin: 0.32rem 0 0;
+  font-size: clamp(0.72rem, 1.4vw, 1.02rem);
+  font-weight: 500;
+  line-height: 1.35;
+  color: rgba(238, 244, 255, 0.92);
+}
+
+.platform-cover-tagline::after {
+  content: "";
+  display: block;
+  width: 2.35rem;
+  height: 3px;
+  margin-top: 0.42rem;
+  border-radius: 99px;
+  background: linear-gradient(90deg, #7b5cff, #c44dff);
 }
 
 .auth-brand {
@@ -1745,6 +1771,16 @@ body.play-focus {
 
   .platform-cover {
     margin-bottom: 1.25rem;
+  }
+
+  .platform-cover-copy {
+    left: 13%;
+    max-width: min(58%, 22rem);
+    padding: 0.4rem 0.75rem 0.5rem;
+  }
+
+  .platform-cover-brand {
+    letter-spacing: 0.12em;
   }
 
   .player-bar {
