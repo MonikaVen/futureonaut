@@ -316,9 +316,13 @@ button, input, select, textarea {
   padding: 0.55rem 1.05rem 0.7rem 0.95rem;
   border-radius: 1.15rem;
   color: #f4f7ff;
-  background: rgba(8, 12, 24, 0.42);
+  background: rgba(8, 12, 24, 0.55);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
+}
+
+.platform-cover-light .platform-cover-copy {
+  background: rgba(8, 12, 24, 0.72);
 }
 
 .platform-cover-brand {
