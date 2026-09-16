@@ -52,6 +52,7 @@ from app.services.storage import (
     save_uploaded_zip,
     write_template_game,
 )
+from app.services.demo_seed import restore_game_html_files
 from app.services.topics import ensure_topic_tag
 
 GAME_FRAME_CSP = (
@@ -531,6 +532,7 @@ def publish_draft(
         difficulty=draft.difficulty,
         entry_path=entry,
         source_language=(draft.language or "en")[:16],
+        html=draft.html,
     )
     db.add(game)
     draft.published_game_id = game.id
@@ -698,6 +700,20 @@ def serve_game_file(
         raise HTTPException(status_code=404, detail="Game not found")
     base = game_dir(game_id).resolve()
     target = (base / file_path).resolve()
+    if not target.is_file() or not target.is_relative_to(base):
+        html = game.html
+        if not html:
+            draft = (
+                db.query(GameDraft)
+                .filter(GameDraft.published_game_id == game.id)
+                .first()
+            )
+            html = draft.html if draft else None
+            if html and not game.html:
+                game.html = html
+                db.commit()
+        restore_game_html_files(game, html)
+        target = (base / file_path).resolve()
     if not target.is_file() or not target.is_relative_to(base):
         raise HTTPException(status_code=404, detail="File not found")
     return FileResponse(

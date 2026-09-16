@@ -19,6 +19,7 @@ from app.services.demo_seed import (
 class CatalogCurationTests(unittest.TestCase):
     def test_boot_only_seeds_empty_catalog(self) -> None:
         source = inspect.getsource(seed_demo_games)
+        self.assertIn("restore_published_html", source)
         self.assertIn("db.query(Game).count() == 0", source)
         self.assertNotIn("prune_games_to_manifest(db)", source)
         self.assertNotIn("refresh_seed_html(db)", source)
@@ -42,6 +43,7 @@ class CatalogCurationTests(unittest.TestCase):
             patch("app.services.demo_seed.seed_html_pack") as pack,
             patch("app.services.demo_seed.backfill_seed_files"),
             patch("app.services.demo_seed.normalize_game_topics"),
+            patch("app.services.demo_seed.restore_published_html"),
             patch("app.services.demo_seed.restore_missing_game_files"),
             patch("app.services.demo_seed.restore_missing_template_html"),
             patch("app.services.demo_seed.refresh_game_previews"),

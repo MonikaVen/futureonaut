@@ -71,6 +71,7 @@ class Game(Base):
     template_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
     seed_file: Mapped[str | None] = mapped_column(String(200), nullable=True)
     source_language: Mapped[str] = mapped_column(String(16), nullable=False, default="en")
+    html: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     owner: Mapped[User] = relationship(back_populates="games")

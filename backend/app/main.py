@@ -119,6 +119,9 @@ def ensure_schema() -> None:
             )
         )
         conn.execute(
+            text("ALTER TABLE games ADD COLUMN IF NOT EXISTS html TEXT")
+        )
+        conn.execute(
             text(
                 "CREATE INDEX IF NOT EXISTS ix_game_drafts_owner_id ON game_drafts (owner_id)"
             )

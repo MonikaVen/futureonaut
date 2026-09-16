@@ -7,7 +7,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from app.database import SessionLocal
-from app.models import Game, GameSource, User, UserRole
+from app.models import Game, GameDraft, GameSource, User, UserRole
 from app.services.snapshot import ensure_game_preview, write_game_preview
 from app.services.storage import ensure_sdk_injected, game_dir, save_uploaded_html, write_sdk, write_template_game
 from app.services.topics import ensure_topic_tag
@@ -105,6 +105,7 @@ def seed_demo_games() -> None:
 
         backfill_seed_files(db)
         normalize_game_topics(db)
+        restore_published_html(db)
         restore_missing_game_files(db)
         restore_missing_template_html(db)
         refresh_game_previews(db)
@@ -115,6 +116,34 @@ def seed_demo_games() -> None:
 def prune_games_to_manifest(db) -> None:
     """Unused on boot. Catalog membership is curated in Postgres by admins."""
     return
+
+
+def restore_published_html(db) -> None:
+    """Rewrite catalog HTML from Postgres after a container replace."""
+    changed = False
+    drafts = {
+        d.published_game_id: d.html
+        for d in db.query(GameDraft).filter(GameDraft.published_game_id.isnot(None)).all()
+        if d.html
+    }
+    for game in db.query(Game).all():
+        html = game.html or drafts.get(game.id)
+        if html and not game.html:
+            game.html = html
+            changed = True
+        restore_game_html_files(game, html)
+    if changed:
+        db.commit()
+
+
+def restore_game_html_files(game: Game, html: str | None) -> bool:
+    if not html:
+        return False
+    target = game_dir(game.id) / (game.entry_path or "index.html")
+    if target.is_file():
+        return False
+    save_uploaded_html(game.id, html, "index.html")
+    return True
 
 
 def restore_missing_game_files(db) -> None:
