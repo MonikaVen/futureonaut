@@ -76,6 +76,7 @@ class GameOut(BaseModel):
     levels_completed: int = 0
     total_levels: int | None = None
     progress_pct: int | None = None
+    has_screenshot: bool = False
 
     model_config = {"from_attributes": True}
 
@@ -273,6 +274,7 @@ class ContinueSessionOut(BaseModel):
     total_levels: int | None
     total_points: int
     started_at: datetime
+    has_screenshot: bool = False
 
 
 class ClassroomCreate(BaseModel):

@@ -162,6 +162,21 @@ class SnapshotTests(unittest.TestCase):
                 self.assertEqual(img.size, (1200, 630))
                 self.assertEqual(img.getpixel((10, 10)), (18, 200, 160))
 
+    def test_has_screenshot_only_when_icon_saved(self) -> None:
+        from app.services.snapshot import has_game_screenshot, save_game_icon
+
+        game = self._game()
+        with tempfile.TemporaryDirectory() as tmp:
+            dest = Path(tmp) / str(game.id)
+            dest.mkdir()
+            settings = SimpleNamespace(games_dir=tmp)
+            with patch("app.services.snapshot.get_settings", return_value=settings):
+                self.assertFalse(has_game_screenshot(game.id))
+                buf = io.BytesIO()
+                Image.new("RGB", (64, 64), (90, 40, 200)).save(buf, format="PNG")
+                save_game_icon(dest, buf.getvalue())
+                self.assertTrue(has_game_screenshot(game.id))
+
 
 if __name__ == "__main__":
     unittest.main()

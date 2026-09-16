@@ -17,6 +17,7 @@ from app.schemas import (
 )
 from app.services.guest_merge import apply_session_event
 from app.services.progress import best_sessions_by_game, progress_from_session
+from app.services.snapshot import has_game_screenshot
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
 
@@ -130,6 +131,7 @@ def continue_sessions(
                 total_levels=s.total_levels,
                 total_points=s.total_points,
                 started_at=s.started_at,
+                has_screenshot=has_game_screenshot(s.game_id),
             )
         )
         if len(out) >= 6:

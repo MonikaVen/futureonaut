@@ -33,6 +33,7 @@ export interface Game {
   levels_completed?: number;
   total_levels?: number | null;
   progress_pct?: number | null;
+  has_screenshot?: boolean;
 }
 
 export interface Comment {
@@ -76,6 +77,7 @@ export interface ContinueSession {
   total_levels: number | null;
   total_points: number;
   started_at: string;
+  has_screenshot?: boolean;
 }
 
 export interface Classroom {

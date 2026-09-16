@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.models import Game, PlaySession
 from app.schemas import GameOut, RecommendationOut
+from app.services.snapshot import has_game_screenshot
 from app.services.topics import TOPICS, normalize_topic
 
 
@@ -25,6 +26,7 @@ def game_to_out(game: Game) -> GameOut:
         source_language=getattr(game, "source_language", None) or "en",
         created_at=game.created_at,
         play_url=f"/api/games/{game.id}/files/{game.entry_path}",
+        has_screenshot=has_game_screenshot(game.id),
     )
 
 

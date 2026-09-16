@@ -8,7 +8,7 @@ from app.database import get_db
 from app.models import Game, PlaySession
 from app.public_url import public_base_url
 from app.services.og import og_description, og_image_svg, score_card_svg, share_html
-from app.services.snapshot import ensure_game_preview
+from app.services.snapshot import ensure_game_preview, has_game_screenshot, screenshot_file
 
 router = APIRouter(tags=["share"])
 
@@ -47,6 +47,21 @@ def share_card_png(game_id: UUID, db: Session = Depends(get_db)) -> FileResponse
         headers={
             "Cache-Control": "public, max-age=3600",
             "Content-Disposition": 'inline; filename="card.png"',
+        },
+    )
+
+
+@router.get("/share/{game_id}/shot.png")
+def share_shot_png(game_id: UUID, db: Session = Depends(get_db)) -> FileResponse:
+    game = db.get(Game, game_id)
+    if game is None or not has_game_screenshot(game.id):
+        raise HTTPException(status_code=404, detail="Screenshot not found")
+    return FileResponse(
+        screenshot_file(game.id),
+        media_type="image/png",
+        headers={
+            "Cache-Control": "public, max-age=3600",
+            "Content-Disposition": 'inline; filename="shot.png"',
         },
     )
 

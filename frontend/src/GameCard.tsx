@@ -42,6 +42,7 @@ export function GameCard({ game, topic, focusLabels, onUpdate }: Props) {
         solved={solved}
         progressLabel={progressLabel}
         progressPct={progressPct}
+        hasScreenshot={Boolean(game.has_screenshot)}
       />
       <div className="game-tile-body">
         {focusLabels.length > 0 ? (

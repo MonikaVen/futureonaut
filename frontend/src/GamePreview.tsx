@@ -13,6 +13,7 @@ type Props = {
   progressLabel?: string;
   progressPct?: number | null;
   solved?: boolean;
+  hasScreenshot?: boolean;
 };
 
 function orbStyle(id: string): CSSProperties {
@@ -35,6 +36,7 @@ export function GamePreview({
   progressLabel,
   progressPct,
   solved = false,
+  hasScreenshot = false,
 }: Props) {
   const { t } = useLanguage();
   const kind = posterKind(topic);
@@ -42,6 +44,7 @@ export function GamePreview({
   const clampedPct =
     typeof progressPct === "number" ? Math.max(0, Math.min(100, progressPct)) : null;
   const [photoFailed, setPhotoFailed] = useState(false);
+  const showPhoto = hasScreenshot && !photoFailed;
   const statusChip = solved ? (
     <span className="game-preview-chip solved">{t("solved")}</span>
   ) : progressLabel ? (
@@ -50,15 +53,15 @@ export function GamePreview({
 
   return (
     <Link
-      className={`game-preview topic-${kind}${photoFailed ? "" : " has-photo"}${solved ? " is-solved" : ""}`}
+      className={`game-preview topic-${kind}${showPhoto ? " has-photo" : ""}${solved ? " is-solved" : ""}`}
       to={`/play/${gameId}`}
       aria-label={`${t("play")} ${title}`}
       style={orbStyle(gameId)}
     >
-      {!photoFailed ? (
+      {showPhoto ? (
         <img
           className="game-preview-photo"
-          src={`/share/${gameId}/card.png`}
+          src={`/share/${gameId}/shot.png`}
           alt=""
           loading="lazy"
           decoding="async"
@@ -66,7 +69,7 @@ export function GamePreview({
         />
       ) : null}
       <span className="game-preview-top">
-        {photoFailed ? <span className="game-preview-brand">Futureonaut</span> : <span />}
+        <span className="game-preview-brand">Futureonaut</span>
         <span className="game-preview-play" aria-hidden>
           <PlayIcon size={14} />
         </span>

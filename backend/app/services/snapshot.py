@@ -9,6 +9,7 @@ from uuid import UUID
 
 from PIL import Image, ImageDraw, ImageFont
 
+from app.config import get_settings
 from app.services.storage import game_dir
 from app.services.topics import normalize_topic
 
@@ -51,6 +52,18 @@ _WS = re.compile(r"\s+")
 
 def preview_path(game_id: UUID) -> Path:
     return game_dir(game_id) / PREVIEW_FILENAME
+
+
+def screenshot_file(game_id: UUID) -> Path:
+    return Path(get_settings().games_dir) / str(game_id) / ICON_FILENAME
+
+
+def has_game_screenshot(game_id: UUID) -> bool:
+    path = screenshot_file(game_id)
+    try:
+        return path.is_file() and path.stat().st_size > 32
+    except OSError:
+        return False
 
 
 def write_game_preview(game) -> Path | None:

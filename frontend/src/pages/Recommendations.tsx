@@ -32,6 +32,7 @@ export function RecommendationsPage() {
                 description={r.game.description}
                 topic={primaryTopic(r.game.topic_tags)}
                 difficulty={r.game.difficulty}
+                hasScreenshot={Boolean(r.game.has_screenshot)}
               />
               <div className="game-tile-body">
                 <p className="meta">{r.reason}</p>

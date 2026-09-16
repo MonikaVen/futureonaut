@@ -457,7 +457,7 @@ export function CreatorPage() {
             />
           </label>
           <label>
-            Game icon (optional)
+            Screenshot (optional)
             <input
               type="file"
               accept="image/png,image/jpeg,image/webp,image/gif,.png,.jpg,.jpeg,.webp,.gif"

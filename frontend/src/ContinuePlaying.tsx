@@ -48,6 +48,7 @@ export function ContinuePlaying() {
                 difficulty={item.difficulty ?? 1}
                 progressLabel={progressLabel}
                 progressPct={progressPct}
+                hasScreenshot={Boolean(item.has_screenshot)}
               />
               <div className="game-tile-body continue-tile-body">
                 <p className="meta">
