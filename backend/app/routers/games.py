@@ -60,8 +60,7 @@ GAME_FRAME_CSP = (
     "connect-src 'none'; "
     "object-src 'none'; "
     "frame-src 'none'; "
-    "base-uri 'none'; "
-    "frame-ancestors 'self'"
+    "base-uri 'none'"
 )
 GAME_IFRAME_SANDBOX = "allow-scripts allow-forms"
 VIEW_DEDUP_WINDOW = timedelta(hours=1)
