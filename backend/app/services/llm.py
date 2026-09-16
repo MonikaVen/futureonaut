@@ -174,6 +174,55 @@ def _chat_messages(user: str, history: list[dict[str, str]] | None) -> list[dict
     return messages[-12:]
 
 
+MAX_OUTPUT_TOKENS = 8192
+MAX_REASONING_OUTPUT_TOKENS = 16384
+
+
+def uses_max_completion_tokens(model: str) -> bool:
+    """Newer OpenAI chat models reject max_tokens in favor of max_completion_tokens."""
+    name = (model or "").strip().lower()
+    return name.startswith(("o1", "o3", "o4", "gpt-5", "gpt-4.1"))
+
+
+def openai_chat_payload(
+    *,
+    model: str,
+    system: str,
+    messages: list[dict[str, str]],
+    json_mode: bool = False,
+) -> dict:
+    payload: dict = {
+        "model": model,
+        "messages": [{"role": "system", "content": system}, *messages],
+    }
+    if uses_max_completion_tokens(model):
+        payload["max_completion_tokens"] = MAX_REASONING_OUTPUT_TOKENS
+    else:
+        payload["max_tokens"] = MAX_OUTPUT_TOKENS
+        payload["temperature"] = 0.4
+    if json_mode:
+        payload["response_format"] = {"type": "json_object"}
+    return payload
+
+
+def _retarget_token_limit(payload: dict) -> dict:
+    next_payload = dict(payload)
+    if "max_tokens" in next_payload:
+        next_payload["max_completion_tokens"] = max(
+            int(next_payload.pop("max_tokens") or MAX_OUTPUT_TOKENS),
+            MAX_REASONING_OUTPUT_TOKENS,
+        )
+        next_payload.pop("temperature", None)
+    return next_payload
+
+
+def _should_swap_max_tokens(status_code: int, body: str) -> bool:
+    if status_code != 400:
+        return False
+    text = (body or "").lower()
+    return "max_tokens" in text and "max_completion_tokens" in text
+
+
 async def chat_complete(
     *,
     provider: str,
@@ -202,28 +251,30 @@ async def chat_complete(
                     },
                     json={
                         "model": chosen,
-                        "max_tokens": 8192,
+                        "max_tokens": MAX_OUTPUT_TOKENS,
                         "system": system,
                         "messages": convo,
                     },
                 )
             else:
-                payload: dict = {
-                    "model": chosen,
-                    "temperature": 0.4,
-                    "max_tokens": 8192,
-                    "messages": [{"role": "system", "content": system}, *convo],
+                url = f"{spec['base'].rstrip('/')}/chat/completions"
+                headers = {
+                    "Authorization": f"Bearer {key}",
+                    "Content-Type": "application/json",
                 }
-                if json_mode:
-                    payload["response_format"] = {"type": "json_object"}
-                resp = await client.post(
-                    f"{spec['base'].rstrip('/')}/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {key}",
-                        "Content-Type": "application/json",
-                    },
-                    json=payload,
+                payload = openai_chat_payload(
+                    model=chosen,
+                    system=system,
+                    messages=convo,
+                    json_mode=json_mode,
                 )
+                resp = await client.post(url, headers=headers, json=payload)
+                if _should_swap_max_tokens(resp.status_code, resp.text):
+                    resp = await client.post(
+                        url,
+                        headers=headers,
+                        json=_retarget_token_limit(payload),
+                    )
     except httpx.TimeoutException as exc:
         raise HTTPException(
             status_code=status.HTTP_504_GATEWAY_TIMEOUT,

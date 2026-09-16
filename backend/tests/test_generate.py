@@ -221,6 +221,71 @@ class ChatCompleteTests(unittest.IsolatedAsyncioTestCase):
         kwargs = client.post.call_args.kwargs
         self.assertIn("Authorization", kwargs["headers"])
         self.assertEqual(kwargs["json"]["messages"][0]["role"], "system")
+        self.assertEqual(kwargs["json"]["max_tokens"], 8192)
+        self.assertNotIn("max_completion_tokens", kwargs["json"])
+
+    async def test_gpt5_uses_max_completion_tokens(self) -> None:
+        from app.services.llm import chat_complete, openai_chat_payload, uses_max_completion_tokens
+
+        self.assertTrue(uses_max_completion_tokens("gpt-5"))
+        self.assertTrue(uses_max_completion_tokens("o3-mini"))
+        self.assertFalse(uses_max_completion_tokens("gpt-4o-mini"))
+        payload = openai_chat_payload(model="gpt-5-mini", system="sys", messages=[{"role": "user", "content": "hi"}])
+        self.assertIn("max_completion_tokens", payload)
+        self.assertNotIn("max_tokens", payload)
+        self.assertNotIn("temperature", payload)
+
+        response = MagicMock()
+        response.status_code = 200
+        response.json.return_value = {"choices": [{"message": {"content": SAMPLE_HTML}}]}
+        response.text = ""
+        client = AsyncMock()
+        client.post.return_value = response
+        client.__aenter__.return_value = client
+        client.__aexit__.return_value = False
+        with patch("app.services.llm.httpx.AsyncClient", return_value=client):
+            await chat_complete(
+                provider="openai",
+                api_key="sk-test-1234567890",
+                system="sys",
+                user="do it",
+                model="gpt-5",
+            )
+        body = client.post.call_args.kwargs["json"]
+        self.assertEqual(body["max_completion_tokens"], 16384)
+        self.assertNotIn("max_tokens", body)
+
+    async def test_retries_when_model_rejects_max_tokens(self) -> None:
+        from app.services.llm import chat_complete
+
+        rejected = MagicMock()
+        rejected.status_code = 400
+        rejected.text = (
+            '{"error":{"message":"Unsupported parameter: \'max_tokens\' is not supported '
+            'with this model. Use \'max_completion_tokens\' instead.","code":"unsupported_parameter"}}'
+        )
+        rejected.json.return_value = {"error": {"message": rejected.text}}
+        ok = MagicMock()
+        ok.status_code = 200
+        ok.json.return_value = {"choices": [{"message": {"content": SAMPLE_HTML}}]}
+        ok.text = ""
+        client = AsyncMock()
+        client.post.side_effect = [rejected, ok]
+        client.__aenter__.return_value = client
+        client.__aexit__.return_value = False
+        with patch("app.services.llm.httpx.AsyncClient", return_value=client):
+            text = await chat_complete(
+                provider="openai",
+                api_key="sk-test-1234567890",
+                system="sys",
+                user="do it",
+                model="gpt-4o-mini",
+            )
+        self.assertIn("LearnPlay.stage", text)
+        self.assertEqual(client.post.call_count, 2)
+        second = client.post.call_args_list[1].kwargs["json"]
+        self.assertIn("max_completion_tokens", second)
+        self.assertNotIn("max_tokens", second)
 
     async def test_claude_reads_text_blocks(self) -> None:
         from app.services.llm import chat_complete
