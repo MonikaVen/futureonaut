@@ -602,6 +602,9 @@ button, input, select, textarea {
 .game-preview {
   --orb-x: 85%;
   --orb-y: 8%;
+  --poster-fill:
+    radial-gradient(ellipse 90% 80% at var(--orb-x) var(--orb-y), var(--poster-glow, var(--accent-glow)), transparent 58%),
+    linear-gradient(165deg, var(--poster-1) 0%, var(--poster-2) 52%, var(--poster-3) 100%);
   position: relative;
   display: flex;
   flex-direction: column;
@@ -615,18 +618,26 @@ button, input, select, textarea {
   overflow: hidden;
   isolation: isolate;
   border-bottom: 1px solid var(--line);
-  background:
-    radial-gradient(ellipse 90% 80% at var(--orb-x) var(--orb-y), var(--poster-glow, var(--accent-glow)), transparent 58%),
-    linear-gradient(165deg, var(--poster-1) 0%, var(--poster-2) 52%, var(--poster-3) 100%);
+  background: var(--poster-fill);
 }
 
+.game-preview::before,
 .game-preview::after {
   content: "";
   position: absolute;
   inset: 0;
-  background: var(--poster-overlay);
-  z-index: 0;
   pointer-events: none;
+}
+
+.game-preview::before {
+  z-index: 0;
+  background: var(--poster-fill);
+  opacity: 0;
+}
+
+.game-preview::after {
+  z-index: 0;
+  background: var(--poster-overlay);
 }
 
 .game-preview > * {
@@ -645,9 +656,14 @@ button, input, select, textarea {
   pointer-events: none;
 }
 
+.game-preview.has-photo::before {
+  z-index: 1;
+  opacity: 0.62;
+}
+
 .game-preview.has-photo::after {
   z-index: 1;
-  opacity: 0.52;
+  opacity: 0.58;
 }
 
 .game-preview.topic-ai {
