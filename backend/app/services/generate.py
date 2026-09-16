@@ -132,11 +132,14 @@ def html_game_prompt(
                 f"Use TOTAL = {level_count} in every LearnPlay.stage(done, TOTAL, extra) call.",
                 f"On success call LearnPlay.stage({level_count}, {level_count}, {{ complete: true, score, label: 'Complete' }}).",
                 "Keep the same (done, TOTAL) structure when the learner is done — do not switch to a different event shape.",
-                "Show a short title, instructions, and a Next or Check control on each level.",
+                "Each level MUST be a real graded task: multiple-choice, matching pairs, or a typed answer. Include the actual items, options, and Check control in the HTML.",
+                "Never ship a lone Next/Finish button that always succeeds. Grade the learner's answer before calling LearnPlay.stage.",
+                "Show a short title, instructions, and feedback (correct/try again) on each level.",
                 "No remote scripts, fonts, images, or iframes. Inline CSS and JavaScript only.",
                 "Do not include <script src> except optionally ./learnplay-sdk.js (the host injects the SDK).",
                 "Do not invent a LearnPlay global. Call window.LearnPlay when it exists.",
                 "Keep the game keyboard accessible and readable in light and dark (html[data-lp-theme]).",
+                "Do not use alert(), prompt(), or confirm(). Keep feedback on the page.",
             ],
         }
     )
@@ -199,8 +202,10 @@ def html_revise_prompt(
                 f"Keep exactly {level_count} playable levels unless the teacher asks to change that.",
                 f"Use TOTAL = {level_count} in every LearnPlay.stage(done, TOTAL, extra) call.",
                 f"On success call LearnPlay.stage({level_count}, {level_count}, {{ complete: true, score, label: 'Complete' }}).",
+                "Each level must stay a real graded task with options or inputs — never a lone Next button that always succeeds.",
                 "No remote scripts, fonts, images, or iframes. Inline CSS and JavaScript only.",
                 "Do not invent a LearnPlay global. Call window.LearnPlay when it exists.",
+                "Do not use alert(), prompt(), or confirm().",
             ],
             "current_html": html,
         }

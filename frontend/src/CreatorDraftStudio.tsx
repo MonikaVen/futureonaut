@@ -92,7 +92,16 @@ export function CreatorDraftStudio({
             <button className="btn" type="button" disabled={busy || !draft} onClick={() => onDeploy()}>
               {busy ? t("publishingGame") : t("publishGame")}
             </button>
-            {draft ? (
+            {!draft ? (
+              <button
+                className="btn secondary"
+                type="button"
+                disabled={busy}
+                onClick={() => setNote(t("exampleChatPrompt"))}
+              >
+                {t("tryExampleChat")}
+              </button>
+            ) : (
               <>
                 <button className="btn secondary" type="button" disabled={busy} onClick={onNew}>
                   {t("newGameChat")}
@@ -101,8 +110,9 @@ export function CreatorDraftStudio({
                   {t("discardDraft")}
                 </button>
               </>
-            ) : null}
+            )}
           </div>
+          {!apiKey ? <p className="meta">{t("pasteApiKeyToSend")}</p> : null}
         </form>
       </div>
     </div>

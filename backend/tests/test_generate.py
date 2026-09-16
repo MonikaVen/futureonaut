@@ -32,7 +32,7 @@ SAMPLE_HTML = """<!DOCTYPE html>
 <html lang="en">
 <body>
   <h1>Tokens</h1>
-  <button id="next">Next</button>
+  <button id="next" data-choice="next">Next</button>
   <script>
     const TOTAL = 3;
     let done = 0;
@@ -140,6 +140,7 @@ class PromptContractTests(unittest.TestCase):
         self.assertEqual(payload["level_count"], 4)
         self.assertTrue(any("TOTAL = 4" in rule for rule in payload["requirements"]))
         self.assertTrue(any("complete: true" in rule for rule in payload["requirements"]))
+        self.assertTrue(any("real graded task" in rule for rule in payload["requirements"]))
 
 
 class HtmlDraftLoopTests(unittest.IsolatedAsyncioTestCase):

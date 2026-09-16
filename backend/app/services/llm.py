@@ -115,6 +115,12 @@ def html_contract_warnings(html: str, total_levels: int) -> list[str]:
         warnings.append("Missing a completion marker on the final level")
     if str(total_levels) not in html:
         warnings.append("Does not use the requested level total")
+    interactive = any(
+        marker in html.lower()
+        for marker in ("<input", "<select", "<textarea", "data-", "option", "choice", "quiz", "match")
+    )
+    if not interactive:
+        warnings.append("Levels look like placeholders. Ask for real questions, matches, or typed answers.")
     return warnings
 
 

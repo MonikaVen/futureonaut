@@ -20,7 +20,7 @@ export function CreatorPage() {
   const [analytics, setAnalytics] = useState<GameAnalytics[]>([]);
   const [provider, setProvider] = useState(user?.llm_provider || "openai");
   const [apiKey, setApiKey] = useState(() => sessionStorage.getItem(LLM_KEY_STORAGE) || "");
-  const [model, setModel] = useState("");
+  const [model, setModel] = useState("gpt-4o-mini");
   const [assignClassId, setAssignClassId] = useState("");
   const [classrooms, setClassrooms] = useState<Classroom[]>([]);
   const [draft, setDraft] = useState<GameDraft | null>(null);

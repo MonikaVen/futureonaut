@@ -197,6 +197,7 @@ class FrameIsolationTests(unittest.TestCase):
         self.assertIn("/api/games/drafts/chat", creator)
         self.assertIn("GameFrame", studio)
         self.assertIn("/t/", studio)
+        self.assertIn("tryExampleChat", studio)
         self.assertNotIn("/files/", studio)
 
 
