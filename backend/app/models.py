@@ -78,6 +78,30 @@ class Game(Base):
     views: Mapped[list["GameView"]] = relationship(back_populates="game")
 
 
+class GameDraft(Base):
+    __tablename__ = "game_drafts"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    owner_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    topic: Mapped[str] = mapped_column(String(200), nullable=False, default="")
+    description: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    difficulty: Mapped[int] = mapped_column(Integer, nullable=False, default=2)
+    level_count: Mapped[int] = mapped_column(Integer, nullable=False, default=4)
+    language: Mapped[str] = mapped_column(String(16), nullable=False, default="en")
+    provider: Mapped[str] = mapped_column(String(16), nullable=False, default="openai")
+    model: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    html: Mapped[str] = mapped_column(Text, nullable=False)
+    messages: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    warnings: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    assign_classroom_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    published_game_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    owner: Mapped[User] = relationship()
+
+
 class GameView(Base):
     __tablename__ = "game_views"
 

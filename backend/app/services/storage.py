@@ -129,3 +129,28 @@ def delete_game_files(game_id: UUID) -> None:
     dest = games_root() / str(game_id)
     if dest.exists():
         shutil.rmtree(dest)
+
+
+def drafts_root() -> Path:
+    path = games_root() / "_drafts"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def draft_dir(draft_id: UUID) -> Path:
+    path = drafts_root() / str(draft_id)
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def save_draft_html(draft_id: UUID, html: str) -> str:
+    dest = draft_dir(draft_id)
+    (dest / "index.html").write_text(html, encoding="utf-8")
+    ensure_sdk_injected(dest, "index.html")
+    return "index.html"
+
+
+def delete_draft_files(draft_id: UUID) -> None:
+    dest = drafts_root() / str(draft_id)
+    if dest.exists():
+        shutil.rmtree(dest)

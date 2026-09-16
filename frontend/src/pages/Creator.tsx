@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, type Classroom, type Game, type GameAnalytics, type GameAnalyticsDetail } from "../api";
+import { api, type Classroom, type Game, type GameAnalytics, type GameAnalyticsDetail, type GameDraft } from "../api";
+import { CreatorDraftStudio } from "../CreatorDraftStudio";
 import { GameAnalyticsDetailPanel } from "../GameAnalyticsDetail";
 import { useAuth } from "../auth";
 import { useLanguage } from "../language";
@@ -92,6 +93,8 @@ export function CreatorPage() {
   );
   const [assignClassId, setAssignClassId] = useState("");
   const [classrooms, setClassrooms] = useState<Classroom[]>([]);
+  const [draft, setDraft] = useState<GameDraft | null>(null);
+  const [drafts, setDrafts] = useState<GameDraft[]>([]);
 
   async function reload() {
     const list = await api<Game[]>("/api/games/mine");
@@ -107,6 +110,19 @@ export function CreatorPage() {
       setClassrooms(mine.filter((c) => c.teacher_id === user?.id));
     } catch {
       setClassrooms([]);
+    }
+    try {
+      const open = await api<GameDraft[]>("/api/games/drafts");
+      setDrafts(open);
+      setDraft((current) => {
+        if (current) {
+          const fresh = open.find((item) => item.id === current.id);
+          if (fresh) return fresh;
+        }
+        return open[0] || null;
+      });
+    } catch {
+      setDrafts([]);
     }
   }
 
@@ -230,7 +246,7 @@ export function CreatorPage() {
     setError("");
     setMessage("");
     try {
-      const game = await api<Game>("/api/games/generate-html", {
+      const next = await api<GameDraft>("/api/games/generate-html", {
         method: "POST",
         body: JSON.stringify({
           title: genTitle,
@@ -245,11 +261,77 @@ export function CreatorPage() {
           assign_classroom_id: assignClassId || null,
         }),
       });
-      setMessage(`${t("gameDeployed")} ${game.title}`);
+      setDraft(next);
+      setMessage(t("gameDraftReady"));
       await refreshMe();
       await reload();
+      setDraft(next);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("generateAndDeploy"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function reviseDraft(message: string) {
+    if (!draft) return;
+    setBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      const next = await api<GameDraft>(`/api/games/drafts/${draft.id}/revise`, {
+        method: "POST",
+        body: JSON.stringify({
+          message,
+          provider,
+          api_key: apiKey,
+          model: model || undefined,
+        }),
+      });
+      setDraft(next);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("reviseGame"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function publishDraft() {
+    if (!draft) return;
+    setBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      const game = await api<Game>(`/api/games/drafts/${draft.id}/publish`, {
+        method: "POST",
+        body: JSON.stringify({
+          title: genTitle || draft.title,
+          assign_classroom_id: assignClassId || null,
+        }),
+      });
+      setDraft(null);
+      setMessage(`${t("gamePublished")} ${game.title}`);
+      await reload();
+      setDraft(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("publishGame"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function discardDraft() {
+    if (!draft) return;
+    if (!confirm(t("discardDraft"))) return;
+    setBusy(true);
+    setError("");
+    try {
+      await api(`/api/games/drafts/${draft.id}`, { method: "DELETE" });
+      setDraft(null);
+      await reload();
+      setDraft(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("discardDraft"));
     } finally {
       setBusy(false);
     }
@@ -361,10 +443,41 @@ export function CreatorPage() {
             </label>
           )}
           <button className="btn accent" disabled={busy} type="submit">
-            {busy ? t("generatingGame") : t("generateAndDeploy")}
+            {busy && !draft ? t("generatingGame") : t("generateAndDeploy")}
           </button>
         </form>
       </div>
+
+      {drafts.length > 1 && (
+        <div className="panel" style={{ marginBottom: 16 }}>
+          <h2 style={{ fontFamily: "var(--font-display)", marginTop: 0 }}>{t("openDraft")}</h2>
+          <div className="row" style={{ flexWrap: "wrap", gap: 8 }}>
+            {drafts.map((item) => (
+              <button
+                key={item.id}
+                className={`btn ${draft?.id === item.id ? "accent" : "secondary"}`}
+                type="button"
+                onClick={() => setDraft(item)}
+              >
+                {item.title}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {draft && (
+        <div className="panel" style={{ marginBottom: 16 }}>
+          <CreatorDraftStudio
+            draft={draft}
+            apiKey={apiKey}
+            busy={busy}
+            onRevise={reviseDraft}
+            onPublish={publishDraft}
+            onDiscard={discardDraft}
+          />
+        </div>
+      )}
 
       {analytics.length > 0 && (
         <div className="panel" style={{ marginBottom: 16 }}>

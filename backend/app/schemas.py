@@ -188,6 +188,43 @@ class HtmlGenerateRequest(BaseModel):
     assign_classroom_id: uuid.UUID | None = None
 
 
+class DraftMessage(BaseModel):
+    role: str
+    content: str
+
+
+class GameDraftOut(BaseModel):
+    id: uuid.UUID
+    title: str
+    topic: str
+    description: str
+    difficulty: int
+    level_count: int
+    language: str
+    provider: str
+    model: str | None = None
+    warnings: list[str] = Field(default_factory=list)
+    messages: list[DraftMessage] = Field(default_factory=list)
+    preview_path: str = "index.html"
+    published_game_id: uuid.UUID | None = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class DraftReviseRequest(BaseModel):
+    message: str = Field(min_length=2, max_length=4000)
+    provider: str = Field(default="openai", max_length=16)
+    api_key: str = Field(min_length=12, max_length=256)
+    model: str | None = Field(default=None, max_length=80)
+
+
+class DraftPublishRequest(BaseModel):
+    title: str | None = Field(default=None, max_length=200)
+    assign_classroom_id: uuid.UUID | None = None
+
+
 class LlmKeyIn(BaseModel):
     provider: str = Field(min_length=3, max_length=16)
     api_key: str = Field(min_length=12, max_length=256)

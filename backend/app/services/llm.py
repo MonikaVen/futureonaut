@@ -94,6 +94,30 @@ def store_llm_key(user, provider: str, api_key: str) -> None:
     user.llm_api_key_hint = api_key_hint(key)
 
 
+def assert_html_safe(html: str) -> str:
+    if len(html) > MAX_HTML_CHARS:
+        raise HTTPException(status_code=502, detail="Generated HTML is too large")
+    lower = html.lower()
+    if "<html" not in lower:
+        raise HTTPException(status_code=502, detail="LLM did not return an HTML document")
+    if re.search(r"<script[^>]+src=['\"]https?://", html, flags=re.I):
+        raise HTTPException(status_code=502, detail="Generated game must not load remote scripts")
+    if re.search(r"<iframe\b", html, flags=re.I):
+        raise HTTPException(status_code=502, detail="Generated game must not embed iframes")
+    return html
+
+
+def html_contract_warnings(html: str, total_levels: int) -> list[str]:
+    warnings: list[str] = []
+    if "LearnPlay.stage" not in html:
+        warnings.append("Missing LearnPlay.stage level markers")
+    if "complete:" not in html and "complete :" not in html:
+        warnings.append("Missing a completion marker on the final level")
+    if str(total_levels) not in html:
+        warnings.append("Does not use the requested level total")
+    return warnings
+
+
 def extract_html(raw: str) -> str:
     text = (raw or "").strip()
     if not text:
@@ -126,31 +150,22 @@ def extract_html(raw: str) -> str:
 
 
 def validate_generated_html(html: str, total_levels: int) -> str:
-    if len(html) > MAX_HTML_CHARS:
-        raise HTTPException(status_code=502, detail="Generated HTML is too large")
-    lower = html.lower()
-    if "<html" not in lower:
-        raise HTTPException(status_code=502, detail="LLM did not return an HTML document")
-    if re.search(r"<script[^>]+src=['\"]https?://", html, flags=re.I):
-        raise HTTPException(status_code=502, detail="Generated game must not load remote scripts")
-    if re.search(r"<iframe\b", html, flags=re.I):
-        raise HTTPException(status_code=502, detail="Generated game must not embed iframes")
-    if "LearnPlay.stage" not in html:
-        raise HTTPException(
-            status_code=502,
-            detail="Generated game is missing LearnPlay.stage level markers",
-        )
-    if "complete:" not in html and "complete :" not in html:
-        raise HTTPException(
-            status_code=502,
-            detail="Generated game is missing a completion marker on the final level",
-        )
-    if str(total_levels) not in html:
-        raise HTTPException(
-            status_code=502,
-            detail="Generated game does not use the requested level total",
-        )
+    html = assert_html_safe(html)
+    warnings = html_contract_warnings(html, total_levels)
+    if warnings:
+        raise HTTPException(status_code=502, detail=warnings[0])
     return html
+
+
+def _chat_messages(user: str, history: list[dict[str, str]] | None) -> list[dict[str, str]]:
+    messages: list[dict[str, str]] = []
+    for item in history or []:
+        role = (item.get("role") or "").strip()
+        content = (item.get("content") or "").strip()
+        if role in {"user", "assistant"} and content:
+            messages.append({"role": role, "content": content[:8000]})
+    messages.append({"role": "user", "content": user})
+    return messages[-12:]
 
 
 async def chat_complete(
@@ -162,10 +177,12 @@ async def chat_complete(
     model: str | None = None,
     json_mode: bool = False,
     timeout: float = 180.0,
+    history: list[dict[str, str]] | None = None,
 ) -> str:
     spec = PROVIDERS[normalize_provider(provider)]
     key = require_api_key(api_key)
     chosen = (model or "").strip() or spec["model"]
+    convo = _chat_messages(user, history)
 
     try:
         async with httpx.AsyncClient(timeout=timeout) as client:
@@ -181,7 +198,7 @@ async def chat_complete(
                         "model": chosen,
                         "max_tokens": 8192,
                         "system": system,
-                        "messages": [{"role": "user", "content": user}],
+                        "messages": convo,
                     },
                 )
             else:
@@ -189,10 +206,7 @@ async def chat_complete(
                     "model": chosen,
                     "temperature": 0.4,
                     "max_tokens": 8192,
-                    "messages": [
-                        {"role": "system", "content": system},
-                        {"role": "user", "content": user},
-                    ],
+                    "messages": [{"role": "system", "content": system}, *convo],
                 }
                 if json_mode:
                     payload["response_format"] = {"type": "json_object"}

@@ -9,12 +9,13 @@ from fastapi import HTTPException
 
 from app.auth import can_author_games
 from app.models import UserRole
-from app.services.generate import html_game_prompt
+from app.services.generate import html_game_prompt, html_revise_prompt, generate_html_game, revise_html_game
 from app.services.llm import (
     STAGE_INSTRUCTIONS,
     api_key_hint,
     extract_html,
     hash_api_key,
+    html_contract_warnings,
     store_llm_key,
     validate_generated_html,
 )
@@ -82,6 +83,11 @@ class HtmlExtractTests(unittest.TestCase):
         validated = validate_generated_html(SAMPLE_HTML, 3)
         self.assertIn("LearnPlay.stage", validated)
 
+    def test_incomplete_html_is_kept_with_warnings(self) -> None:
+        warnings = html_contract_warnings("<html><body>hello</body></html>", 3)
+        self.assertTrue(warnings)
+        self.assertTrue(any("LearnPlay.stage" in w for w in warnings))
+
     def test_rejects_remote_script(self) -> None:
         bad = SAMPLE_HTML.replace(
             "<script>",
@@ -109,6 +115,51 @@ class PromptContractTests(unittest.TestCase):
         self.assertEqual(payload["level_count"], 4)
         self.assertTrue(any("TOTAL = 4" in rule for rule in payload["requirements"]))
         self.assertTrue(any("complete: true" in rule for rule in payload["requirements"]))
+
+
+class HtmlDraftLoopTests(unittest.IsolatedAsyncioTestCase):
+    async def test_generate_keeps_html_when_hooks_are_missing(self) -> None:
+        incomplete = "<!DOCTYPE html><html><body><h1>Draft</h1></body></html>"
+        with patch("app.services.generate.chat_complete", AsyncMock(return_value=incomplete)):
+            html, warnings = await generate_html_game(
+                title="Draft",
+                topic="AI",
+                difficulty=2,
+                level_count=3,
+                levels_brief="1 warm-up\n2 practice\n3 boss check",
+                language="en",
+                api_key="sk-test-1234567890",
+                provider="openai",
+            )
+        self.assertIn("<h1>Draft</h1>", html)
+        self.assertTrue(warnings)
+
+    async def test_revise_sends_current_html_and_teacher_note(self) -> None:
+        chat = AsyncMock(return_value=SAMPLE_HTML)
+        with patch("app.services.generate.chat_complete", chat):
+            html, warnings = await revise_html_game(
+                html="<html><body>old copy</body></html>",
+                message="Make level 2 a matching task",
+                level_count=3,
+                title="Tokens",
+                api_key="sk-test-1234567890",
+                provider="openai",
+                history=[{"role": "user", "content": "earlier note"}],
+            )
+        self.assertIn("LearnPlay.stage", html)
+        self.assertEqual(warnings, [])
+        payload = json.loads(chat.call_args.kwargs["user"])
+        self.assertEqual(payload["teacher_request"], "Make level 2 a matching task")
+        self.assertIn("old copy", payload["current_html"])
+        self.assertEqual(chat.call_args.kwargs["history"], [{"role": "user", "content": "earlier note"}])
+        system, user = html_revise_prompt(
+            html="<html></html>",
+            message="nudge",
+            level_count=3,
+            title="Tokens",
+        )
+        self.assertIn("LearnPlay.stage", system)
+        self.assertIn("nudge", user)
 
 
 class ChatCompleteTests(unittest.IsolatedAsyncioTestCase):

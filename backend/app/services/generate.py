@@ -10,11 +10,12 @@ from app.config import get_settings
 from app.schemas import DragMatchContent, QuizContent, TimedChallengeContent
 from app.services.llm import (
     STAGE_INSTRUCTIONS,
+    assert_html_safe,
     chat_complete,
     extract_html,
+    html_contract_warnings,
     normalize_provider,
     require_api_key,
-    validate_generated_html,
 )
 
 TEMPLATE_SCHEMAS = {
@@ -161,7 +162,7 @@ async def generate_html_game(
     api_key: str,
     provider: str,
     model: str | None = None,
-) -> str:
+) -> tuple[str, list[str]]:
     system, user = html_game_prompt(
         title=title,
         topic=topic,
@@ -178,5 +179,73 @@ async def generate_html_game(
         model=model,
         json_mode=False,
     )
-    html = extract_html(raw)
-    return validate_generated_html(html, level_count)
+    html = assert_html_safe(extract_html(raw))
+    return html, html_contract_warnings(html, level_count)
+
+
+def html_revise_prompt(
+    *,
+    html: str,
+    message: str,
+    level_count: int,
+    title: str,
+) -> tuple[str, str]:
+    system = (
+        "You are editing an existing self-contained HTML5 educational game. "
+        "Return one complete HTML5 document (no markdown). "
+        "Keep the game playable in a sandboxed iframe with no network except relative files. "
+        + STAGE_INSTRUCTIONS
+    )
+    user = json.dumps(
+        {
+            "title": title,
+            "level_count": level_count,
+            "teacher_request": message,
+            "requirements": [
+                "Apply the teacher's request to the current HTML.",
+                "Return the FULL updated document, not a diff.",
+                f"Keep exactly {level_count} playable levels unless the teacher asks to change that.",
+                f"Use TOTAL = {level_count} in every LearnPlay.stage(done, TOTAL, extra) call.",
+                f"On success call LearnPlay.stage({level_count}, {level_count}, {{ complete: true, score, label: 'Complete' }}).",
+                "No remote scripts, fonts, images, or iframes. Inline CSS and JavaScript only.",
+                "Do not invent a LearnPlay global. Call window.LearnPlay when it exists.",
+            ],
+            "current_html": html,
+        }
+    )
+    return system, user
+
+
+async def revise_html_game(
+    *,
+    html: str,
+    message: str,
+    level_count: int,
+    title: str,
+    api_key: str,
+    provider: str,
+    model: str | None = None,
+    history: list[dict[str, str]] | None = None,
+) -> tuple[str, list[str]]:
+    system, user = html_revise_prompt(
+        html=html,
+        message=message,
+        level_count=level_count,
+        title=title,
+    )
+    prior = [
+        item
+        for item in (history or [])
+        if item.get("role") == "user" and (item.get("content") or "").strip()
+    ][-6:]
+    raw = await chat_complete(
+        provider=provider,
+        api_key=api_key,
+        system=system,
+        user=user,
+        model=model,
+        json_mode=False,
+        history=prior,
+    )
+    next_html = assert_html_safe(extract_html(raw))
+    return next_html, html_contract_warnings(next_html, level_count)

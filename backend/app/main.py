@@ -93,6 +93,36 @@ def ensure_schema() -> None:
                 """
             )
         )
+        conn.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS game_drafts (
+                    id UUID PRIMARY KEY,
+                    owner_id UUID NOT NULL REFERENCES users(id),
+                    title VARCHAR(200) NOT NULL,
+                    topic VARCHAR(200) NOT NULL DEFAULT '',
+                    description TEXT NOT NULL DEFAULT '',
+                    difficulty INTEGER NOT NULL DEFAULT 2,
+                    level_count INTEGER NOT NULL DEFAULT 4,
+                    language VARCHAR(16) NOT NULL DEFAULT 'en',
+                    provider VARCHAR(16) NOT NULL DEFAULT 'openai',
+                    model VARCHAR(80),
+                    html TEXT NOT NULL,
+                    messages JSONB NOT NULL DEFAULT '[]'::jsonb,
+                    warnings JSONB NOT NULL DEFAULT '[]'::jsonb,
+                    assign_classroom_id UUID,
+                    published_game_id UUID,
+                    created_at TIMESTAMPTZ DEFAULT now(),
+                    updated_at TIMESTAMPTZ DEFAULT now()
+                )
+                """
+            )
+        )
+        conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_game_drafts_owner_id ON game_drafts (owner_id)"
+            )
+        )
 
 
 @asynccontextmanager

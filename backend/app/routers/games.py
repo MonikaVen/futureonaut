@@ -1,17 +1,18 @@
+from datetime import datetime, timezone
 from uuid import UUID, uuid4
-from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
-from app.auth import get_current_user, get_optional_user, require_game_author
+from app.auth import get_optional_user, require_game_author
 from app.database import get_db
 from app.models import (
     Classroom,
     ClassroomAssignment,
     Game,
     GameComment,
+    GameDraft,
     GameLike,
     GameSource,
     GameView,
@@ -21,19 +22,30 @@ from app.models import (
 )
 from app.schemas import (
     AIGenerateRequest,
+    DraftPublishRequest,
+    DraftReviseRequest,
+    GameDraftOut,
     GameOut,
     GameUpdate,
     HtmlGenerateRequest,
     TemplateGameCreate,
 )
-from app.services.generate import generate_ai_content, generate_html_game, validate_template_content
+from app.services.generate import (
+    generate_ai_content,
+    generate_html_game,
+    revise_html_game,
+    validate_template_content,
+)
 from app.services.llm import normalize_provider, require_api_key, store_llm_key
 from app.services.recommendations import game_to_out
 from app.services.snapshot import promote_pack_icon, save_game_icon, write_game_preview
 from app.services.social import enrich_games
 from app.services.storage import (
+    delete_draft_files,
     delete_game_files,
+    draft_dir,
     game_dir,
+    save_draft_html,
     save_uploaded_html,
     save_uploaded_zip,
     write_template_game,
@@ -214,17 +226,65 @@ def _assign_if_requested(db: Session, user: User, game: Game, classroom_id) -> N
     db.commit()
 
 
-@router.post("/generate-html", response_model=GameOut, status_code=status.HTTP_201_CREATED)
+def _draft_messages(raw) -> list[dict[str, str]]:
+    out: list[dict[str, str]] = []
+    for item in raw or []:
+        if not isinstance(item, dict):
+            continue
+        role = str(item.get("role") or "").strip()
+        content = str(item.get("content") or "").strip()
+        if role in {"user", "assistant"} and content:
+            out.append({"role": role, "content": content[:4000]})
+    return out
+
+
+def _draft_to_out(draft: GameDraft) -> GameDraftOut:
+    return GameDraftOut(
+        id=draft.id,
+        title=draft.title,
+        topic=draft.topic,
+        description=draft.description,
+        difficulty=draft.difficulty,
+        level_count=draft.level_count,
+        language=draft.language,
+        provider=draft.provider,
+        model=draft.model,
+        warnings=list(draft.warnings or []),
+        messages=[
+            {"role": m["role"], "content": m["content"]} for m in _draft_messages(draft.messages)
+        ],
+        preview_path="index.html",
+        published_game_id=draft.published_game_id,
+        created_at=draft.created_at,
+        updated_at=draft.updated_at,
+    )
+
+
+def _owned_draft(db: Session, user: User, draft_id: UUID) -> GameDraft:
+    draft = db.get(GameDraft, draft_id)
+    if draft is None:
+        raise HTTPException(status_code=404, detail="Draft not found")
+    if user.role != UserRole.admin and draft.owner_id != user.id:
+        raise HTTPException(status_code=403, detail="Not your draft")
+    return draft
+
+
+def _write_draft_preview(draft: GameDraft) -> None:
+    save_draft_html(draft.id, draft.html)
+
+
+@router.post("/generate-html", response_model=GameDraftOut, status_code=status.HTTP_201_CREATED)
 async def generate_html_game_endpoint(
     body: HtmlGenerateRequest,
     db: Session = Depends(get_db),
     user: User = Depends(require_game_author),
-) -> GameOut:
+) -> GameDraftOut:
     provider = normalize_provider(body.provider)
     api_key = require_api_key(body.api_key)
     store_llm_key(user, provider, api_key)
+    db.add(user)
     title = (body.title or "").strip() or f"{body.topic} game"
-    html = await generate_html_game(
+    html, warnings = await generate_html_game(
         title=title,
         topic=body.topic,
         difficulty=body.difficulty,
@@ -235,30 +295,178 @@ async def generate_html_game_endpoint(
         provider=provider,
         model=body.model,
     )
+    draft = GameDraft(
+        title=title[:200],
+        topic=body.topic[:200],
+        description=body.levels_brief[:8000],
+        owner_id=user.id,
+        difficulty=body.difficulty,
+        level_count=body.level_count,
+        language=(body.language or "en")[:16],
+        provider=provider,
+        model=(body.model or None),
+        html=html,
+        warnings=warnings,
+        messages=[
+            {
+                "role": "assistant",
+                "content": "Draft ready. Play it, then tell me what to change before you publish.",
+            }
+        ],
+        assign_classroom_id=body.assign_classroom_id,
+    )
+    db.add(draft)
+    db.commit()
+    db.refresh(draft)
+    try:
+        _write_draft_preview(draft)
+    except Exception as exc:
+        delete_draft_files(draft.id)
+        db.delete(draft)
+        db.commit()
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return _draft_to_out(draft)
+
+
+@router.get("/drafts", response_model=list[GameDraftOut])
+def list_drafts(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_game_author),
+) -> list[GameDraftOut]:
+    q = db.query(GameDraft).filter(GameDraft.published_game_id.is_(None))
+    if user.role != UserRole.admin:
+        q = q.filter(GameDraft.owner_id == user.id)
+    drafts = q.order_by(GameDraft.updated_at.desc()).limit(20).all()
+    return [_draft_to_out(d) for d in drafts]
+
+
+@router.get("/drafts/{draft_id}", response_model=GameDraftOut)
+def get_draft(
+    draft_id: UUID,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_game_author),
+) -> GameDraftOut:
+    return _draft_to_out(_owned_draft(db, user, draft_id))
+
+
+@router.post("/drafts/{draft_id}/revise", response_model=GameDraftOut)
+async def revise_draft(
+    draft_id: UUID,
+    body: DraftReviseRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_game_author),
+) -> GameDraftOut:
+    draft = _owned_draft(db, user, draft_id)
+    if draft.published_game_id is not None:
+        raise HTTPException(status_code=400, detail="This draft is already published")
+    provider = normalize_provider(body.provider)
+    api_key = require_api_key(body.api_key)
+    store_llm_key(user, provider, api_key)
+    db.add(user)
+    html, warnings = await revise_html_game(
+        html=draft.html,
+        message=body.message.strip(),
+        level_count=draft.level_count,
+        title=draft.title,
+        api_key=api_key,
+        provider=provider,
+        model=body.model or draft.model,
+        history=_draft_messages(draft.messages),
+    )
+    messages = _draft_messages(draft.messages)
+    messages.append({"role": "user", "content": body.message.strip()})
+    messages.append({"role": "assistant", "content": "Updated the game from your note."})
+    draft.html = html
+    draft.warnings = warnings
+    draft.messages = messages[-24:]
+    draft.provider = provider
+    if body.model:
+        draft.model = body.model
+    draft.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(draft)
+    _write_draft_preview(draft)
+    return _draft_to_out(draft)
+
+
+@router.post("/drafts/{draft_id}/publish", response_model=GameOut, status_code=status.HTTP_201_CREATED)
+def publish_draft(
+    draft_id: UUID,
+    body: DraftPublishRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_game_author),
+) -> GameOut:
+    draft = _owned_draft(db, user, draft_id)
+    if draft.published_game_id is not None:
+        game = db.get(Game, draft.published_game_id)
+        if game is not None:
+            return game_to_out(game)
+        raise HTTPException(status_code=400, detail="Published game is missing")
+    title = (body.title or draft.title or "").strip() or "Untitled game"
     game_id = uuid4()
     try:
-        entry = save_uploaded_html(game_id, html, "index.html")
+        entry = save_uploaded_html(game_id, draft.html, "index.html")
     except Exception as exc:
         delete_game_files(game_id)
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     game = Game(
         id=game_id,
         title=title[:200],
-        description=body.levels_brief[:500],
+        description=(draft.description or "")[:500],
         owner_id=user.id,
         source=GameSource.ai,
-        topic_tags=ensure_topic_tag([body.topic], title, body.levels_brief),
-        difficulty=body.difficulty,
+        topic_tags=ensure_topic_tag([draft.topic], title, draft.description),
+        difficulty=draft.difficulty,
         entry_path=entry,
-        source_language=(body.language or "en")[:16],
+        source_language=(draft.language or "en")[:16],
     )
     db.add(game)
+    draft.published_game_id = game.id
+    draft.title = title[:200]
+    draft.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(game)
     write_game_preview(game)
-    _assign_if_requested(db, user, game, body.assign_classroom_id)
+    classroom_id = body.assign_classroom_id if body.assign_classroom_id is not None else draft.assign_classroom_id
+    _assign_if_requested(db, user, game, classroom_id)
     db.refresh(game)
     return game_to_out(game)
+
+
+@router.delete("/drafts/{draft_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
+def delete_draft(
+    draft_id: UUID,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_game_author),
+) -> None:
+    draft = _owned_draft(db, user, draft_id)
+    delete_draft_files(draft.id)
+    db.delete(draft)
+    db.commit()
+
+
+@router.get("/drafts/{draft_id}/files/{file_path:path}")
+def serve_draft_file(
+    draft_id: UUID,
+    file_path: str,
+    db: Session = Depends(get_db),
+):
+    draft = db.get(GameDraft, draft_id)
+    if draft is None or draft.published_game_id is not None:
+        raise HTTPException(status_code=404, detail="Draft not found")
+    base = draft_dir(draft_id).resolve()
+    target = (base / file_path).resolve()
+    if not target.is_file() or not target.is_relative_to(base):
+        raise HTTPException(status_code=404, detail="File not found")
+    return FileResponse(
+        target,
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Cross-Origin-Resource-Policy": "cross-origin",
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "no-store",
+        },
+    )
 
 
 @router.get("/{game_id}", response_model=GameOut)

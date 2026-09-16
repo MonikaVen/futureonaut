@@ -36,6 +36,29 @@ export interface Game {
   has_screenshot?: boolean;
 }
 
+export interface DraftMessage {
+  role: "user" | "assistant" | string;
+  content: string;
+}
+
+export interface GameDraft {
+  id: string;
+  title: string;
+  topic: string;
+  description: string;
+  difficulty: number;
+  level_count: number;
+  language: string;
+  provider: string;
+  model?: string | null;
+  warnings: string[];
+  messages: DraftMessage[];
+  preview_path: string;
+  published_game_id?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Comment {
   id: string;
   game_id: string;
