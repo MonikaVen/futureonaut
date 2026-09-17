@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.database import get_db
 from app.models import Game, PlaySession
 from app.public_url import public_base_url
+from app.services.handles import play_slug, resolve_game
 from app.services.og import og_description, og_image_svg, score_card_svg, share_html
 from app.services.snapshot import ensure_game_preview, has_game_screenshot, screenshot_file
 
@@ -14,13 +15,13 @@ router = APIRouter(tags=["share"])
 
 
 @router.get("/share/{game_id}", response_class=HTMLResponse)
-def share_page(game_id: UUID, request: Request, db: Session = Depends(get_db)) -> HTMLResponse:
-    game = db.get(Game, game_id)
+def share_page(game_id: str, request: Request, db: Session = Depends(get_db)) -> HTMLResponse:
+    game = resolve_game(db, game_id)
     if game is None:
         raise HTTPException(status_code=404, detail="Game not found")
     base = public_base_url(request)
     share_url = f"{base}/share/{game.id}"
-    play_url = f"{base}/play/{game.id}"
+    play_url = f"{base}/play/{play_slug(game)}"
     image_url = f"{base}/share/{game.id}/card.png"
     html = share_html(
         title=game.title,

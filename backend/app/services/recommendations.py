@@ -24,6 +24,7 @@ def game_to_out(game: Game) -> GameOut:
         entry_path=game.entry_path,
         template_type=game.template_type,
         source_language=getattr(game, "source_language", None) or "en",
+        handle=getattr(game, "handle", None),
         created_at=game.created_at,
         play_url=f"/api/games/{game.id}/files/{game.entry_path}",
         has_screenshot=has_game_screenshot(game.id),

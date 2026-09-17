@@ -20,9 +20,10 @@ export function PlayPage() {
   const { gameId } = useParams();
   const { user } = useAuth();
   const { t, lang, setLang } = useLanguage();
-  const { theme, setTheme } = useTheme();
+  const { theme: platformTheme } = useTheme();
   const visitorId = useMemo(() => getVisitorId(), []);
   const [game, setGame] = useState<Game | null>(null);
+  const [gameTheme, setGameTheme] = useState<Theme>(platformTheme);
   const [session, setSession] = useState<Session | null>(null);
   const [points, setPoints] = useState(0);
   const [correct, setCorrect] = useState(0);
@@ -37,8 +38,8 @@ export function PlayPage() {
   const frameRef = useRef<HTMLIFrameElement>(null);
   const iframeSrcRef = useRef("");
   const iframeGameIdRef = useRef<string | null>(null);
-  const prefsRef = useRef({ theme, lang });
-  prefsRef.current = { theme, lang };
+  const prefsRef = useRef({ theme: gameTheme, lang });
+  prefsRef.current = { theme: gameTheme, lang };
 
   const postPrefs = useCallback((target?: Window | MessageEventSource | null) => {
     const win = (target && "postMessage" in target ? target : frameRef.current?.contentWindow) as
@@ -57,6 +58,7 @@ export function PlayPage() {
     let cancelled = false;
     iframeSrcRef.current = "";
     iframeGameIdRef.current = null;
+    setGameTheme(platformTheme);
     setReady(false);
     setSession(null);
     setPoints(0);
@@ -72,15 +74,15 @@ export function PlayPage() {
         const g = await api<Game>(`/api/games/${gameId}`);
         if (cancelled) return;
         setGame(g);
-        api(`/api/games/${gameId}/view`, { method: "POST", visitorId }).catch(() => {});
+        api(`/api/games/${g.id}/view`, { method: "POST", visitorId }).catch(() => {});
         const s = user
           ? await api<Session>("/api/sessions", {
               method: "POST",
-              body: JSON.stringify({ game_id: gameId }),
+              body: JSON.stringify({ game_id: g.id }),
             })
           : await api<Session>("/api/sessions/guest", {
               method: "POST",
-              body: JSON.stringify({ game_id: gameId, visitor_id: visitorId }),
+              body: JSON.stringify({ game_id: g.id, visitor_id: visitorId }),
             });
         if (!cancelled) {
           setSession(s);
@@ -126,7 +128,7 @@ export function PlayPage() {
         const nextTheme = payload.theme;
         const nextLang = typeof payload.lang === "string" ? payload.lang.slice(0, 2).toLowerCase() : "";
         if (nextTheme === "dark" || nextTheme === "light") {
-          setTheme(nextTheme as Theme);
+          setGameTheme(nextTheme as Theme);
         }
         if (UI_LANGS.some((item) => item.code === nextLang)) {
           setLang(nextLang as LangCode);
@@ -179,23 +181,23 @@ export function PlayPage() {
     }
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, [session, user, visitorId, postPrefs, setLang, setTheme]);
+  }, [session, user, visitorId, postPrefs, setLang]);
 
   useEffect(() => {
     postPrefs();
-  }, [theme, lang, ready, postPrefs]);
+  }, [gameTheme, lang, ready, postPrefs]);
 
   const src = useMemo(() => {
     if (!game) return "";
     if (iframeGameIdRef.current === game.id && iframeSrcRef.current) {
       return iframeSrcRef.current;
     }
-    const params = new URLSearchParams({ theme, lang });
+    const params = new URLSearchParams({ theme: gameTheme, lang });
     const next = `/api/games/${game.id}/files/${game.entry_path}?${params.toString()}`;
     iframeGameIdRef.current = game.id;
     iframeSrcRef.current = next;
     return next;
-  }, [game, theme, lang]);
+  }, [game, gameTheme, lang]);
 
   if (error) {
     return (
@@ -215,6 +217,7 @@ export function PlayPage() {
           {t("back")}
         </Link>
         <h1 className="player-title">{game.title}</h1>
+        {game.handle ? <span className="player-handle">{game.handle}</span> : null}
         <div className="metrics metrics-inline" aria-live="polite">
           <span>
             {t("points")} <b>{points}</b>

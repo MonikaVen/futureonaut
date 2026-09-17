@@ -42,6 +42,30 @@ export function Shell() {
           <NavLink to="/" className="brand">
             <BrandLogo />
           </NavLink>
+          <div className="nav-end">
+            <LanguageSelect />
+            <ThemeToggle />
+            {user ? (
+              <div className="nav-user">
+                <span className="nav-user-meta">
+                  {user.display_name}
+                  <span className="nav-user-role">{user.role}</span>
+                </span>
+                <button className="btn secondary btn-sm" type="button" onClick={logout}>
+                  {t("logout")}
+                </button>
+              </div>
+            ) : (
+              <div className="nav-auth">
+                <Link className="btn secondary btn-sm" to="/login">
+                  {t("signIn")}
+                </Link>
+                <Link className="btn accent btn-sm" to="/register">
+                  {t("signUp")}
+                </Link>
+              </div>
+            )}
+          </div>
           <button
             type="button"
             className="nav-toggle"
@@ -52,43 +76,19 @@ export function Shell() {
           >
             <span className="nav-toggle-icon" aria-hidden />
           </button>
-          <nav id="main-nav" className={`nav-links${navOpen ? " open" : ""}`}>
-            <div className="nav-pages">
-              <NavLink to="/">{t("games")}</NavLink>
-              {user && <NavLink to="/dashboard">{t("dashboard")}</NavLink>}
-              {user && <NavLink to="/recommendations">{t("forYou")}</NavLink>}
-              {user && <NavLink to="/classrooms">{t("classrooms")}</NavLink>}
-              {user && (user.can_create_games || user.role === "creator" || user.role === "admin" || user.role === "teacher") && (
-                <NavLink to="/creator">{t("creator")}</NavLink>
-              )}
-              {user?.role === "admin" && <NavLink to="/admin">{t("admin")}</NavLink>}
-            </div>
-            <div className="nav-end">
-              <LanguageSelect />
-              <ThemeToggle />
-              {user ? (
-                <div className="nav-user">
-                  <span className="nav-user-meta">
-                    {user.display_name}
-                    <span className="nav-user-role">{user.role}</span>
-                  </span>
-                  <button className="btn secondary btn-sm" type="button" onClick={logout}>
-                    {t("logout")}
-                  </button>
-                </div>
-              ) : (
-                <div className="nav-auth">
-                  <Link className="btn secondary btn-sm" to="/login">
-                    {t("signIn")}
-                  </Link>
-                  <Link className="btn accent btn-sm" to="/register">
-                    {t("signUp")}
-                  </Link>
-                </div>
-              )}
-            </div>
-          </nav>
         </div>
+        <nav id="main-nav" className={`nav-tabs${navOpen ? " open" : ""}`}>
+          <div className="nav-pages">
+            <NavLink to="/">{t("games")}</NavLink>
+            {user && <NavLink to="/dashboard">{t("dashboard")}</NavLink>}
+            {user && <NavLink to="/recommendations">{t("forYou")}</NavLink>}
+            {user && <NavLink to="/classrooms">{t("classrooms")}</NavLink>}
+            {user && (user.can_create_games || user.role === "creator" || user.role === "admin" || user.role === "teacher") && (
+              <NavLink to="/creator">{t("creator")}</NavLink>
+            )}
+            {user?.role === "admin" && <NavLink to="/admin">{t("admin")}</NavLink>}
+          </div>
+        </nav>
       </header>
 
       {!isPlay && (

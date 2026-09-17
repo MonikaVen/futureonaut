@@ -8,6 +8,7 @@ from uuid import uuid4
 
 from app.database import SessionLocal
 from app.models import Game, GameDraft, GameSource, User, UserRole
+from app.services.handles import allocate_handle
 from app.services.snapshot import ensure_game_preview, write_game_preview
 from app.services.storage import ensure_sdk_injected, game_dir, save_uploaded_html, write_sdk, write_template_game
 from app.services.topics import ensure_topic_tag
@@ -98,6 +99,7 @@ def seed_demo_games() -> None:
                         entry_path=entry,
                         template_type=template_type,
                         seed_file=f"template:{template_type}",
+                        handle=allocate_handle(db, admin, content["title"]),
                     )
                 )
             db.commit()
@@ -109,6 +111,7 @@ def seed_demo_games() -> None:
         restore_missing_game_files(db)
         restore_missing_template_html(db)
         refresh_game_previews(db)
+        backfill_game_handles(db)
     finally:
         db.close()
 
@@ -262,6 +265,7 @@ def seed_html_pack(db, owner_id) -> None:
             item.get("title") or "",
             item.get("file") or "",
         )
+        owner = db.get(User, owner_id)
         db.add(
             Game(
                 id=game_id,
@@ -273,12 +277,26 @@ def seed_html_pack(db, owner_id) -> None:
                 difficulty=int(item.get("difficulty") or 1),
                 entry_path=entry,
                 seed_file=seed_file,
+                handle=allocate_handle(db, owner, title),
             )
         )
         existing_files.add(seed_file)
         existing_titles.add(title)
         added += 1
     if added:
+        db.commit()
+
+
+def backfill_game_handles(db) -> None:
+    changed = False
+    for game in db.query(Game).all():
+        if game.handle:
+            continue
+        owner = db.get(User, game.owner_id)
+        game.handle = allocate_handle(db, owner, game.title, exclude_id=game.id)
+        db.flush()
+        changed = True
+    if changed:
         db.commit()
 
 

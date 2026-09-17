@@ -66,6 +66,7 @@ class GameOut(BaseModel):
     entry_path: str
     template_type: str | None
     source_language: str = "en"
+    handle: str | None = None
     created_at: datetime
     play_url: str | None = None
     like_count: int = 0
@@ -106,6 +107,7 @@ class GameUpdate(BaseModel):
     description: str | None = None
     topic_tags: list[str] | None = None
     difficulty: int | None = Field(default=None, ge=1, le=5)
+    html: str | None = Field(default=None, max_length=400_000)
 
 
 class QuizOption(BaseModel):
@@ -208,6 +210,7 @@ class GameDraftOut(BaseModel):
     preview_path: str = "index.html"
     preview_token: str = ""
     published_game_id: uuid.UUID | None = None
+    source_game_id: uuid.UUID | None = None
     created_at: datetime
     updated_at: datetime
 

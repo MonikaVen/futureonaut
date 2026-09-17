@@ -144,6 +144,10 @@ const COPY: Record<LangCode, Record<string, string>> = {
     openDraft: "Continue draft",
     chatEmptyPreview: "Your game preview will appear here after the first reply.",
     newGameChat: "New game",
+    editGame: "Edit",
+    editingPublishedGame: "Editing a published game. Chat to change it, then Deploy to update the live listing.",
+    gameHandle: "Handle",
+    gameUpdated: "Game updated.",
   },
   lt: {
     games: "Žaidimai",
@@ -266,6 +270,10 @@ const COPY: Record<LangCode, Record<string, string>> = {
     openDraft: "Tęsti juodraštį",
     chatEmptyPreview: "Peržiūra atsiras po pirmo atsakymo.",
     newGameChat: "Naujas žaidimas",
+    editGame: "Redaguoti",
+    editingPublishedGame: "Redaguojamas paskelbtas žaidimas. Pakeisk pokalbiu ir Deploy atnaujins sąrašą.",
+    gameHandle: "Adresas",
+    gameUpdated: "Žaidimas atnaujintas.",
   },
   lv: {
     games: "Spēles",

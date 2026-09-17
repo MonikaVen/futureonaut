@@ -11,6 +11,11 @@ export function gameShareImageUrl(gameId: string): string {
 }
 
 /** Direct play URL for users already on the site. */
+export function gamePlayPath(game: { id: string; handle?: string | null }): string {
+  const slug = (game.handle || "").trim() || game.id;
+  return `/play/${slug}`;
+}
+
 export function gamePlayUrl(gameId: string): string {
   return `${window.location.origin}/play/${gameId}`;
 }

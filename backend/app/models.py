@@ -72,6 +72,7 @@ class Game(Base):
     seed_file: Mapped[str | None] = mapped_column(String(200), nullable=True)
     source_language: Mapped[str] = mapped_column(String(16), nullable=False, default="en")
     html: Mapped[str | None] = mapped_column(Text, nullable=True)
+    handle: Mapped[str | None] = mapped_column(String(120), unique=True, index=True, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     owner: Mapped[User] = relationship(back_populates="games")
@@ -97,6 +98,7 @@ class GameDraft(Base):
     warnings: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
     assign_classroom_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     published_game_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    source_game_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

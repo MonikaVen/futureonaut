@@ -47,6 +47,7 @@ class CatalogCurationTests(unittest.TestCase):
             patch("app.services.demo_seed.restore_missing_game_files"),
             patch("app.services.demo_seed.restore_missing_template_html"),
             patch("app.services.demo_seed.refresh_game_previews"),
+            patch("app.services.demo_seed.backfill_game_handles"),
         ):
             seed_demo_games()
         pack.assert_not_called()

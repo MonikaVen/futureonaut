@@ -134,7 +134,7 @@ export function GameSocial({
         </div>
         {compact && (
           <div className="social-actions-right">
-            <Link className="btn accent social-play-btn" to={`/play/${game.id}`}>
+            <Link className="btn accent social-play-btn" to={game.handle ? `/play/${game.handle}` : `/play/${game.id}`}>
               <PlayIcon size={14} />
               <span>{t("play")}</span>
             </Link>

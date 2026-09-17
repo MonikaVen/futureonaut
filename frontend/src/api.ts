@@ -23,6 +23,7 @@ export interface Game {
   entry_path: string;
   template_type: string | null;
   source_language?: string;
+  handle?: string | null;
   created_at: string;
   play_url?: string | null;
   like_count?: number;
@@ -56,6 +57,7 @@ export interface GameDraft {
   preview_path: string;
   preview_token?: string;
   published_game_id?: string | null;
+  source_game_id?: string | null;
   created_at: string;
   updated_at: string;
 }

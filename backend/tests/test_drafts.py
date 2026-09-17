@@ -14,6 +14,7 @@ from app.routers.games import (
     GAME_IFRAME_SANDBOX,
     _draft_to_out,
     chat_draft,
+    create_edit_draft,
     game_file_headers,
     generate_html_game_endpoint,
     publish_draft,
@@ -98,8 +99,66 @@ class DraftEndpointTests(unittest.IsolatedAsyncioTestCase):
             out = publish_draft(draft_id, DraftPublishRequest(), db, user)
         self.assertEqual(created["game"].source, GameSource.ai)
         self.assertEqual(created["game"].title, "Neurons")
+        self.assertTrue(getattr(created["game"], "handle", None))
         self.assertEqual(draft.published_game_id, created["game"].id)
         self.assertEqual(out.title, "Neurons")
+
+    def test_publish_updates_existing_game_in_place(self) -> None:
+        from app.models import Game
+
+        draft_id = uuid4()
+        user_id = uuid4()
+        game_id = uuid4()
+        game = Game(
+            id=game_id,
+            title="Old title",
+            description="old",
+            owner_id=user_id,
+            source=GameSource.ai,
+            topic_tags=["AI"],
+            difficulty=2,
+            entry_path="index.html",
+            html="<html>old</html>",
+            handle="teacher-old-title",
+        )
+        draft = GameDraft(
+            id=draft_id,
+            owner_id=user_id,
+            title="Old title",
+            topic="neurons",
+            description="updated brief",
+            difficulty=2,
+            level_count=3,
+            language="en",
+            provider="openai",
+            html="<!DOCTYPE html><html><body>new</body></html>",
+            messages=[],
+            warnings=[],
+            source_game_id=game_id,
+        )
+        db = MagicMock()
+
+        def getter(model, ident):
+            if ident == draft_id:
+                return draft
+            if ident == game_id:
+                return game
+            return None
+
+        db.get.side_effect = getter
+        user = SimpleNamespace(id=user_id, role=UserRole.teacher, display_name="Teacher", email="t@x.com")
+        with (
+            patch("app.routers.games.save_uploaded_html", return_value="index.html"),
+            patch("app.routers.games.write_game_preview"),
+            patch("app.routers.games.game_to_out", side_effect=lambda g: SimpleNamespace(id=g.id, title=g.title, handle=g.handle)),
+            patch("app.routers.games.allocate_handle", return_value="teacher-old-title"),
+        ):
+            out = publish_draft(draft_id, DraftPublishRequest(title="Old title"), db, user)
+        self.assertEqual(game.html, draft.html)
+        self.assertEqual(draft.published_game_id, game_id)
+        self.assertEqual(out.id, game_id)
+        self.assertEqual(game.handle, "teacher-old-title")
+        db.add.assert_not_called()
 
     async def test_chat_creates_draft_from_message(self) -> None:
         html = "<!DOCTYPE html><html><title>Gravity Lab</title><body>ok</body></html>"
@@ -208,6 +267,92 @@ class FrameIsolationTests(unittest.TestCase):
         self.assertIn("tryExampleChat", studio)
         self.assertIn("onSend(example)", studio)
         self.assertNotIn("/files/", studio)
+        self.assertIn("edit-draft", creator)
+        self.assertIn("setGameTheme", play)
+        self.assertNotIn("setTheme(nextTheme", play)
+        shell = (root / "frontend/src/Shell.tsx").read_text(encoding="utf-8")
+        self.assertIn("nav-tabs", shell)
+        self.assertIn("ThemeToggle", shell)
+        self.assertLess(shell.index("topnav-bar"), shell.index("nav-tabs"))
+
+
+class EditDraftTests(unittest.TestCase):
+    def test_edit_draft_reuses_open_source_draft(self) -> None:
+        user_id = uuid4()
+        game_id = uuid4()
+        existing_id = uuid4()
+        now = datetime.now(timezone.utc)
+        existing = SimpleNamespace(
+            id=existing_id,
+            owner_id=user_id,
+            title="Keep",
+            topic="AI",
+            description="",
+            difficulty=2,
+            level_count=4,
+            language="en",
+            provider="openai",
+            model=None,
+            html="<html>keep</html>",
+            warnings=[],
+            messages=[],
+            published_game_id=None,
+            source_game_id=game_id,
+            created_at=now,
+            updated_at=now,
+        )
+        game = SimpleNamespace(
+            id=game_id,
+            owner_id=user_id,
+            title="Keep",
+            html="<html>keep</html>",
+            description="",
+            difficulty=2,
+            topic_tags=["AI"],
+            source_language="en",
+            entry_path="index.html",
+        )
+        db = MagicMock()
+        db.get.return_value = game
+        db.query.return_value.filter.return_value.order_by.return_value.first.return_value = existing
+        user = SimpleNamespace(id=user_id, role=UserRole.teacher)
+        with patch("app.routers.games._write_draft_preview"):
+            out = create_edit_draft(str(game_id), db, user)
+        self.assertEqual(out.id, existing_id)
+        db.add.assert_not_called()
+
+    def test_edit_draft_creates_from_game_html(self) -> None:
+        user_id = uuid4()
+        game_id = uuid4()
+        game = SimpleNamespace(
+            id=game_id,
+            owner_id=user_id,
+            title="Editable",
+            html="<!DOCTYPE html><html><body>edit me</body></html>",
+            description="desc",
+            difficulty=3,
+            topic_tags=["AI"],
+            source_language="en",
+            entry_path="index.html",
+        )
+        db = MagicMock()
+        db.get.return_value = game
+        db.query.return_value.filter.return_value.order_by.return_value.first.return_value = None
+        captured: dict = {}
+
+        def add(obj):
+            captured["draft"] = obj
+            obj.id = uuid4()
+            obj.created_at = datetime.now(timezone.utc)
+            obj.updated_at = obj.created_at
+
+        db.add.side_effect = add
+        user = SimpleNamespace(id=user_id, role=UserRole.teacher, llm_provider="openai")
+        with patch("app.routers.games._write_draft_preview"):
+            out = create_edit_draft(str(game_id), db, user)
+        self.assertEqual(captured["draft"].source_game_id, game_id)
+        self.assertEqual(captured["draft"].html, game.html)
+        self.assertEqual(out.source_game_id, game_id)
 
 
 class DraftFileTokenTests(unittest.TestCase):

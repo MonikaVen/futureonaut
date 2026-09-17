@@ -127,7 +127,7 @@ export function CreatorPage() {
     }
   }
 
-  async function deployDraft() {
+  async function deployDraft(title?: string) {
     if (!draft) return;
     setBusy(true);
     setError("");
@@ -136,12 +136,13 @@ export function CreatorPage() {
       const game = await api<Game>(`/api/games/drafts/${draft.id}/publish`, {
         method: "POST",
         body: JSON.stringify({
-          title: draft.title,
+          title: (title || draft.title).trim() || draft.title,
           assign_classroom_id: assignClassId || null,
         }),
       });
+      const updated = Boolean(draft.source_game_id);
       setDraft(null);
-      setMessage(`${t("gamePublished")} ${game.title}`);
+      setMessage(`${updated ? t("gameUpdated") : t("gamePublished")} ${game.title}`);
       await reload(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("publishGame"));
@@ -161,6 +162,21 @@ export function CreatorPage() {
       await reload(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("discardDraft"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function startEdit(id: string) {
+    setBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      const next = await api<GameDraft>(`/api/games/${id}/edit-draft`, { method: "POST" });
+      setDraft(next);
+      document.querySelector(".draft-studio")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("editGame"));
     } finally {
       setBusy(false);
     }
@@ -322,9 +338,10 @@ export function CreatorPage() {
         <table className="table">
           <thead>
             <tr>
-              <th>Title</th>
+              <th>{t("titleSort")}</th>
+              <th>{t("gameHandle")}</th>
               <th>Source</th>
-              <th>Difficulty</th>
+              <th>{t("level")}</th>
               <th />
             </tr>
           </thead>
@@ -332,12 +349,18 @@ export function CreatorPage() {
             {games.map((g) => (
               <tr key={g.id}>
                 <td>{g.title}</td>
+                <td>
+                  <code className="game-handle">{g.handle || g.id.slice(0, 8)}</code>
+                </td>
                 <td>{g.source}</td>
                 <td>{g.difficulty}</td>
                 <td className="row">
-                  <Link className="btn secondary" to={`/play/${g.id}`}>
-                    Play
+                  <Link className="btn secondary" to={g.handle ? `/play/${g.handle}` : `/play/${g.id}`}>
+                    {t("play")}
                   </Link>
+                  <button className="btn secondary" type="button" disabled={busy} onClick={() => startEdit(g.id)}>
+                    {t("editGame")}
+                  </button>
                   <button className="btn danger" type="button" onClick={() => remove(g.id)}>
                     Delete
                   </button>

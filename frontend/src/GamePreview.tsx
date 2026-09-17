@@ -6,6 +6,7 @@ import { useLanguage } from "./language";
 
 type Props = {
   gameId: string;
+  playId?: string;
   title: string;
   description?: string;
   topic: string;
@@ -29,6 +30,7 @@ function orbStyle(id: string): CSSProperties {
 
 export function GamePreview({
   gameId,
+  playId,
   title,
   description,
   topic,
@@ -54,7 +56,7 @@ export function GamePreview({
   return (
     <Link
       className={`game-preview topic-${kind}${showPhoto ? " has-photo" : ""}${solved ? " is-solved" : ""}`}
-      to={`/play/${gameId}`}
+      to={`/play/${playId || gameId}`}
       aria-label={`${t("play")} ${title}`}
       style={orbStyle(gameId)}
     >

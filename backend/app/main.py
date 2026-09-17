@@ -122,6 +122,15 @@ def ensure_schema() -> None:
             text("ALTER TABLE games ADD COLUMN IF NOT EXISTS html TEXT")
         )
         conn.execute(
+            text("ALTER TABLE games ADD COLUMN IF NOT EXISTS handle VARCHAR(120)")
+        )
+        conn.execute(
+            text("CREATE UNIQUE INDEX IF NOT EXISTS ix_games_handle ON games (handle)")
+        )
+        conn.execute(
+            text("ALTER TABLE game_drafts ADD COLUMN IF NOT EXISTS source_game_id UUID")
+        )
+        conn.execute(
             text(
                 "CREATE INDEX IF NOT EXISTS ix_game_drafts_owner_id ON game_drafts (owner_id)"
             )

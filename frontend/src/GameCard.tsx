@@ -35,6 +35,7 @@ export function GameCard({ game, topic, focusLabels, onUpdate }: Props) {
     <article className="game-tile">
       <GamePreview
         gameId={game.id}
+        playId={game.handle || game.id}
         title={game.title}
         description={game.description}
         topic={topic}

@@ -53,6 +53,7 @@ from app.services.storage import (
     write_template_game,
 )
 from app.services.demo_seed import restore_game_html_files
+from app.services.handles import allocate_handle, resolve_game
 from app.services.topics import ensure_topic_tag
 
 # Document CSP sandbox (no allow-same-origin) makes game HTML a unique origin even
@@ -155,6 +156,8 @@ async def upload_game(
         topic_tags=tags,
         difficulty=difficulty,
         entry_path=entry,
+        html=raw.decode("utf-8", errors="replace") if not filename.lower().endswith(".zip") else None,
+        handle=allocate_handle(db, user, title),
     )
     db.add(game)
     db.commit()
@@ -190,6 +193,7 @@ def create_from_template(
         difficulty=int(content.get("difficulty") or 1),
         entry_path=entry,
         template_type=body.template_type,
+        handle=allocate_handle(db, user, content.get("title", "Untitled")),
     )
     db.add(game)
     db.commit()
@@ -233,6 +237,7 @@ async def generate_game(
         difficulty=body.difficulty,
         entry_path=entry,
         template_type=body.template_type,
+        handle=allocate_handle(db, user, content.get("title", f"{body.topic} game")),
     )
     db.add(game)
     db.commit()
@@ -291,9 +296,40 @@ def _draft_to_out(draft: GameDraft) -> GameDraftOut:
         preview_path="index.html",
         preview_token=create_draft_file_token(draft.id, draft.owner_id),
         published_game_id=draft.published_game_id,
+        source_game_id=getattr(draft, "source_game_id", None),
         created_at=draft.created_at,
         updated_at=draft.updated_at,
     )
+
+
+def _game_or_404(db: Session, ref: str) -> Game:
+    game = resolve_game(db, ref)
+    if game is None:
+        raise HTTPException(status_code=404, detail="Game not found")
+    return game
+
+
+def _owned_game(db: Session, user: User, ref: str) -> Game:
+    game = _game_or_404(db, ref)
+    if user.role != UserRole.admin and game.owner_id != user.id:
+        raise HTTPException(status_code=403, detail="Not your game")
+    return game
+
+
+def _game_html(game: Game) -> str:
+    if game.html:
+        return game.html
+    path = game_dir(game.id) / (game.entry_path or "index.html")
+    if path.is_file():
+        return path.read_text(encoding="utf-8", errors="replace")
+    return ""
+
+
+def _refresh_handle(db: Session, game: Game, title: str, actor: User) -> None:
+    if game.handle and game.title == title[:200]:
+        return
+    owner = db.get(User, game.owner_id) or actor
+    game.handle = allocate_handle(db, owner, title, exclude_id=game.id)
 
 
 def _owned_draft(db: Session, user: User, draft_id: UUID) -> GameDraft:
@@ -520,6 +556,32 @@ def publish_draft(
             return game_to_out(game)
         raise HTTPException(status_code=400, detail="Published game is missing")
     title = (body.title or draft.title or "").strip() or "Untitled game"
+    if draft.source_game_id is not None:
+        game = db.get(Game, draft.source_game_id)
+        if game is None:
+            raise HTTPException(status_code=404, detail="Game not found")
+        if user.role != UserRole.admin and game.owner_id != user.id:
+            raise HTTPException(status_code=403, detail="Not your game")
+        try:
+            entry = save_uploaded_html(game.id, draft.html, "index.html")
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        next_title = title[:200]
+        _refresh_handle(db, game, next_title, user)
+        game.title = next_title
+        game.description = (draft.description or game.description or "")[:500]
+        game.entry_path = entry
+        game.html = draft.html
+        draft.published_game_id = game.id
+        draft.title = title[:200]
+        draft.updated_at = datetime.now(timezone.utc)
+        db.commit()
+        db.refresh(game)
+        write_game_preview(game)
+        classroom_id = body.assign_classroom_id if body.assign_classroom_id is not None else draft.assign_classroom_id
+        _assign_if_requested(db, user, game, classroom_id)
+        db.refresh(game)
+        return game_to_out(game)
     game_id = uuid4()
     try:
         entry = save_uploaded_html(game_id, draft.html, "index.html")
@@ -537,6 +599,7 @@ def publish_draft(
         entry_path=entry,
         source_language=(draft.language or "en")[:16],
         html=draft.html,
+        handle=allocate_handle(db, user, title),
     )
     db.add(game)
     draft.published_game_id = game.id
@@ -589,28 +652,87 @@ def serve_draft_file(
     )
 
 
+@router.post("/{game_id}/edit-draft", response_model=GameDraftOut)
+def create_edit_draft(
+    game_id: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_game_author),
+) -> GameDraftOut:
+    game = _owned_game(db, user, game_id)
+    existing = (
+        db.query(GameDraft)
+        .filter(
+            GameDraft.source_game_id == game.id,
+            GameDraft.published_game_id.is_(None),
+            GameDraft.owner_id == user.id,
+        )
+        .order_by(GameDraft.updated_at.desc())
+        .first()
+    )
+    if existing is not None:
+        if not existing.html:
+            existing.html = _game_html(game)
+            db.commit()
+            db.refresh(existing)
+        _write_draft_preview(existing)
+        return _draft_to_out(existing)
+    html = _game_html(game)
+    if not html.strip():
+        raise HTTPException(status_code=400, detail="This game has no HTML to edit")
+    now = datetime.now(timezone.utc)
+    draft = GameDraft(
+        title=game.title[:200],
+        topic=(game.topic_tags[0] if game.topic_tags else game.title)[:200],
+        description=(game.description or "")[:8000],
+        owner_id=user.id,
+        difficulty=game.difficulty or 2,
+        level_count=4,
+        language=(game.source_language or "en")[:16],
+        provider=getattr(user, "llm_provider", None) or "openai",
+        model=None,
+        html=html,
+        warnings=[],
+        messages=[
+            {
+                "role": "assistant",
+                "content": "Editing your published game. Chat to change it, then Deploy to update the live version.",
+            }
+        ],
+        source_game_id=game.id,
+        created_at=now,
+        updated_at=now,
+    )
+    db.add(draft)
+    db.commit()
+    db.refresh(draft)
+    try:
+        _write_draft_preview(draft)
+    except Exception as exc:
+        delete_draft_files(draft.id)
+        db.delete(draft)
+        db.commit()
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return _draft_to_out(draft)
+
+
 @router.get("/{game_id}", response_model=GameOut)
 def get_game(
-    game_id: UUID,
+    game_id: str,
     db: Session = Depends(get_db),
     user: User | None = Depends(get_optional_user),
 ) -> GameOut:
-    game = db.get(Game, game_id)
-    if game is None:
-        raise HTTPException(status_code=404, detail="Game not found")
+    game = _game_or_404(db, game_id)
     return enrich_games(db, [game], user.id if user else None)[0]
 
 
 @router.post("/{game_id}/view", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 def record_game_view(
-    game_id: UUID,
+    game_id: str,
     db: Session = Depends(get_db),
     user: User | None = Depends(get_optional_user),
     x_visitor_id: str | None = Header(default=None, alias="X-Visitor-Id"),
 ) -> None:
-    game = db.get(Game, game_id)
-    if game is None:
-        raise HTTPException(status_code=404, detail="Game not found")
+    game = _game_or_404(db, game_id)
     visitor = (x_visitor_id or "").strip()[:64] or None
     if user is None and not visitor:
         return
@@ -644,29 +766,39 @@ def record_game_view(
 
 @router.patch("/{game_id}", response_model=GameOut)
 def update_game(
-    game_id: UUID,
+    game_id: str,
     body: GameUpdate,
     db: Session = Depends(get_db),
     user: User = Depends(require_game_author),
 ) -> GameOut:
-    game = db.get(Game, game_id)
-    if game is None:
-        raise HTTPException(status_code=404, detail="Game not found")
-    if user.role != UserRole.admin and game.owner_id != user.id:
-        raise HTTPException(status_code=403, detail="Not your game")
+    game = _owned_game(db, user, game_id)
     data = body.model_dump(exclude_unset=True)
+    html = data.pop("html", None)
     if "title" in data:
         data["title"] = (data["title"] or "").strip()
         if not data["title"]:
             raise HTTPException(status_code=400, detail="Title is required")
+        _refresh_handle(db, game, data["title"], user)
     if "topic_tags" in data and data["topic_tags"] is not None:
         data["topic_tags"] = ensure_topic_tag(
             data["topic_tags"],
             data.get("title") or game.title,
             data.get("description") or game.description or "",
         )
+    if html is not None:
+        html = html.strip()
+        if not html:
+            raise HTTPException(status_code=400, detail="HTML is required")
+        try:
+            entry = save_uploaded_html(game.id, html, "index.html")
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        game.html = html
+        game.entry_path = entry
     for key, value in data.items():
         setattr(game, key, value)
+    if not game.handle:
+        _refresh_handle(db, game, game.title, user)
     db.commit()
     db.refresh(game)
     write_game_preview(game)
@@ -675,15 +807,11 @@ def update_game(
 
 @router.delete("/{game_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 def delete_game(
-    game_id: UUID,
+    game_id: str,
     db: Session = Depends(get_db),
     user: User = Depends(require_game_author),
 ) -> None:
-    game = db.get(Game, game_id)
-    if game is None:
-        raise HTTPException(status_code=404, detail="Game not found")
-    if user.role != UserRole.admin and game.owner_id != user.id:
-        raise HTTPException(status_code=403, detail="Not your game")
+    game = _owned_game(db, user, game_id)
     sessions = db.query(PlaySession).filter(PlaySession.game_id == game.id).all()
     for session in sessions:
         db.delete(session)
