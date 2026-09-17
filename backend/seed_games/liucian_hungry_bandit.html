@@ -127,7 +127,7 @@ button.primary{background:var(--accent);color:#fff}button:disabled{opacity:.45;c
     $("mTreats").textContent = treats;
     const regret = (BUDGET - left) * oracle() - treats;
     $("mRegret").textContent = Math.max(0, regret).toFixed(1);
-    $("campaign").textContent = campaign + treats;
+    $("campaign").textContent = campaign + (finished ? 0 : treats);
     const host = $("bowls");
     host.innerHTML = "";
     pulls.forEach((_, i) => {
@@ -140,10 +140,14 @@ button.primary{background:var(--accent);color:#fff}button:disabled{opacity:.45;c
         <div><b>${counts[i]}</b> tries</div>
         <div class="tiny">avg ${counts[i] ? a.toFixed(2) : "—"}</div>
         <div class="bar"><div class="fill" style="width:${Math.round(a*100)}%"></div></div>`;
-      el.disabled = left <= 0 || !!timer;
+      el.disabled = left <= 0 || !!timer || finished;
       el.onclick = () => pounce(i, false);
       host.appendChild(el);
     });
+    if (finished) {
+      const best = pulls.indexOf(oracle());
+      host.children[best]?.classList.add("best");
+    }
     $("avgs").innerHTML = pulls.map((_, i) =>
       `${ICONS[i]} ${NAMES[i]}: ${counts[i] ? avg(i).toFixed(2) : "no data yet"}`
     ).join("<br>");
@@ -180,7 +184,6 @@ button.primary{background:var(--accent);color:#fff}button:disabled{opacity:.45;c
     lp.answer({
       correct: treats >= 12,
       taskId: "kitchen-" + kitchen,
-      points: treats
     });
     $("feedback").innerHTML =
       `Kitchen done. Best bowl was <b>${NAMES[best]}</b> (p = ${oracle().toFixed(2)}). You got <b>${treats}</b> treats. Regret ≈ ${regret.toFixed(1)}.`;

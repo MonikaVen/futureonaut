@@ -79,9 +79,9 @@ svg{display:block;width:100%;height:auto}.feedback{min-height:24px;margin-top:10
 (() => {
   const lp = window.LearnPlay || {score(){},answer(){},taskStart(){},taskEnd(){},complete(){}};
   const $ = (id) => document.getElementById(id);
-  const xmin = -4.5, xmax = 4.5, W = 700, H = 300, pad = 36;
+  const xmin = -4.5, xmax = 4.5, W = 700, H = 300, pad = 36, ymax = 8.2;
   const sx = (x) => pad + (x - xmin) / (xmax - xmin) * (W - 2 * pad);
-  const sy = (y) => 20 + (1 - (y - 0) / 6.2) * (H - 30);
+  const sy = (y) => 20 + (1 - (Math.min(ymax, Math.max(0, y)) / ymax)) * (H - 30);
 
   const levels = [
     {
@@ -127,7 +127,7 @@ svg{display:block;width:100%;height:auto}.feedback{min-height:24px;margin-top:10
     let d = "";
     for (let i = 0; i <= 120; i++) {
       const xv = xmin + (xmax - xmin) * i / 120;
-      const y = Math.min(6.2, lv.L(xv));
+      const y = Math.min(ymax, lv.L(xv));
       d += (i ? "L" : "M") + sx(xv) + " " + sy(y) + " ";
     }
     $("curve").setAttribute("d", d);
@@ -138,7 +138,7 @@ svg{display:block;width:100%;height:auto}.feedback{min-height:24px;margin-top:10
     ft.textContent = "🐟";
     const cat = $("cat");
     cat.innerHTML = "";
-    const cx = sx(x), cy = sy(Math.min(6.2, lv.L(x)));
+    const cx = sx(x), cy = sy(lv.L(x));
     addSvg("circle", { cx, cy: cy - 6, r: 14, fill: "#6b7280", stroke: "#111827", "stroke-width": 3 }, cat);
     const lb = addSvg("text", { x: cx, y: cy - 24, "text-anchor": "middle", "font-size": 12, fill: "#111827" }, cat);
     lb.textContent = "Liucian";
