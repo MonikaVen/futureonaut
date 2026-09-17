@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, type Game, type Session } from "../api";
 import { useAuth } from "../auth";
 import { GameShare } from "../GameShare";
@@ -18,6 +18,7 @@ type SdkMessage = {
 
 export function PlayPage() {
   const { gameId } = useParams();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const { t, lang, setLang } = useLanguage();
   const { theme: platformTheme } = useTheme();
@@ -38,6 +39,9 @@ export function PlayPage() {
   const frameRef = useRef<HTMLIFrameElement>(null);
   const iframeSrcRef = useRef("");
   const iframeGameIdRef = useRef<string | null>(null);
+  const loadedUserRef = useRef<string>("");
+  const gameRef = useRef(game);
+  gameRef.current = game;
   const prefsRef = useRef({ theme: gameTheme, lang });
   prefsRef.current = { theme: gameTheme, lang };
 
@@ -55,6 +59,11 @@ export function PlayPage() {
 
   useEffect(() => {
     if (!gameId) return;
+    const userKey = user?.id || "guest";
+    const current = gameRef.current;
+    if (current && (current.handle === gameId || current.id === gameId) && loadedUserRef.current === userKey) {
+      return;
+    }
     let cancelled = false;
     iframeSrcRef.current = "";
     iframeGameIdRef.current = null;
@@ -74,6 +83,7 @@ export function PlayPage() {
         const g = await api<Game>(`/api/games/${gameId}`);
         if (cancelled) return;
         setGame(g);
+        loadedUserRef.current = userKey;
         api(`/api/games/${g.id}/view`, { method: "POST", visitorId }).catch(() => {});
         const s = user
           ? await api<Session>("/api/sessions", {
@@ -102,7 +112,13 @@ export function PlayPage() {
     return () => {
       cancelled = true;
     };
-  }, [gameId, user, visitorId]);
+  }, [gameId, user, visitorId, navigate]);
+
+  useEffect(() => {
+    if (ready && game?.handle && gameId && game.handle !== gameId) {
+      navigate(`/play/${game.handle}`, { replace: true });
+    }
+  }, [ready, game, gameId, navigate]);
 
   useEffect(() => {
     function onMessage(ev: MessageEvent<SdkMessage>) {

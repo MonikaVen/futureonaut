@@ -132,6 +132,7 @@ def continue_sessions(
                 total_points=s.total_points,
                 started_at=s.started_at,
                 has_screenshot=has_game_screenshot(s.game_id),
+                handle=getattr(s.game, "handle", None) if s.game else None,
             )
         )
         if len(out) >= 6:

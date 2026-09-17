@@ -104,6 +104,7 @@ export interface ContinueSession {
   total_points: number;
   started_at: string;
   has_screenshot?: boolean;
+  handle?: string | null;
 }
 
 export interface Classroom {

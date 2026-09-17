@@ -42,6 +42,7 @@ export function ContinuePlaying() {
             <article key={item.session_id} className="game-tile">
               <GamePreview
                 gameId={item.game_id}
+                playId={item.handle || item.game_id}
                 title={item.game_title}
                 description={item.game_description}
                 topic={primaryTopic(item.topic_tags)}
@@ -55,7 +56,7 @@ export function ContinuePlaying() {
                   {item.total_points} {t("pts")}
                   {progressLabel ? ` · ${progressLabel}` : ""}
                 </p>
-                <Link className="btn accent btn-sm" to={`/play/${item.game_id}`}>
+                <Link className="btn accent btn-sm" to={`/play/${item.handle || item.game_id}`}>
                   {t("continue")}
                 </Link>
               </div>

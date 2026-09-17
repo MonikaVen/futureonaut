@@ -326,6 +326,7 @@ class ContinueSessionOut(BaseModel):
     total_points: int
     started_at: datetime
     has_screenshot: bool = False
+    handle: str | None = None
 
 
 class ClassroomCreate(BaseModel):
