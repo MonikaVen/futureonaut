@@ -235,7 +235,13 @@ export function PlayPage() {
           {t("back")}
         </Link>
         <h1 className="player-title">{game.title}</h1>
-        {game.handle ? <span className="player-handle">{game.handle}</span> : null}
+        {game.owner_slug ? (
+          <Link className="player-handle" to={`/u/${game.owner_slug}`}>
+            {game.owner_name || game.owner_slug}
+          </Link>
+        ) : game.handle ? (
+          <span className="player-handle">{game.handle}</span>
+        ) : null}
         <div className="metrics metrics-inline" aria-live="polite">
           <span>
             {t("points")} <b>{points}</b>
@@ -270,6 +276,7 @@ export function PlayPage() {
             liked_by_me: game.liked_by_me ?? false,
           }}
           onUpdate={(patch) => setGame((g) => (g ? { ...g, ...patch } : g))}
+          showComments
         />
         <GameShare gameId={game.id} title={game.title} description={game.description} />
       </div>

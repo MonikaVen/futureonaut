@@ -6,8 +6,13 @@ from sqlalchemy.orm import Session
 from app.auth import require_game_author
 from app.database import get_db
 from app.models import Game, User, UserRole
-from app.schemas import GameAnalyticsDetailOut, GameAnalyticsOut
+from app.schemas import GameAnalyticsDetailOut, GameAnalyticsOut, CreatorStyleOut, CreatorStyleUpdate
 from app.services.game_analytics import build_game_analytics, build_game_analytics_detail
+from app.services.prompts import (
+    get_or_create_platform_settings,
+    normalize_style_source,
+    resolve_style_guidelines,
+)
 
 router = APIRouter(prefix="/creator", tags=["creator"])
 
@@ -36,3 +41,38 @@ def creator_analytics_detail(
     if user.role != UserRole.admin and game.owner_id != user.id:
         raise HTTPException(status_code=403, detail="Not your game")
     return build_game_analytics_detail(db, game_id, include_player_emails=user.role == UserRole.admin)
+
+
+@router.get("/style", response_model=CreatorStyleOut)
+def get_creator_style(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_game_author),
+) -> CreatorStyleOut:
+    settings = get_or_create_platform_settings(db)
+    source = normalize_style_source(getattr(user, "style_source", None))
+    return CreatorStyleOut(
+        source=source,
+        custom_guidelines=(getattr(user, "style_guidelines", None) or ""),
+        default_guidelines=settings.style_guidelines,
+        effective_guidelines=resolve_style_guidelines(settings, user),
+    )
+
+
+@router.put("/style", response_model=CreatorStyleOut)
+def update_creator_style(
+    body: CreatorStyleUpdate,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_game_author),
+) -> CreatorStyleOut:
+    source = normalize_style_source(body.source)
+    user.style_source = source
+    user.style_guidelines = (body.custom_guidelines or "").strip() or None
+    db.commit()
+    db.refresh(user)
+    settings = get_or_create_platform_settings(db)
+    return CreatorStyleOut(
+        source=source,
+        custom_guidelines=user.style_guidelines or "",
+        default_guidelines=settings.style_guidelines,
+        effective_guidelines=resolve_style_guidelines(settings, user),
+    )

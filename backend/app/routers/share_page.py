@@ -2,16 +2,57 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, Response
+from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
 from app.models import Game, PlaySession
 from app.public_url import public_base_url
+from app.services.avatars import render_creator_card_png
+from app.services.creators import find_user_by_slug
 from app.services.handles import play_slug, resolve_game
 from app.services.og import og_description, og_image_svg, score_card_svg, share_html
 from app.services.snapshot import ensure_game_preview, has_game_screenshot, screenshot_file
 
 router = APIRouter(tags=["share"])
+
+
+@router.get("/share/u/{slug}", response_class=HTMLResponse)
+def share_creator_page(slug: str, request: Request, db: Session = Depends(get_db)) -> HTMLResponse:
+    user = find_user_by_slug(db, slug)
+    if user is None:
+        raise HTTPException(status_code=404, detail="Creator not found")
+    game_count = db.query(func.count(Game.id)).filter(Game.owner_id == user.id).scalar() or 0
+    base = public_base_url(request)
+    profile_url = f"{base}/u/{slug}"
+    share_url = f"{base}/share/u/{slug}"
+    image_url = f"{base}/share/u/{slug}/card.png"
+    name = user.display_name or slug
+    html = share_html(
+        title=f"{name} on Futureonaut",
+        description=f"Play {game_count} educational game{'s' if game_count != 1 else ''} by {name}.",
+        share_url=share_url,
+        play_url=profile_url,
+        image_url=image_url,
+    )
+    return HTMLResponse(content=html)
+
+
+@router.get("/share/u/{slug}/card.png")
+def share_creator_card_png(slug: str, db: Session = Depends(get_db)) -> Response:
+    user = find_user_by_slug(db, slug)
+    if user is None:
+        raise HTTPException(status_code=404, detail="Creator not found")
+    game_count = db.query(func.count(Game.id)).filter(Game.owner_id == user.id).scalar() or 0
+    png = render_creator_card_png(user, game_count=int(game_count))
+    return Response(
+        content=png,
+        media_type="image/png",
+        headers={
+            "Cache-Control": "public, max-age=300",
+            "Content-Disposition": 'inline; filename="creator.png"',
+        },
+    )
 
 
 @router.get("/share/{game_id}", response_class=HTMLResponse)

@@ -75,8 +75,6 @@ class AuthorAccessTests(unittest.TestCase):
 
 class CallerLlmKeyTests(unittest.TestCase):
     def test_template_generate_requires_caller_key(self) -> None:
-        from pydantic import ValidationError
-
         from app.schemas import AIGenerateRequest
         from app.services.generate import _require_caller_llm_key
 
@@ -84,8 +82,8 @@ class CallerLlmKeyTests(unittest.TestCase):
             _require_caller_llm_key(None, "openai")
         with self.assertRaises(HTTPException):
             _require_caller_llm_key("", "openai")
-        with self.assertRaises(ValidationError):
-            AIGenerateRequest(topic="neurons", template_type="quiz")
+        parsed = AIGenerateRequest(topic="neurons", template_type="quiz")
+        self.assertIsNone(parsed.api_key)
         provider, key = _require_caller_llm_key("sk-test-1234567890", "openai")
         self.assertEqual(provider, "openai")
         self.assertEqual(key, "sk-test-1234567890")
@@ -134,13 +132,16 @@ class PromptContractTests(unittest.TestCase):
             level_count=4,
             levels_brief="1 warm-up\n2 filter\n3 map\n4 boss",
             language="en",
+            style_guidelines="Use orange buttons and a calm voice.",
         )
         self.assertIn("LearnPlay.stage", system)
         payload = json.loads(user)
         self.assertEqual(payload["level_count"], 4)
+        self.assertEqual(payload["style_guidelines"], "Use orange buttons and a calm voice.")
         self.assertTrue(any("TOTAL = 4" in rule for rule in payload["requirements"]))
         self.assertTrue(any("complete: true" in rule for rule in payload["requirements"]))
         self.assertTrue(any("real graded task" in rule for rule in payload["requirements"]))
+        self.assertTrue(any("style_guidelines" in rule for rule in payload["requirements"]))
 
 
 class HtmlDraftLoopTests(unittest.IsolatedAsyncioTestCase):

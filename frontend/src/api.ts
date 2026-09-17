@@ -10,6 +10,24 @@ export interface User {
   llm_provider?: string | null;
   llm_key_configured?: boolean;
   llm_key_hint?: string | null;
+  llm_keys?: { provider: string; hint?: string | null }[];
+  style_source?: "futureonaut" | "custom";
+  style_guidelines?: string | null;
+  slug?: string;
+  has_avatar?: boolean;
+}
+
+export interface PlatformPrompts {
+  style_guidelines: string;
+  generation_system_prompt: string;
+  revise_system_prompt: string;
+}
+
+export interface CreatorStyle {
+  source: "futureonaut" | "custom" | string;
+  custom_guidelines: string;
+  default_guidelines: string;
+  effective_guidelines: string;
 }
 
 export interface Game {
@@ -35,6 +53,10 @@ export interface Game {
   total_levels?: number | null;
   progress_pct?: number | null;
   has_screenshot?: boolean;
+  is_new?: boolean;
+  owner_slug?: string | null;
+  owner_name?: string | null;
+  owner_has_avatar?: boolean;
 }
 
 export interface DraftMessage {
@@ -69,6 +91,8 @@ export interface Comment {
   author_name: string;
   body: string;
   created_at: string;
+  author_slug?: string | null;
+  author_has_avatar?: boolean;
 }
 
 export interface LikeToggle {
@@ -105,6 +129,7 @@ export interface ContinueSession {
   started_at: string;
   has_screenshot?: boolean;
   handle?: string | null;
+  is_new?: boolean;
 }
 
 export interface Classroom {
@@ -197,6 +222,20 @@ export interface PlatformStats {
   sessions: number;
   creators: number;
   learners: number;
+}
+
+export interface CreatorPublic {
+  id: string;
+  display_name: string;
+  slug: string;
+  role: Role;
+  has_avatar: boolean;
+  game_count: number;
+  created_at: string;
+}
+
+export interface CreatorProfile extends CreatorPublic {
+  games: Game[];
 }
 
 export interface GameAnalytics {

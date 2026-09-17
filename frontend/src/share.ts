@@ -5,6 +5,14 @@ export function gameShareUrl(gameId: string): string {
   return `${window.location.origin}/share/${gameId}`;
 }
 
+export function creatorProfilePath(slug: string): string {
+  return `/u/${encodeURIComponent(slug)}`;
+}
+
+export function creatorShareUrl(slug: string): string {
+  return `${window.location.origin}/share/u/${encodeURIComponent(slug)}`;
+}
+
 /** 1200×630 PNG snapshot used on catalog cards and social share photos. */
 export function gameShareImageUrl(gameId: string): string {
   return `${window.location.origin}/share/${gameId}/card.png`;
@@ -25,24 +33,31 @@ export function gameShareText(title: string, description?: string): string {
   return `Play "${title}" on Futureonaut${blurb}`;
 }
 
-export function shareLinks(gameId: string, title: string, description?: string) {
-  const url = encodeURIComponent(gameShareUrl(gameId));
-  const text = encodeURIComponent(gameShareText(title, description));
-
+export function shareLinksFor(url: string, text: string) {
+  const encodedUrl = encodeURIComponent(url);
+  const encodedText = encodeURIComponent(text);
   return {
-    x: `https://twitter.com/intent/tweet?text=${text}&url=${url}`,
-    facebook: `https://www.facebook.com/sharer/sharer.php?u=${url}`,
-    linkedin: `https://www.linkedin.com/sharing/share-offsite/?url=${url}`,
+    x: `https://twitter.com/intent/tweet?text=${encodedText}&url=${encodedUrl}`,
+    facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`,
+    linkedin: `https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}`,
   };
 }
 
-export async function copyGameLink(gameId: string): Promise<boolean> {
+export function shareLinks(gameId: string, title: string, description?: string) {
+  return shareLinksFor(gameShareUrl(gameId), gameShareText(title, description));
+}
+
+export async function copyLink(url: string): Promise<boolean> {
   try {
-    await navigator.clipboard.writeText(gameShareUrl(gameId));
+    await navigator.clipboard.writeText(url);
     return true;
   } catch {
     return false;
   }
+}
+
+export async function copyGameLink(gameId: string): Promise<boolean> {
+  return copyLink(gameShareUrl(gameId));
 }
 
 async function gameShareImageFile(gameId: string, title: string): Promise<File | null> {

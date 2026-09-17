@@ -1,23 +1,44 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 from sqlalchemy.orm import Session, joinedload
 
 from app.models import Game, PlaySession
 from app.schemas import GameOut, RecommendationOut
+from app.services.avatars import has_user_avatar
+from app.services.handles import split_handle, username_slug
 from app.services.snapshot import has_game_screenshot
 from app.services.topics import TOPICS, normalize_topic
 
+NEW_GAME_DAYS = 7
+
+
+def game_is_new(created_at: datetime | None, *, now: datetime | None = None) -> bool:
+    if created_at is None:
+        return False
+    current = now or datetime.now(timezone.utc)
+    created = created_at if created_at.tzinfo else created_at.replace(tzinfo=timezone.utc)
+    if current.tzinfo is None:
+        current = current.replace(tzinfo=timezone.utc)
+    return current - created <= timedelta(days=NEW_GAME_DAYS)
+
 
 def game_to_out(game: Game) -> GameOut:
+    owner = getattr(game, "owner", None)
+    owner_slug = username_slug(owner) if owner is not None else None
+    if not owner_slug:
+        parts = split_handle(getattr(game, "handle", None))
+        owner_slug = parts[0] if parts else None
+    owner_name = getattr(owner, "display_name", None) if owner is not None else None
+    owner_id = getattr(game, "owner_id", None)
     return GameOut(
         id=game.id,
         title=game.title,
         description=game.description,
-        owner_id=getattr(game, "owner_id", None),
+        owner_id=owner_id,
         source=game.source,
         topic_tags=game.topic_tags or [],
         difficulty=game.difficulty,
@@ -28,6 +49,10 @@ def game_to_out(game: Game) -> GameOut:
         created_at=game.created_at,
         play_url=f"/api/games/{game.id}/files/{game.entry_path}",
         has_screenshot=has_game_screenshot(game.id),
+        is_new=game_is_new(getattr(game, "created_at", None)),
+        owner_slug=owner_slug,
+        owner_name=owner_name,
+        owner_has_avatar=has_user_avatar(owner_id) if owner_id else False,
     )
 
 

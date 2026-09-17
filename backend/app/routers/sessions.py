@@ -17,6 +17,7 @@ from app.schemas import (
 )
 from app.services.guest_merge import apply_session_event
 from app.services.progress import best_sessions_by_game, progress_from_session
+from app.services.recommendations import game_is_new
 from app.services.snapshot import has_game_screenshot
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
@@ -133,6 +134,7 @@ def continue_sessions(
                 started_at=s.started_at,
                 has_screenshot=has_game_screenshot(s.game_id),
                 handle=getattr(s.game, "handle", None) if s.game else None,
+                is_new=game_is_new(getattr(s.game, "created_at", None) if s.game else None),
             )
         )
         if len(out) >= 6:

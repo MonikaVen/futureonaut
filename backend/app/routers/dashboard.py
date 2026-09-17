@@ -12,6 +12,8 @@ from app.schemas import (
     DashboardStats,
     GameAnalyticsDetailOut,
     GameAnalyticsOut,
+    PlatformPromptsOut,
+    PlatformPromptsUpdate,
     PlatformStats,
     RecommendationOut,
     SessionDetail,
@@ -19,7 +21,10 @@ from app.schemas import (
     UserRoleUpdate,
 )
 from app.services.accounts import delete_user_keeping_games
+from app.services.avatars import has_user_avatar
 from app.services.game_analytics import build_game_analytics, build_game_analytics_detail
+from app.services.handles import username_slug
+from app.services.prompts import get_or_create_platform_settings
 from app.services.recommendations import recommend_games
 
 router = APIRouter(tags=["dashboard"])
@@ -233,6 +238,8 @@ def list_all_comments(
             author_name=c.user.display_name if c.user else "Unknown",
             body=c.body,
             created_at=c.created_at,
+            author_slug=username_slug(c.user) if c.user else None,
+            author_has_avatar=has_user_avatar(c.user_id) if c.user_id else False,
         )
         for c in comments
     ]
@@ -249,3 +256,38 @@ def delete_comment(
         raise HTTPException(status_code=404, detail="Comment not found")
     db.delete(comment)
     db.commit()
+
+
+@admin_router.get("/prompts", response_model=PlatformPromptsOut)
+def get_prompts(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(UserRole.admin)),
+) -> PlatformPromptsOut:
+    settings = get_or_create_platform_settings(db)
+    return PlatformPromptsOut(
+        style_guidelines=settings.style_guidelines,
+        generation_system_prompt=settings.generation_system_prompt,
+        revise_system_prompt=settings.revise_system_prompt,
+    )
+
+
+@admin_router.put("/prompts", response_model=PlatformPromptsOut)
+def update_prompts(
+    body: PlatformPromptsUpdate,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(UserRole.admin)),
+) -> PlatformPromptsOut:
+    from datetime import datetime, timezone
+
+    settings = get_or_create_platform_settings(db)
+    settings.style_guidelines = body.style_guidelines.strip()
+    settings.generation_system_prompt = body.generation_system_prompt.strip()
+    settings.revise_system_prompt = body.revise_system_prompt.strip()
+    settings.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(settings)
+    return PlatformPromptsOut(
+        style_guidelines=settings.style_guidelines,
+        generation_system_prompt=settings.generation_system_prompt,
+        revise_system_prompt=settings.revise_system_prompt,
+    )

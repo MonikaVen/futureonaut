@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, type Comment, type Game, type GameAnalytics, type GameAnalyticsDetail, type PlatformStats, type Role, type User } from "../api";
+import { api, type Comment, type Game, type GameAnalytics, type GameAnalyticsDetail, type PlatformPrompts, type PlatformStats, type Role, type User } from "../api";
 import { GameAnalyticsDetailPanel } from "../GameAnalyticsDetail";
 
 const TOPICS = ["AI", "Physics", "Math"] as const;
@@ -41,20 +41,25 @@ export function AdminPage() {
   const [detail, setDetail] = useState<GameAnalyticsDetail | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
+  const [prompts, setPrompts] = useState<PlatformPrompts | null>(null);
+  const [promptBusy, setPromptBusy] = useState(false);
+  const [promptMessage, setPromptMessage] = useState("");
 
   async function load() {
-    const [u, s, g, a, c] = await Promise.all([
+    const [u, s, g, a, c, p] = await Promise.all([
       api<User[]>("/api/admin/users"),
       api<PlatformStats>("/api/admin/stats"),
       api<Game[]>("/api/games"),
       api<GameAnalytics[]>("/api/admin/game-analytics"),
       api<Comment[]>("/api/admin/comments"),
+      api<PlatformPrompts>("/api/admin/prompts"),
     ]);
     setUsers(u);
     setStats(s);
     setGames(g);
     setAnalytics(a);
     setComments(c);
+    setPrompts(p);
   }
 
   useEffect(() => {
@@ -69,6 +74,26 @@ export function AdminPage() {
     });
     return list;
   }, [analytics, sortKey]);
+
+  async function savePrompts(e: React.FormEvent) {
+    e.preventDefault();
+    if (!prompts) return;
+    setPromptBusy(true);
+    setError("");
+    setPromptMessage("");
+    try {
+      const next = await api<PlatformPrompts>("/api/admin/prompts", {
+        method: "PUT",
+        body: JSON.stringify(prompts),
+      });
+      setPrompts(next);
+      setPromptMessage("Generation prompts saved.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Save failed");
+    } finally {
+      setPromptBusy(false);
+    }
+  }
 
   async function setRole(userId: string, role: Role) {
     await api(`/api/admin/users/${userId}/role`, {
@@ -179,6 +204,46 @@ export function AdminPage() {
             <b>{stats.sessions}</b>
           </div>
         </div>
+      )}
+
+      {prompts && (
+        <form className="form panel section-gap" onSubmit={savePrompts}>
+          <h2 style={{ fontFamily: "var(--font-display)", marginTop: 0 }}>Generation prompts</h2>
+          <p className="meta">
+            Default Futureonaut style and the system prompts used when creators generate or revise games.
+            Creators can follow this style or write their own.
+          </p>
+          {promptMessage && <p className="meta">{promptMessage}</p>}
+          <label>
+            Futureonaut style guidelines
+            <textarea
+              rows={8}
+              value={prompts.style_guidelines}
+              onChange={(e) => setPrompts({ ...prompts, style_guidelines: e.target.value })}
+            />
+          </label>
+          <label>
+            Generation system prompt
+            <textarea
+              rows={6}
+              value={prompts.generation_system_prompt}
+              onChange={(e) => setPrompts({ ...prompts, generation_system_prompt: e.target.value })}
+            />
+          </label>
+          <label>
+            Revise system prompt
+            <textarea
+              rows={6}
+              value={prompts.revise_system_prompt}
+              onChange={(e) => setPrompts({ ...prompts, revise_system_prompt: e.target.value })}
+            />
+          </label>
+          <div className="form-actions">
+            <button className="btn accent" type="submit" disabled={promptBusy}>
+              {promptBusy ? "Saving…" : "Save prompts"}
+            </button>
+          </div>
+        </form>
       )}
 
       <div className="panel section-gap">

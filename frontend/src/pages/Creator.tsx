@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, type Classroom, type Game, type GameAnalytics, type GameAnalyticsDetail, type GameDraft } from "../api";
+import { api, type Classroom, type CreatorStyle, type Game, type GameAnalytics, type GameAnalyticsDetail, type GameDraft } from "../api";
+import { AvatarEditor } from "../AvatarEditor";
 import { CreatorDraftStudio } from "../CreatorDraftStudio";
 import { GameAnalyticsDetailPanel } from "../GameAnalyticsDetail";
 import { useAuth } from "../auth";
 import { useLanguage } from "../language";
 
-const LLM_KEY_STORAGE = "futureonaut_llm_api_key";
+const LLM_PROVIDERS = ["openai", "claude", "grok"] as const;
 
 export function CreatorPage() {
   const { user, refreshMe } = useAuth();
@@ -19,7 +20,7 @@ export function CreatorPage() {
   const [detail, setDetail] = useState<GameAnalyticsDetail | null>(null);
   const [analytics, setAnalytics] = useState<GameAnalytics[]>([]);
   const [provider, setProvider] = useState(user?.llm_provider || "openai");
-  const [apiKey, setApiKey] = useState(() => sessionStorage.getItem(LLM_KEY_STORAGE) || "");
+  const [keyDrafts, setKeyDrafts] = useState<Record<string, string>>({ openai: "", claude: "", grok: "" });
   const [model, setModel] = useState("gpt-4o-mini");
   const [assignClassId, setAssignClassId] = useState("");
   const [classrooms, setClassrooms] = useState<Classroom[]>([]);
@@ -28,6 +29,9 @@ export function CreatorPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [shotBust, setShotBust] = useState<Record<string, number>>({});
+  const [styleSource, setStyleSource] = useState<"futureonaut" | "custom">("futureonaut");
+  const [customStyle, setCustomStyle] = useState("");
+  const [defaultStyle, setDefaultStyle] = useState("");
 
   async function reload(keepDraft = true) {
     const list = await api<Game[]>("/api/games/mine");
@@ -43,6 +47,14 @@ export function CreatorPage() {
       setClassrooms(mine.filter((c) => c.teacher_id === user?.id));
     } catch {
       setClassrooms([]);
+    }
+    try {
+      const prefs = await api<CreatorStyle>("/api/creator/style");
+      setStyleSource(prefs.source === "custom" ? "custom" : "futureonaut");
+      setCustomStyle(prefs.custom_guidelines || "");
+      setDefaultStyle(prefs.default_guidelines || "");
+    } catch {
+      setDefaultStyle("");
     }
     try {
       const open = await api<GameDraft[]>("/api/games/drafts");
@@ -68,19 +80,29 @@ export function CreatorPage() {
   }, []);
 
   useEffect(() => {
-    if (apiKey) sessionStorage.setItem(LLM_KEY_STORAGE, apiKey);
-    else sessionStorage.removeItem(LLM_KEY_STORAGE);
-  }, [apiKey]);
+    if (user?.llm_provider) setProvider(user.llm_provider);
+  }, [user?.llm_provider]);
 
-  async function saveKey() {
+  function savedHint(name: string) {
+    return user?.llm_keys?.find((item) => item.provider === name)?.hint || "";
+  }
+
+  function hasProviderKey(name: string) {
+    return Boolean((keyDrafts[name] || "").trim() || savedHint(name) || (user?.llm_provider === name && user?.llm_key_configured));
+  }
+
+  async function saveKey(name: string) {
+    const value = (keyDrafts[name] || "").trim();
+    if (!value) return;
     setBusy(true);
     setError("");
     setMessage("");
     try {
       await api("/api/auth/llm-key", {
         method: "POST",
-        body: JSON.stringify({ provider, api_key: apiKey }),
+        body: JSON.stringify({ provider: name, api_key: value }),
       });
+      setKeyDrafts((current) => ({ ...current, [name]: "" }));
       await refreshMe();
       setMessage(t("apiKeySaved"));
     } catch (err) {
@@ -90,12 +112,12 @@ export function CreatorPage() {
     }
   }
 
-  async function clearKey() {
+  async function clearKey(name: string) {
     setBusy(true);
     setError("");
     try {
-      await api("/api/auth/llm-key", { method: "DELETE" });
-      setApiKey("");
+      await api(`/api/auth/llm-key?provider=${encodeURIComponent(name)}`, { method: "DELETE" });
+      setKeyDrafts((current) => ({ ...current, [name]: "" }));
       await refreshMe();
     } catch (err) {
       setError(err instanceof Error ? err.message : t("clearApiKey"));
@@ -109,6 +131,7 @@ export function CreatorPage() {
     setError("");
     setMessage("");
     try {
+      const pasted = (keyDrafts[provider] || "").trim();
       const next = await api<GameDraft>("/api/games/drafts/chat", {
         method: "POST",
         body: JSON.stringify({
@@ -116,11 +139,12 @@ export function CreatorPage() {
           draft_id: draft?.id || null,
           language: document.documentElement.lang || "en",
           provider,
-          api_key: apiKey,
+          api_key: pasted || undefined,
           model: model || undefined,
           assign_classroom_id: assignClassId || null,
         }),
       });
+      if (pasted) setKeyDrafts((current) => ({ ...current, [provider]: "" }));
       setDraft(next);
       await refreshMe();
     } catch (err) {
@@ -232,6 +256,29 @@ export function CreatorPage() {
     }
   }
 
+  async function saveStyle() {
+    setBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      const prefs = await api<CreatorStyle>("/api/creator/style", {
+        method: "PUT",
+        body: JSON.stringify({
+          source: styleSource,
+          custom_guidelines: customStyle,
+        }),
+      });
+      setStyleSource(prefs.source === "custom" ? "custom" : "futureonaut");
+      setCustomStyle(prefs.custom_guidelines || "");
+      setDefaultStyle(prefs.default_guidelines || "");
+      setMessage(t("styleSaved"));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("saveStyle"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function remove(id: string) {
     if (!confirm("Delete this game?")) return;
     await api(`/api/games/${id}`, { method: "DELETE" });
@@ -248,6 +295,51 @@ export function CreatorPage() {
       {message && <div className="panel" style={{ marginBottom: 12 }}>{message}</div>}
 
       <div className="panel" style={{ marginBottom: 16 }}>
+        <h2 style={{ fontFamily: "var(--font-display)", marginTop: 0 }}>{t("yourAvatar")}</h2>
+        <AvatarEditor compact />
+        {user?.slug ? (
+          <p className="meta">
+            <Link to={`/u/${user.slug}`}>{t("viewCreatorPage")}</Link>
+          </p>
+        ) : null}
+      </div>
+
+      <div className="panel" style={{ marginBottom: 16 }}>
+        <h2 style={{ fontFamily: "var(--font-display)", marginTop: 0 }}>{t("llmKeys")}</h2>
+        <p className="meta">{t("llmKeysHelp")}</p>
+        <div className="llm-key-list">
+          {LLM_PROVIDERS.map((name) => {
+            const hint = savedHint(name);
+            return (
+              <div key={name} className="llm-key-row">
+                <strong>{t(name)}</strong>
+                <span className="meta">
+                  {hint ? `${t("apiKeySaved")} ••••${hint}` : t("apiKeyMissing")}
+                </span>
+                <input
+                  type="password"
+                  autoComplete="off"
+                  value={keyDrafts[name] || ""}
+                  onChange={(e) => setKeyDrafts((current) => ({ ...current, [name]: e.target.value }))}
+                  placeholder={hint ? t("replaceApiKey") : t("apiKey")}
+                />
+                <button
+                  className="btn secondary btn-sm"
+                  type="button"
+                  disabled={busy || !(keyDrafts[name] || "").trim()}
+                  onClick={() => void saveKey(name)}
+                >
+                  {t("saveApiKey")}
+                </button>
+                {hint ? (
+                  <button className="btn secondary btn-sm" type="button" disabled={busy} onClick={() => void clearKey(name)}>
+                    {t("clearApiKey")}
+                  </button>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
         <form className="form creator-llm-bar" onSubmit={(e) => e.preventDefault()}>
           <label>
             {t("llmProvider")}
@@ -256,16 +348,6 @@ export function CreatorPage() {
               <option value="claude">{t("claude")}</option>
               <option value="grok">{t("grok")}</option>
             </select>
-          </label>
-          <label>
-            {t("apiKey")}
-            <input
-              type="password"
-              autoComplete="off"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              required
-            />
           </label>
           <label>
             {t("modelOptional")}
@@ -286,18 +368,56 @@ export function CreatorPage() {
           )}
         </form>
         <p className="meta">
-          {t("apiKeyHelp")}
-          {user?.llm_key_configured ? ` ${t("apiKeySaved")}${user.llm_key_hint ? ` ••••${user.llm_key_hint}` : ""}.` : ""}
+          {hasProviderKey(provider) ? t("usingSavedKey") : t("pasteApiKeyToSend")}
         </p>
+      </div>
+
+      <div className="panel" style={{ marginBottom: 16 }}>
+        <h2 style={{ fontFamily: "var(--font-display)", marginTop: 0 }}>{t("styleGuidelines")}</h2>
+        <p className="meta">{t("styleGuidelinesHelp")}</p>
+        <div className="style-choice" role="radiogroup" aria-label={t("styleGuidelines")}>
+          <label className={`style-choice-card${styleSource === "futureonaut" ? " is-selected" : ""}`}>
+            <input
+              type="radio"
+              name="style-source"
+              checked={styleSource === "futureonaut"}
+              onChange={() => setStyleSource("futureonaut")}
+            />
+            <span>
+              <strong>{t("futureonautStyle")}</strong>
+              <span className="meta">{t("futureonautStyleHelp")}</span>
+            </span>
+          </label>
+          <label className={`style-choice-card${styleSource === "custom" ? " is-selected" : ""}`}>
+            <input
+              type="radio"
+              name="style-source"
+              checked={styleSource === "custom"}
+              onChange={() => setStyleSource("custom")}
+            />
+            <span>
+              <strong>{t("customStyle")}</strong>
+              <span className="meta">{t("customStyleHelp")}</span>
+            </span>
+          </label>
+        </div>
+        {styleSource === "futureonaut" ? (
+          <pre className="style-preview">{defaultStyle || t("styleLoading")}</pre>
+        ) : (
+          <label>
+            {t("customStyle")}
+            <textarea
+              rows={8}
+              value={customStyle}
+              onChange={(e) => setCustomStyle(e.target.value)}
+              placeholder={t("customStylePlaceholder")}
+            />
+          </label>
+        )}
         <div className="form-actions">
-          <button className="btn secondary" type="button" disabled={busy || !apiKey} onClick={saveKey}>
-            {t("saveApiKey")}
+          <button className="btn accent" type="button" disabled={busy} onClick={saveStyle}>
+            {t("saveStyle")}
           </button>
-          {user?.llm_key_configured ? (
-            <button className="btn secondary" type="button" disabled={busy} onClick={clearKey}>
-              {t("clearApiKey")}
-            </button>
-          ) : null}
         </div>
       </div>
 
@@ -322,7 +442,7 @@ export function CreatorPage() {
       <div className="panel" style={{ marginBottom: 16 }}>
         <CreatorDraftStudio
           draft={draft}
-          apiKey={apiKey}
+          apiKey={hasProviderKey(provider) ? "saved" : ""}
           busy={busy}
           onSend={sendChat}
           onDeploy={deployDraft}

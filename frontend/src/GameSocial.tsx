@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, type Comment, type Game, type LikeToggle } from "./api";
+import { AvatarImage } from "./AvatarImage";
 import { useAuth } from "./auth";
 import { GameShare } from "./GameShare";
 import { CommentIcon, PlayIcon, StarIcon } from "./Icons";
@@ -184,7 +185,14 @@ export function GameSocial({
             {comments.map((c) => (
               <li key={c.id} className="comment-item">
                 <div className="comment-meta">
-                  <b>{c.author_name}</b>
+                  <AvatarImage userId={c.user_id} name={c.author_name} hasAvatar={Boolean(c.author_has_avatar)} size={28} />
+                  {c.author_slug ? (
+                    <Link to={`/u/${c.author_slug}`}>
+                      <b>{c.author_name}</b>
+                    </Link>
+                  ) : (
+                    <b>{c.author_name}</b>
+                  )}
                   <span className="meta">{formatWhen(c.created_at)}</span>
                 </div>
                 <p>{c.body}</p>

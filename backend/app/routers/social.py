@@ -7,18 +7,23 @@ from app.auth import get_current_user, require_roles
 from app.database import get_db
 from app.models import Game, GameComment, GameLike, User, UserRole
 from app.schemas import CommentCreate, CommentOut, LikeToggleOut
+from app.services.avatars import has_user_avatar
+from app.services.handles import username_slug
 
 router = APIRouter(prefix="/games", tags=["social"])
 
 
 def _comment_out(comment: GameComment) -> CommentOut:
+    author = comment.user
     return CommentOut(
         id=comment.id,
         game_id=comment.game_id,
         user_id=comment.user_id,
-        author_name=comment.user.display_name if comment.user else "Unknown",
+        author_name=author.display_name if author else "Unknown",
         body=comment.body,
         created_at=comment.created_at,
+        author_slug=username_slug(author) if author else None,
+        author_has_avatar=has_user_avatar(comment.user_id) if comment.user_id else False,
     )
 
 

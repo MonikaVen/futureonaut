@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { ShareIcon } from "./ShareIcon";
 import { useLanguage } from "./language";
-import { copyGameLink, openShareWindow, shareLinks, type SharePlatform } from "./share";
+import { copyLink, gameShareUrl, openShareWindow, shareLinksFor, type SharePlatform } from "./share";
 
 type Props = {
-  gameId: string;
+  gameId?: string;
+  shareUrl?: string;
   title: string;
   description?: string;
   compact?: boolean;
@@ -24,12 +25,13 @@ function ShareIconButton({ label, onClick }: { label: string; onClick: () => voi
   );
 }
 
-export function GameShare({ gameId, title, description, compact = false }: Props) {
+export function GameShare({ gameId, shareUrl, title, description, compact = false }: Props) {
   const { t } = useLanguage();
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-  const links = shareLinks(gameId, title, description);
+  const url = shareUrl || (gameId ? gameShareUrl(gameId) : window.location.href);
+  const links = shareLinksFor(url, `Play with ${title} on Futureonaut${description ? ` — ${description}` : ""}`);
 
   useEffect(() => {
     if (!open) return;
@@ -44,7 +46,7 @@ export function GameShare({ gameId, title, description, compact = false }: Props
 
   async function handle(platform: SharePlatform) {
     if (platform === "copy") {
-      const ok = await copyGameLink(gameId);
+      const ok = await copyLink(url);
       if (ok) {
         setCopied(true);
         window.setTimeout(() => setCopied(false), 2000);

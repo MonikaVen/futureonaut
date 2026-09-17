@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, type DashboardStats } from "../api";
+import { AvatarEditor } from "../AvatarEditor";
 import { ContinuePlaying } from "../ContinuePlaying";
 
 export function DashboardPage() {
@@ -22,6 +23,10 @@ export function DashboardPage() {
         <h1>Your progress</h1>
         <p>Scores, accuracy, and time across everything you have played.</p>
       </section>
+      <div className="panel" style={{ marginBottom: 16 }}>
+        <h2 style={{ fontFamily: "var(--font-display)", marginTop: 0 }}>Profile</h2>
+        <AvatarEditor compact />
+      </div>
       <ContinuePlaying />
       <div className="stats" style={{ marginBottom: 18 }}>
         <div className="stat">

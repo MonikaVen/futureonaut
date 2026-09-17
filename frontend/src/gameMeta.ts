@@ -8,6 +8,15 @@ export function primaryTopic(tags?: string[] | null): Topic {
   return "AI";
 }
 
+export const NEW_GAME_MS = 7 * 24 * 60 * 60 * 1000;
+
+export function isNewGame(game: { is_new?: boolean; created_at?: string }): boolean {
+  if (typeof game.is_new === "boolean") return game.is_new;
+  if (!game.created_at) return false;
+  const created = Date.parse(game.created_at);
+  return Number.isFinite(created) && Date.now() - created <= NEW_GAME_MS;
+}
+
 export function posterKind(topic: string): "ai" | "physics" | "math" {
   const value = topic.toLowerCase();
   if (value === "physics") return "physics";

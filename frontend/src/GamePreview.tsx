@@ -15,6 +15,7 @@ type Props = {
   progressPct?: number | null;
   solved?: boolean;
   hasScreenshot?: boolean;
+  isNew?: boolean;
 };
 
 function orbStyle(id: string): CSSProperties {
@@ -39,6 +40,7 @@ export function GamePreview({
   progressPct,
   solved = false,
   hasScreenshot = false,
+  isNew = false,
 }: Props) {
   const { t } = useLanguage();
   const kind = posterKind(topic);
@@ -72,6 +74,7 @@ export function GamePreview({
       ) : null}
       <span className="game-preview-top">
         <span className="game-preview-brand">Futureonaut</span>
+        {isNew ? <span className="game-preview-new">{t("newGame")}</span> : null}
         <span className="game-preview-play" aria-hidden>
           <PlayIcon size={14} />
         </span>

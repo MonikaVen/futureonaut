@@ -3,6 +3,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import (
+    Boolean,
     DateTime,
     Enum,
     ForeignKey,
@@ -51,10 +52,33 @@ class User(Base):
     llm_provider: Mapped[str | None] = mapped_column(String(16), nullable=True)
     llm_api_key_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     llm_api_key_hint: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    style_source: Mapped[str] = mapped_column(String(16), nullable=False, default="futureonaut")
+    style_guidelines: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     games: Mapped[list["Game"]] = relationship(back_populates="owner")
     sessions: Mapped[list["PlaySession"]] = relationship(back_populates="user")
+    stored_llm_keys: Mapped[list["UserLlmKey"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+
+
+class UserLlmKey(Base):
+    __tablename__ = "user_llm_keys"
+    __table_args__ = (UniqueConstraint("user_id", "provider", name="uq_user_llm_keys_provider"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    provider: Mapped[str] = mapped_column(String(16), nullable=False)
+    key_ciphertext: Mapped[str] = mapped_column(Text, nullable=False)
+    key_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    key_hint: Mapped[str] = mapped_column(String(8), nullable=False, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    user: Mapped["User"] = relationship(back_populates="stored_llm_keys")
 
 
 class Game(Base):
@@ -221,3 +245,14 @@ class SessionEvent(Base):
     ts: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     session: Mapped[PlaySession] = relationship(back_populates="events")
+
+
+class PlatformSettings(Base):
+    __tablename__ = "platform_settings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    style_guidelines: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    generation_system_prompt: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    revise_system_prompt: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    catalog_assigned: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

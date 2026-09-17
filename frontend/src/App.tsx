@@ -9,6 +9,8 @@ import { PlayPage } from "./pages/Play";
 import { DashboardPage } from "./pages/Dashboard";
 import { RecommendationsPage } from "./pages/Recommendations";
 import { CreatorPage } from "./pages/Creator";
+import { CreatorsPage } from "./pages/Creators";
+import { CreatorProfilePage } from "./pages/CreatorProfile";
 import { ClassroomPage } from "./pages/Classroom";
 import { AdminPage } from "./pages/Admin";
 import { applyTheme, useTheme } from "./theme";
@@ -54,6 +56,8 @@ export default function App() {
         <Route path="/register" element={<RegisterPage />} />
         <Route element={<Shell />}>
           <Route path="/" element={<CatalogPage />} />
+          <Route path="/creators" element={<CreatorsPage />} />
+          <Route path="/u/:slug" element={<CreatorProfilePage />} />
           <Route path="/play/:ownerSlug/:gameSlug" element={<PlayPage />} />
           <Route path="/play/:gameId" element={<PlayPage />} />
           <Route

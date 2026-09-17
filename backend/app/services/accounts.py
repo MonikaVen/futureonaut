@@ -15,6 +15,7 @@ from app.models import (
     GameView,
     PlaySession,
     User,
+    UserLlmKey,
     UserRole,
 )
 
@@ -42,6 +43,10 @@ def delete_user_keeping_games(db: Session, *, actor: User, user_id: UUID) -> Non
     db.query(GameLike).filter(GameLike.user_id == target.id).delete(synchronize_session=False)
     db.query(GameComment).filter(GameComment.user_id == target.id).delete(synchronize_session=False)
     db.query(GameDraft).filter(GameDraft.owner_id == target.id).delete(synchronize_session=False)
+    db.query(UserLlmKey).filter(UserLlmKey.user_id == target.id).delete(synchronize_session=False)
+    from app.services.avatars import delete_user_avatar
+
+    delete_user_avatar(target.id)
     db.query(ClassroomMember).filter(ClassroomMember.user_id == target.id).delete(
         synchronize_session=False
     )

@@ -86,13 +86,34 @@ def catalog_owner(db) -> User | None:
     return db.query(User).filter(User.role == UserRole.admin).first()
 
 
+def _should_reassign_game(db, game: Game, owner: User) -> bool:
+    if game.owner_id is None or game.owner_id == owner.id:
+        return True
+    current = db.get(User, game.owner_id)
+    if current is None:
+        return True
+    if current.role == UserRole.admin:
+        return True
+    teacher_email = (get_settings().teacher_email or "").strip().lower()
+    if teacher_email and str(getattr(current, "email", "") or "").lower() == teacher_email:
+        return True
+    return False
+
+
 def assign_catalog_to_owner(db, owner: User) -> None:
-    """Move every catalog game to owner and rewrite handles as username/gamename."""
+    """One-time handoff of demo/admin catalog games to the Futureonaut creator."""
     from app.services.handles import allocate_handle, split_handle, username_slug
+    from app.services.prompts import get_or_create_platform_settings
+
+    settings_row = get_or_create_platform_settings(db)
+    if settings_row.catalog_assigned:
+        return
 
     user_part = username_slug(owner)
     changed = False
     for game in db.query(Game).all():
+        if not _should_reassign_game(db, game, owner):
+            continue
         if game.owner_id != owner.id:
             game.owner_id = owner.id
             changed = True
@@ -111,8 +132,8 @@ def assign_catalog_to_owner(db, owner: User) -> None:
         game.handle = next_handle
         db.flush()
         changed = True
-    if changed:
-        db.commit()
+    settings_row.catalog_assigned = True
+    db.commit()
 
 
 def seed_demo_games() -> None:

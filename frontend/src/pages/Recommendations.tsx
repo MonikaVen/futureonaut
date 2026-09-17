@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, type Recommendation } from "../api";
 import { GamePreview } from "../GamePreview";
-import { primaryTopic } from "../gameMeta";
+import { isNewGame, primaryTopic } from "../gameMeta";
 import { useLanguage } from "../language";
 
 export function RecommendationsPage() {
@@ -33,6 +33,7 @@ export function RecommendationsPage() {
                 topic={primaryTopic(r.game.topic_tags)}
                 difficulty={r.game.difficulty}
                 hasScreenshot={Boolean(r.game.has_screenshot)}
+                isNew={isNewGame(r.game)}
               />
               <div className="game-tile-body">
                 <p className="meta">{r.reason}</p>

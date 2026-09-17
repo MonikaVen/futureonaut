@@ -6,12 +6,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
 from app.config import get_settings
-from app.database import Base, engine
-from app.routers import auth, classrooms, creator, games, sessions, social
+from app.database import Base, SessionLocal, engine
+from app.routers import auth, classrooms, creator, games, profiles, sessions, social
 from app.routers.dashboard import admin_router, router as dashboard_router
 from app.routers.share_page import router as share_page_router
 from app.seed import seed_admin, seed_creator, seed_teacher
 from app.services.demo_seed import seed_demo_games
+from app.services.prompts import get_or_create_platform_settings
 
 
 def ensure_schema() -> None:
@@ -166,6 +167,49 @@ def ensure_schema() -> None:
                 """
             )
         )
+        conn.execute(
+            text(
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS style_source VARCHAR(16) DEFAULT 'futureonaut'"
+            )
+        )
+        conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS style_guidelines TEXT"))
+        conn.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS platform_settings (
+                    id INTEGER PRIMARY KEY,
+                    style_guidelines TEXT NOT NULL DEFAULT '',
+                    generation_system_prompt TEXT NOT NULL DEFAULT '',
+                    revise_system_prompt TEXT NOT NULL DEFAULT '',
+                    catalog_assigned BOOLEAN NOT NULL DEFAULT FALSE,
+                    updated_at TIMESTAMPTZ DEFAULT now()
+                )
+                """
+            )
+        )
+        conn.execute(
+            text(
+                "ALTER TABLE platform_settings ADD COLUMN IF NOT EXISTS catalog_assigned "
+                "BOOLEAN NOT NULL DEFAULT FALSE"
+            )
+        )
+        conn.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS user_llm_keys (
+                    id UUID PRIMARY KEY,
+                    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    provider VARCHAR(16) NOT NULL,
+                    key_ciphertext TEXT NOT NULL,
+                    key_hash VARCHAR(64) NOT NULL,
+                    key_hint VARCHAR(8) NOT NULL DEFAULT '',
+                    created_at TIMESTAMPTZ DEFAULT now(),
+                    updated_at TIMESTAMPTZ DEFAULT now(),
+                    CONSTRAINT uq_user_llm_keys_provider UNIQUE (user_id, provider)
+                )
+                """
+            )
+        )
 
 
 @asynccontextmanager
@@ -174,6 +218,12 @@ async def lifespan(_: FastAPI):
     Path(settings.games_dir).mkdir(parents=True, exist_ok=True)
     Base.metadata.create_all(bind=engine)
     ensure_schema()
+    db = SessionLocal()
+    try:
+        get_or_create_platform_settings(db)
+        db.commit()
+    finally:
+        db.close()
     seed_admin()
     seed_teacher()
     seed_creator()
@@ -198,6 +248,7 @@ app.include_router(social.router, prefix="/api")
 app.include_router(sessions.router, prefix="/api")
 app.include_router(classrooms.router, prefix="/api")
 app.include_router(creator.router, prefix="/api")
+app.include_router(profiles.router, prefix="/api")
 app.include_router(dashboard_router, prefix="/api")
 app.include_router(admin_router, prefix="/api")
 app.include_router(share_page_router)

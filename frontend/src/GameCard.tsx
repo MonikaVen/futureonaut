@@ -1,6 +1,8 @@
+import { Link } from "react-router-dom";
 import type { Game } from "./api";
 import { GamePreview } from "./GamePreview";
 import { GameSocial } from "./GameSocial";
+import { isNewGame } from "./gameMeta";
 import { useLanguage } from "./language";
 
 type Props = {
@@ -44,8 +46,14 @@ export function GameCard({ game, topic, focusLabels, onUpdate }: Props) {
         progressLabel={progressLabel}
         progressPct={progressPct}
         hasScreenshot={Boolean(game.has_screenshot)}
+        isNew={isNewGame(game)}
       />
       <div className="game-tile-body">
+        {game.owner_slug ? (
+          <Link className="creator-byline" to={`/u/${game.owner_slug}`}>
+            {game.owner_name || game.owner_slug}
+          </Link>
+        ) : null}
         {focusLabels.length > 0 ? (
           <div className="tags">
             {focusLabels.map((label) => (

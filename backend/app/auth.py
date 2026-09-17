@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.database import get_db
 from app.models import User, UserRole
-from app.schemas import UserOut
+from app.schemas import LlmKeyStatus, UserOut
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -26,6 +26,18 @@ def can_author_games(user: User, db: Session | None = None) -> bool:
 
 
 def user_to_out(user: User, db: Session | None = None) -> UserOut:
+    from app.services.avatars import has_user_avatar
+    from app.services.handles import username_slug
+    from app.services.llm import list_llm_keys
+
+    keys = [LlmKeyStatus(provider=row["provider"], hint=row.get("hint")) for row in list_llm_keys(db, user)] if db is not None else []
+    configured = bool(keys) or bool(user.llm_api_key_hash)
+    hint = None
+    if keys:
+        active = next((row for row in keys if row.provider == user.llm_provider), keys[0])
+        hint = active.hint
+    elif user.llm_api_key_hash:
+        hint = user.llm_api_key_hint
     return UserOut(
         id=user.id,
         email=user.email,
@@ -34,8 +46,13 @@ def user_to_out(user: User, db: Session | None = None) -> UserOut:
         created_at=user.created_at,
         can_create_games=can_author_games(user, db),
         llm_provider=user.llm_provider,
-        llm_key_configured=bool(user.llm_api_key_hash),
-        llm_key_hint=user.llm_api_key_hint if user.llm_api_key_hash else None,
+        llm_key_configured=configured,
+        llm_key_hint=hint,
+        llm_keys=keys,
+        style_source=getattr(user, "style_source", None) or "futureonaut",
+        style_guidelines=getattr(user, "style_guidelines", None),
+        slug=username_slug(user),
+        has_avatar=has_user_avatar(user.id),
     )
 
 

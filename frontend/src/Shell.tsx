@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { NavLink, Outlet, Link, useLocation } from "react-router-dom";
 import { useAuth } from "./auth";
 import { BrandLogo } from "./BrandLogo";
+import { AvatarImage } from "./AvatarImage";
 import { LanguageSelect, useLanguage } from "./language";
 import { ThemeToggle, useTheme } from "./theme";
 
@@ -47,6 +48,13 @@ export function Shell() {
             <ThemeToggle />
             {user ? (
               <div className="nav-user">
+                {user.slug ? (
+                  <Link className="nav-user-link" to={`/u/${user.slug}`} title={t("yourPage")}>
+                    <AvatarImage userId={user.id} name={user.display_name} hasAvatar={Boolean(user.has_avatar)} size={32} />
+                  </Link>
+                ) : (
+                  <AvatarImage userId={user.id} name={user.display_name} hasAvatar={Boolean(user.has_avatar)} size={32} />
+                )}
                 <span className="nav-user-meta">
                   {user.display_name}
                   <span className="nav-user-role">{user.role}</span>
@@ -80,6 +88,7 @@ export function Shell() {
         <nav id="main-nav" className={`nav-tabs${navOpen ? " open" : ""}`}>
           <div className="nav-pages">
             <NavLink to="/">{t("games")}</NavLink>
+            <NavLink to="/creators">{t("creators")}</NavLink>
             {user && <NavLink to="/dashboard">{t("dashboard")}</NavLink>}
             {user && <NavLink to="/recommendations">{t("forYou")}</NavLink>}
             {user && <NavLink to="/classrooms">{t("classrooms")}</NavLink>}

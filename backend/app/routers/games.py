@@ -3,7 +3,7 @@ from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.auth import create_draft_file_token, decode_draft_file_token, get_optional_user, require_game_author
 from app.database import get_db
@@ -38,7 +38,7 @@ from app.services.generate import (
     revise_html_game,
     validate_template_content,
 )
-from app.services.llm import normalize_provider, require_api_key, store_llm_key
+from app.services.llm import resolve_llm_key
 from app.services.recommendations import game_to_out
 from app.services.snapshot import promote_pack_icon, save_game_icon, write_game_preview
 from app.services.social import enrich_games
@@ -53,6 +53,7 @@ from app.services.storage import (
     write_template_game,
 )
 from app.services.demo_seed import restore_game_html_files
+from app.services.prompts import generation_context
 from app.services.handles import allocate_handle, resolve_game, user_slug_for_game
 from app.services.topics import ensure_topic_tag
 
@@ -95,7 +96,7 @@ def list_games(
     db: Session = Depends(get_db),
     user: User | None = Depends(get_optional_user),
 ) -> list[GameOut]:
-    games = db.query(Game).order_by(Game.created_at.desc()).all()
+    games = db.query(Game).options(joinedload(Game.owner)).order_by(Game.created_at.desc()).all()
     return enrich_games(db, games, user.id if user else None)
 
 
@@ -104,7 +105,7 @@ def my_games(
     db: Session = Depends(get_db),
     user: User = Depends(require_game_author),
 ) -> list[GameOut]:
-    q = db.query(Game)
+    q = db.query(Game).options(joinedload(Game.owner))
     if user.role != UserRole.admin:
         q = q.filter(Game.owner_id == user.id)
     return [game_to_out(g) for g in q.order_by(Game.created_at.desc()).all()]
@@ -208,8 +209,8 @@ async def generate_game(
     db: Session = Depends(get_db),
     user: User = Depends(require_game_author),
 ) -> GameOut:
-    api_key = require_api_key(body.api_key)
-    store_llm_key(user, body.provider or "openai", api_key)
+    api_key = None
+    provider, api_key = resolve_llm_key(db, user, body.provider, body.api_key)
     db.add(user)
     content = await generate_ai_content(
         topic=body.topic,
@@ -218,8 +219,9 @@ async def generate_game(
         description=body.description,
         question_count=body.question_count,
         api_key=api_key,
-        provider=body.provider,
+        provider=provider,
         model=body.model,
+        style_guidelines=generation_context(db, user)[2],
     )
     game_id = uuid4()
     entry = write_template_game(game_id, body.template_type, content)
@@ -354,11 +356,10 @@ async def generate_html_game_endpoint(
     db: Session = Depends(get_db),
     user: User = Depends(require_game_author),
 ) -> GameDraftOut:
-    provider = normalize_provider(body.provider)
-    api_key = require_api_key(body.api_key)
-    store_llm_key(user, provider, api_key)
+    provider, api_key = resolve_llm_key(db, user, body.provider, body.api_key)
     db.add(user)
     title = (body.title or "").strip() or f"{body.topic} game"
+    gen_system, _rev_system, style = generation_context(db, user)
     html, warnings = await generate_html_game(
         title=title,
         topic=body.topic,
@@ -369,6 +370,8 @@ async def generate_html_game_endpoint(
         api_key=api_key,
         provider=provider,
         model=body.model,
+        style_guidelines=style,
+        system_prompt=gen_system,
     )
     draft = GameDraft(
         title=title[:200],
@@ -421,11 +424,10 @@ async def chat_draft(
     db: Session = Depends(get_db),
     user: User = Depends(require_game_author),
 ) -> GameDraftOut:
-    provider = normalize_provider(body.provider)
-    api_key = require_api_key(body.api_key)
-    store_llm_key(user, provider, api_key)
+    provider, api_key = resolve_llm_key(db, user, body.provider, body.api_key)
     db.add(user)
     note = body.message.strip()
+    gen_system, rev_system, style = generation_context(db, user)
     if body.draft_id is not None:
         draft = _owned_draft(db, user, body.draft_id)
         if draft.published_game_id is not None:
@@ -439,6 +441,8 @@ async def chat_draft(
             provider=provider,
             model=body.model or draft.model,
             history=_draft_messages(draft.messages),
+            style_guidelines=style,
+            system_prompt=rev_system,
         )
         messages = _draft_messages(draft.messages)
         messages.append({"role": "user", "content": note})
@@ -461,6 +465,8 @@ async def chat_draft(
         api_key=api_key,
         provider=provider,
         model=body.model,
+        style_guidelines=style,
+        system_prompt=gen_system,
     )
     draft = GameDraft(
         title=title[:200],
@@ -515,10 +521,9 @@ async def revise_draft(
     draft = _owned_draft(db, user, draft_id)
     if draft.published_game_id is not None:
         raise HTTPException(status_code=400, detail="This draft is already published")
-    provider = normalize_provider(body.provider)
-    api_key = require_api_key(body.api_key)
-    store_llm_key(user, provider, api_key)
+    provider, api_key = resolve_llm_key(db, user, body.provider, body.api_key)
     db.add(user)
+    _gen_system, rev_system, style = generation_context(db, user)
     html, warnings = await revise_html_game(
         html=draft.html,
         message=body.message.strip(),
@@ -528,6 +533,8 @@ async def revise_draft(
         provider=provider,
         model=body.model or draft.model,
         history=_draft_messages(draft.messages),
+        style_guidelines=style,
+        system_prompt=rev_system,
     )
     messages = _draft_messages(draft.messages)
     messages.append({"role": "user", "content": body.message.strip()})

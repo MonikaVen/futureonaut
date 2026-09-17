@@ -50,6 +50,7 @@ async def generate_ai_content(
     api_key: str | None = None,
     provider: str | None = None,
     model: str | None = None,
+    style_guidelines: str = "",
 ) -> dict[str, Any]:
     if template_type not in TEMPLATE_SCHEMAS:
         raise HTTPException(status_code=400, detail=f"Unknown template_type: {template_type}")
@@ -58,7 +59,8 @@ async def generate_ai_content(
     schema_hint = TEMPLATE_SCHEMAS[template_type].model_json_schema()
     system = (
         "You generate educational mini-game content as strict JSON only. "
-        "No markdown fences. Match the provided JSON schema shape."
+        "No markdown fences. Match the provided JSON schema shape. "
+        "Follow style_guidelines for voice and difficulty of language."
     )
     user = {
         "topic": topic,
@@ -67,6 +69,7 @@ async def generate_ai_content(
         "description": description,
         "item_count": question_count,
         "json_schema": schema_hint,
+        "style_guidelines": (style_guidelines or "").strip(),
         "rules": [
             "Use clear learner-friendly language",
             "Include topic_tags related to the topic",
@@ -107,13 +110,15 @@ def html_game_prompt(
     level_count: int,
     levels_brief: str,
     language: str,
+    style_guidelines: str = "",
+    system_prompt: str | None = None,
 ) -> tuple[str, str]:
-    system = (
-        "You are a senior educational game engineer. "
-        "Return one complete, self-contained HTML5 document (no markdown). "
-        "The game must run in a sandboxed iframe with no network except relative files. "
-        + STAGE_INSTRUCTIONS
-    )
+    from app.services.prompts import DEFAULT_GENERATION_SYSTEM_PROMPT
+
+    system = (system_prompt or DEFAULT_GENERATION_SYSTEM_PROMPT).strip()
+    if STAGE_INSTRUCTIONS not in system:
+        system = f"{system}\n\n{STAGE_INSTRUCTIONS}"
+    style = (style_guidelines or "").strip()
     user = json.dumps(
         {
             "title": title,
@@ -122,6 +127,7 @@ def html_game_prompt(
             "language": language or "en",
             "level_count": level_count,
             "levels": levels_brief,
+            "style_guidelines": style,
             "ui": {
                 "use_css_variables": True,
                 "variables": ["--bg", "--text", "--card", "--accent", "--muted", "--border", "--good", "--bad"],
@@ -140,6 +146,7 @@ def html_game_prompt(
                 "Do not invent a LearnPlay global. Call window.LearnPlay when it exists.",
                 "Keep the game keyboard accessible and readable in light and dark (html[data-lp-theme]).",
                 "Do not use alert(), prompt(), or confirm(). Keep feedback on the page.",
+                "Apply style_guidelines for colors, typography, layout, and voice.",
             ],
         }
     )
@@ -157,6 +164,8 @@ async def generate_html_game(
     api_key: str,
     provider: str,
     model: str | None = None,
+    style_guidelines: str = "",
+    system_prompt: str | None = None,
 ) -> tuple[str, list[str]]:
     system, user = html_game_prompt(
         title=title,
@@ -165,6 +174,8 @@ async def generate_html_game(
         level_count=level_count,
         levels_brief=levels_brief,
         language=language,
+        style_guidelines=style_guidelines,
+        system_prompt=system_prompt,
     )
     raw = await chat_complete(
         provider=provider,
@@ -184,18 +195,20 @@ def html_revise_prompt(
     message: str,
     level_count: int,
     title: str,
+    style_guidelines: str = "",
+    system_prompt: str | None = None,
 ) -> tuple[str, str]:
-    system = (
-        "You are editing an existing self-contained HTML5 educational game. "
-        "Return one complete HTML5 document (no markdown). "
-        "Keep the game playable in a sandboxed iframe with no network except relative files. "
-        + STAGE_INSTRUCTIONS
-    )
+    from app.services.prompts import DEFAULT_REVISE_SYSTEM_PROMPT
+
+    system = (system_prompt or DEFAULT_REVISE_SYSTEM_PROMPT).strip()
+    if STAGE_INSTRUCTIONS not in system:
+        system = f"{system}\n\n{STAGE_INSTRUCTIONS}"
     user = json.dumps(
         {
             "title": title,
             "level_count": level_count,
             "teacher_request": message,
+            "style_guidelines": (style_guidelines or "").strip(),
             "requirements": [
                 "Apply the teacher's request to the current HTML.",
                 "Return the FULL updated document, not a diff.",
@@ -206,6 +219,7 @@ def html_revise_prompt(
                 "No remote scripts, fonts, images, or iframes. Inline CSS and JavaScript only.",
                 "Do not invent a LearnPlay global. Call window.LearnPlay when it exists.",
                 "Do not use alert(), prompt(), or confirm().",
+                "Apply style_guidelines for colors, typography, layout, and voice.",
             ],
             "current_html": html,
         }
@@ -223,12 +237,16 @@ async def revise_html_game(
     provider: str,
     model: str | None = None,
     history: list[dict[str, str]] | None = None,
+    style_guidelines: str = "",
+    system_prompt: str | None = None,
 ) -> tuple[str, list[str]]:
     system, user = html_revise_prompt(
         html=html,
         message=message,
         level_count=level_count,
         title=title,
+        style_guidelines=style_guidelines,
+        system_prompt=system_prompt,
     )
     prior = [
         item
@@ -273,6 +291,8 @@ async def generate_html_from_chat(
     api_key: str,
     provider: str,
     model: str | None = None,
+    style_guidelines: str = "",
+    system_prompt: str | None = None,
 ) -> tuple[str, list[str], str, int]:
     level_count = infer_level_count(message)
     seed_title = infer_title_from_html("", message)
@@ -286,6 +306,8 @@ async def generate_html_from_chat(
         api_key=api_key,
         provider=provider,
         model=model,
+        style_guidelines=style_guidelines,
+        system_prompt=system_prompt,
     )
     title = infer_title_from_html(html, seed_title)
     return html, warnings, title, level_count

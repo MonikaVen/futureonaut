@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.auth import (
@@ -19,6 +19,7 @@ from app.schemas import (
     GuestMergeIn,
     LlmKeyIn,
     LlmKeyOut,
+    LlmKeysOut,
     TokenPair,
     TokenRefresh,
     UserCreate,
@@ -26,7 +27,7 @@ from app.schemas import (
     UserOut,
 )
 from app.services.guest_merge import merge_guest_sessions
-from app.services.llm import store_llm_key
+from app.services.llm import delete_llm_key, list_llm_keys, upsert_llm_key
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -97,18 +98,56 @@ def save_llm_key(
     db: Session = Depends(get_db),
     user: User = Depends(require_game_author),
 ) -> LlmKeyOut:
-    store_llm_key(user, body.provider, body.api_key)
+    upsert_llm_key(db, user, body.provider, body.api_key)
     db.commit()
     return LlmKeyOut(provider=user.llm_provider, configured=True, hint=user.llm_api_key_hint)
 
 
+@router.get("/llm-keys", response_model=LlmKeysOut)
+def get_llm_keys(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_game_author),
+) -> LlmKeysOut:
+    from app.schemas import LlmKeyStatus
+
+    rows = [LlmKeyStatus(provider=item["provider"], hint=item.get("hint")) for item in list_llm_keys(db, user)]
+    return LlmKeysOut(keys=rows, active_provider=user.llm_provider)
+
+
 @router.delete("/llm-key", response_model=LlmKeyOut)
 def clear_llm_key(
+    provider: str | None = None,
     db: Session = Depends(get_db),
     user: User = Depends(require_game_author),
 ) -> LlmKeyOut:
-    user.llm_provider = None
-    user.llm_api_key_hash = None
-    user.llm_api_key_hint = None
+    delete_llm_key(db, user, provider)
     db.commit()
-    return LlmKeyOut(provider=None, configured=False, hint=None)
+    configured = bool(user.llm_api_key_hash)
+    return LlmKeyOut(provider=user.llm_provider, configured=configured, hint=user.llm_api_key_hint)
+
+
+@router.post("/avatar", response_model=UserOut)
+async def save_avatar(
+    avatar: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> UserOut:
+    from app.services.avatars import save_user_avatar
+
+    raw = await avatar.read()
+    try:
+        save_user_avatar(user.id, raw)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return user_to_out(user, db)
+
+
+@router.delete("/avatar", response_model=UserOut)
+def clear_avatar(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> UserOut:
+    from app.services.avatars import delete_user_avatar
+
+    delete_user_avatar(user.id)
+    return user_to_out(user, db)
