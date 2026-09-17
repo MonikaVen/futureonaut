@@ -34,19 +34,27 @@ class AvatarTests(unittest.TestCase):
 
 
 class CreatorSlugTests(unittest.TestCase):
-    def test_finds_user_by_display_name_slug(self) -> None:
+    def test_finds_user_by_stored_profile_slug(self) -> None:
         user = SimpleNamespace(
             id=uuid4(),
             display_name="futureonaut",
             email="futureonaut@example.com",
             role=UserRole.creator,
+            profile_slug="futureonaut",
         )
         db = MagicMock()
-        db.query.return_value.all.return_value = [user]
+        db.query.return_value.filter.return_value.first.return_value = user
         found = find_user_by_slug(db, "futureonaut")
         self.assertIs(found, user)
         self.assertEqual(creator_slug(user), "futureonaut")
         self.assertEqual(username_slug(user), "futureonaut")
+        db.query.return_value.filter.assert_called()
+
+    def test_find_user_by_slug_does_not_rank_by_game_count(self) -> None:
+        db = MagicMock()
+        db.query.return_value.filter.return_value.first.return_value = None
+        self.assertIsNone(find_user_by_slug(db, "shared-name"))
+        db.query.return_value.all.assert_not_called()
 
     def test_public_out_includes_slug(self) -> None:
         user = SimpleNamespace(
@@ -54,6 +62,7 @@ class CreatorSlugTests(unittest.TestCase):
             display_name="Ada Lovelace",
             email="ada@example.com",
             role=UserRole.creator,
+            profile_slug="ada-lovelace",
             created_at=datetime.now(timezone.utc),
         )
         with patch("app.services.creators.has_user_avatar", return_value=False):

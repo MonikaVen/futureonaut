@@ -11,9 +11,11 @@ from app.models import UserRole
 from app.services.accounts import delete_user_keeping_games
 from app.services.handles import (
     allocate_handle,
+    allocate_profile_slug,
     compose_handle_base,
     migrate_handle,
     play_slug,
+    profile_slug_for,
     resolve_game,
     slugify,
     split_handle,
@@ -32,6 +34,20 @@ class HandleHelperTests(unittest.TestCase):
         self.assertEqual(username_slug(SimpleNamespace(display_name="Ada Lovelace", email="x@y.com")), "ada-lovelace")
         self.assertEqual(username_slug(SimpleNamespace(display_name="", email="Teacher@School.com")), "teacher")
         self.assertEqual(username_slug(None), "player")
+
+    def test_profile_slug_prefers_stored_column(self) -> None:
+        user = SimpleNamespace(display_name="Ada Lovelace", email="ada@x.com", profile_slug="ada")
+        self.assertEqual(profile_slug_for(user), "ada")
+        self.assertEqual(
+            profile_slug_for(SimpleNamespace(display_name="Ada Lovelace", email="ada@x.com", profile_slug=None)),
+            "ada-lovelace",
+        )
+
+    def test_allocate_profile_slug_suffixes_on_collision(self) -> None:
+        db = MagicMock()
+        db.query.return_value.filter.return_value.first.side_effect = [object(), None]
+        user = SimpleNamespace(display_name="Ada Lovelace", email="ada@x.com")
+        self.assertEqual(allocate_profile_slug(db, user), "ada-lovelace-2")
 
     def test_compose_username_slash_gamename(self) -> None:
         user = SimpleNamespace(display_name="Demo Teacher", email="teacher@example.com")

@@ -24,6 +24,9 @@ services:
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin12345}
       TEACHER_EMAIL: ${TEACHER_EMAIL:-teacher@example.com}
       TEACHER_PASSWORD: ${TEACHER_PASSWORD:-teacher12345}
+      CREATOR_EMAIL: ${CREATOR_EMAIL:-futureonaut@example.com}
+      CREATOR_PASSWORD: ${CREATOR_PASSWORD:-creator12345}
+      CREATOR_DISPLAY_NAME: ${CREATOR_DISPLAY_NAME:-futureonaut}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}

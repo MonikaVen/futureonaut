@@ -28,6 +28,8 @@ from app.services.progress import (
 
 router = APIRouter(prefix="/classrooms", tags=["classrooms"])
 
+JOIN_CODE_MASK = "••••••"
+
 
 def _gen_code() -> str:
     alphabet = string.ascii_uppercase + string.digits
@@ -52,6 +54,20 @@ def _is_member(db: Session, classroom_id: UUID, user_id: UUID) -> bool:
 
 def _best_session(db: Session, user_id: UUID, game_id: UUID) -> PlaySession | None:
     return best_sessions_by_game(db, user_id, [game_id]).get(game_id)
+
+
+def _can_see_join_code(classroom: Classroom, user: User) -> bool:
+    return classroom.teacher_id == user.id or user.role == UserRole.admin
+
+
+def _classroom_out(classroom: Classroom, user: User) -> ClassroomOut:
+    return ClassroomOut(
+        id=classroom.id,
+        name=classroom.name,
+        join_code=classroom.join_code if _can_see_join_code(classroom, user) else JOIN_CODE_MASK,
+        teacher_id=classroom.teacher_id,
+        created_at=classroom.created_at,
+    )
 
 
 def _assignment_out(
@@ -79,7 +95,7 @@ def create_classroom(
     body: ClassroomCreate,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
-) -> Classroom:
+) -> ClassroomOut:
     if user.role not in (UserRole.creator, UserRole.admin, UserRole.teacher):
         raise HTTPException(status_code=403, detail="Only teachers can create a classroom")
     code = _gen_code()
@@ -89,7 +105,7 @@ def create_classroom(
     db.add(classroom)
     db.commit()
     db.refresh(classroom)
-    return classroom
+    return _classroom_out(classroom, user)
 
 
 @router.post("/join", response_model=ClassroomOut)
@@ -97,7 +113,7 @@ def join_classroom(
     body: ClassroomJoin,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
-) -> Classroom:
+) -> ClassroomOut:
     classroom = db.query(Classroom).filter(Classroom.join_code == body.code.strip().upper()).first()
     if classroom is None:
         raise HTTPException(status_code=404, detail="Invalid class code")
@@ -109,14 +125,14 @@ def join_classroom(
     if not exists:
         db.add(ClassroomMember(classroom_id=classroom.id, user_id=user.id))
         db.commit()
-    return classroom
+    return _classroom_out(classroom, user)
 
 
 @router.get("/mine", response_model=list[ClassroomOut])
 def my_classrooms(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
-) -> list[Classroom]:
+) -> list[ClassroomOut]:
     teaching = db.query(Classroom).filter(Classroom.teacher_id == user.id).order_by(Classroom.created_at.desc()).all()
     member_ids = [
         m.classroom_id
@@ -131,11 +147,11 @@ def my_classrooms(
             .all()
         )
     seen = set()
-    out = []
+    out: list[ClassroomOut] = []
     for c in teaching + enrolled:
         if c.id not in seen:
             seen.add(c.id)
-            out.append(c)
+            out.append(_classroom_out(c, user))
     return out
 
 
@@ -208,7 +224,7 @@ def classroom_detail(
     return ClassroomDetailOut(
         id=classroom.id,
         name=classroom.name,
-        join_code=classroom.join_code if is_teacher else "••••••",
+        join_code=classroom.join_code if is_teacher else JOIN_CODE_MASK,
         teacher_id=classroom.teacher_id,
         is_teacher=is_teacher,
         member_count=len(members),

@@ -168,6 +168,32 @@ class ClassroomPrivilegeTests(unittest.TestCase):
             create_classroom(ClassroomCreate(name="Mine"), MagicMock(), user)
         self.assertEqual(ctx.exception.status_code, 403)
 
+    def test_member_list_hides_join_code(self) -> None:
+        from datetime import datetime, timezone
+
+        from app.routers.classrooms import JOIN_CODE_MASK, _classroom_out
+
+        teacher_id = uuid4()
+        classroom = SimpleNamespace(
+            id=uuid4(),
+            name="Math",
+            join_code="TEACH01",
+            teacher_id=teacher_id,
+            created_at=datetime.now(timezone.utc),
+        )
+        student = SimpleNamespace(id=uuid4(), role=UserRole.learner)
+        hidden = _classroom_out(classroom, student)
+        self.assertEqual(hidden.join_code, JOIN_CODE_MASK)
+        self.assertNotEqual(hidden.join_code, "TEACH01")
+
+        teacher = SimpleNamespace(id=teacher_id, role=UserRole.teacher)
+        shown = _classroom_out(classroom, teacher)
+        self.assertEqual(shown.join_code, "TEACH01")
+
+        admin = SimpleNamespace(id=uuid4(), role=UserRole.admin)
+        admin_out = _classroom_out(classroom, admin)
+        self.assertEqual(admin_out.join_code, "TEACH01")
+
 
 if __name__ == "__main__":
     unittest.main()

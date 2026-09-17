@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.models import Game, PlaySession
 from app.schemas import GameOut, RecommendationOut
 from app.services.avatars import has_user_avatar
-from app.services.handles import split_handle, username_slug
+from app.services.handles import profile_slug_for, split_handle
 from app.services.snapshot import has_game_screenshot
 from app.services.topics import TOPICS, normalize_topic
 
@@ -28,7 +28,7 @@ def game_is_new(created_at: datetime | None, *, now: datetime | None = None) -> 
 
 def game_to_out(game: Game) -> GameOut:
     owner = getattr(game, "owner", None)
-    owner_slug = username_slug(owner) if owner is not None else None
+    owner_slug = profile_slug_for(owner) if owner is not None else None
     if not owner_slug:
         parts = split_handle(getattr(game, "handle", None))
         owner_slug = parts[0] if parts else None

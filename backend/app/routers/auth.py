@@ -43,6 +43,10 @@ def register(body: UserCreate, db: Session = Depends(get_db)) -> User:
         role=UserRole.learner,
     )
     db.add(user)
+    db.flush()
+    from app.services.handles import allocate_profile_slug
+
+    user.profile_slug = allocate_profile_slug(db, user)
     db.commit()
     db.refresh(user)
     if body.visitor_id:

@@ -173,6 +173,16 @@ def ensure_schema() -> None:
             )
         )
         conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS style_guidelines TEXT"))
+        conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_slug VARCHAR(48)"))
+        conn.execute(
+            text(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS uq_users_profile_slug
+                ON users (profile_slug)
+                WHERE profile_slug IS NOT NULL
+                """
+            )
+        )
         conn.execute(
             text(
                 """
@@ -227,6 +237,9 @@ async def lifespan(_: FastAPI):
     seed_admin()
     seed_teacher()
     seed_creator()
+    from app.services.creators import backfill_profile_slugs
+
+    backfill_profile_slugs()
     seed_demo_games()
     yield
 

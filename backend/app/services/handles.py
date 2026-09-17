@@ -31,6 +31,38 @@ def username_slug(user: User | None) -> str:
     return slugify(raw) or "player"
 
 
+def profile_slug_for(user: User | None) -> str:
+    stored = str(getattr(user, "profile_slug", "") or "").strip()
+    if stored:
+        return stored
+    return username_slug(user)
+
+
+def allocate_profile_slug(
+    db: Session,
+    user: User | None,
+    *,
+    preferred: str | None = None,
+    exclude_id: UUID | None = None,
+) -> str:
+    base = slugify(preferred or "") or username_slug(user)
+    candidate = base
+    n = 2
+    owner_id = exclude_id or getattr(user, "id", None)
+    while True:
+        q = db.query(User).filter(User.profile_slug == candidate)
+        if owner_id is not None:
+            q = q.filter(User.id != owner_id)
+        if q.first() is None:
+            return candidate
+        suffix = f"-{n}"
+        candidate = f"{base[: PART_MAX - len(suffix)]}{suffix}"
+        n += 1
+        if n > 40:
+            extra = uuid4().hex[:6]
+            return f"{base[: PART_MAX - 7]}-{extra}"
+
+
 def split_handle(handle: str | None) -> tuple[str, str] | None:
     raw = (handle or "").strip().strip("/")
     if "/" not in raw:

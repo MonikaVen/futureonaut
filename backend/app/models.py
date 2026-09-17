@@ -54,6 +54,7 @@ class User(Base):
     llm_api_key_hint: Mapped[str | None] = mapped_column(String(8), nullable=True)
     style_source: Mapped[str] = mapped_column(String(16), nullable=False, default="futureonaut")
     style_guidelines: Mapped[str | None] = mapped_column(Text, nullable=True)
+    profile_slug: Mapped[str | None] = mapped_column(String(48), unique=True, index=True, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     games: Mapped[list["Game"]] = relationship(back_populates="owner")

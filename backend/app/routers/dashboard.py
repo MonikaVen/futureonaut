@@ -23,7 +23,7 @@ from app.schemas import (
 from app.services.accounts import delete_user_keeping_games
 from app.services.avatars import has_user_avatar
 from app.services.game_analytics import build_game_analytics, build_game_analytics_detail
-from app.services.handles import username_slug
+from app.services.handles import profile_slug_for
 from app.services.prompts import get_or_create_platform_settings
 from app.services.recommendations import recommend_games
 
@@ -238,7 +238,7 @@ def list_all_comments(
             author_name=c.user.display_name if c.user else "Unknown",
             body=c.body,
             created_at=c.created_at,
-            author_slug=username_slug(c.user) if c.user else None,
+            author_slug=profile_slug_for(c.user) if c.user else None,
             author_has_avatar=has_user_avatar(c.user_id) if c.user_id else False,
         )
         for c in comments

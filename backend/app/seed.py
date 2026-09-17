@@ -1,7 +1,8 @@
-from app.database import SessionLocal
-from app.models import Classroom, User, UserRole
 from app.auth import hash_password
 from app.config import get_settings
+from app.database import SessionLocal
+from app.models import Classroom, User, UserRole
+from app.services.handles import allocate_profile_slug
 
 
 def seed_admin() -> None:
@@ -18,6 +19,8 @@ def seed_admin() -> None:
             role=UserRole.admin,
         )
         db.add(admin)
+        db.flush()
+        admin.profile_slug = allocate_profile_slug(db, admin)
         db.commit()
     finally:
         db.close()
@@ -43,6 +46,8 @@ def seed_teacher() -> None:
                 role=UserRole.teacher,
             )
             db.add(teacher)
+            db.flush()
+            teacher.profile_slug = allocate_profile_slug(db, teacher)
             db.commit()
             db.refresh(teacher)
 
@@ -74,14 +79,15 @@ def seed_creator() -> None:
     try:
         creator = db.query(User).filter(User.email == email).first()
         if creator is None:
-            db.add(
-                User(
-                    email=email,
-                    password_hash=hash_password(settings.creator_password),
-                    display_name=display_name,
-                    role=UserRole.creator,
-                )
+            creator = User(
+                email=email,
+                password_hash=hash_password(settings.creator_password),
+                display_name=display_name,
+                role=UserRole.creator,
             )
+            db.add(creator)
+            db.flush()
+            creator.profile_slug = allocate_profile_slug(db, creator)
             db.commit()
             return
         changed = False

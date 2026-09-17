@@ -27,7 +27,7 @@ def can_author_games(user: User, db: Session | None = None) -> bool:
 
 def user_to_out(user: User, db: Session | None = None) -> UserOut:
     from app.services.avatars import has_user_avatar
-    from app.services.handles import username_slug
+    from app.services.handles import profile_slug_for
     from app.services.llm import list_llm_keys
 
     keys = [LlmKeyStatus(provider=row["provider"], hint=row.get("hint")) for row in list_llm_keys(db, user)] if db is not None else []
@@ -51,7 +51,7 @@ def user_to_out(user: User, db: Session | None = None) -> UserOut:
         llm_keys=keys,
         style_source=getattr(user, "style_source", None) or "futureonaut",
         style_guidelines=getattr(user, "style_guidelines", None),
-        slug=username_slug(user),
+        slug=profile_slug_for(user),
         has_avatar=has_user_avatar(user.id),
     )
 

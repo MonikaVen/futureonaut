@@ -3,21 +3,22 @@ from __future__ import annotations
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
+from app.database import SessionLocal
 from app.models import Game, User, UserRole
 from app.schemas import CreatorProfileOut, CreatorPublicOut, GameOut
 from app.services.avatars import has_user_avatar
-from app.services.handles import slugify, split_handle, username_slug
+from app.services.handles import allocate_profile_slug, profile_slug_for, slugify, split_handle
 from app.services.social import enrich_games
 
 
 def creator_slug(user: User | None) -> str:
-    return username_slug(user)
+    return profile_slug_for(user)
 
 
 def owner_slug_for_game(game: Game) -> str | None:
     owner = getattr(game, "owner", None)
     if owner is not None:
-        return username_slug(owner)
+        return profile_slug_for(owner)
     parts = split_handle(getattr(game, "handle", None))
     return parts[0] if parts else None
 
@@ -26,23 +27,34 @@ def find_user_by_slug(db: Session, slug: str) -> User | None:
     wanted = slugify(slug)
     if not wanted:
         return None
-    matches = [user for user in db.query(User).all() if username_slug(user) == wanted]
-    if not matches:
-        return None
-    if len(matches) == 1:
-        return matches[0]
-    counts = dict(
-        db.query(Game.owner_id, func.count(Game.id))
-        .filter(Game.owner_id.in_([u.id for u in matches]))
-        .group_by(Game.owner_id)
-        .all()
-    )
-    role_rank = {UserRole.creator: 3, UserRole.admin: 2, UserRole.teacher: 1}
+    return db.query(User).filter(User.profile_slug == wanted).first()
 
-    def score(user: User) -> tuple[int, int]:
-        return (int(counts.get(user.id, 0)), role_rank.get(user.role, 0))
 
-    return max(matches, key=score)
+def ensure_profile_slug(db: Session, user: User) -> str:
+    current = (getattr(user, "profile_slug", None) or "").strip()
+    if current:
+        return current
+    user.profile_slug = allocate_profile_slug(db, user)
+    db.add(user)
+    db.flush()
+    return user.profile_slug
+
+
+def backfill_profile_slugs() -> None:
+    db = SessionLocal()
+    try:
+        users = (
+            db.query(User)
+            .filter((User.profile_slug.is_(None)) | (User.profile_slug == ""))
+            .order_by(User.created_at.asc())
+            .all()
+        )
+        for user in users:
+            ensure_profile_slug(db, user)
+        if users:
+            db.commit()
+    finally:
+        db.close()
 
 
 def _game_counts(db: Session) -> dict:
@@ -58,7 +70,7 @@ def public_creator_out(user: User, game_count: int) -> CreatorPublicOut:
     return CreatorPublicOut(
         id=user.id,
         display_name=user.display_name,
-        slug=username_slug(user),
+        slug=profile_slug_for(user),
         role=user.role,
         has_avatar=has_user_avatar(user.id),
         game_count=game_count,
