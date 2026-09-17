@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Liucian's Precision Pounce — Precision vs Recall</title>
+<style>
+:root{--bg:#f7f7f8;--card:#fff;--text:#1f2937;--muted:#6b7280;--border:#d1d5db;--accent:#4b5563;--good:#237a4b;--bad:#b42318}
+*{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,sans-serif;color:var(--text);background:#fff}
+main{max-width:1080px;margin:auto;padding:22px}h1{margin:0 0 6px}h2{margin:0 0 8px;font-size:18px}
+.sub,.tiny{color:var(--muted)}.sub{margin-bottom:16px}.tiny{font-size:13px}
+.grid{display:grid;gap:14px}.metrics{grid-template-columns:repeat(4,1fr)}.two{grid-template-columns:1.15fr .85fr}
+.card,.metric{border:1px solid var(--border);border-radius:16px;padding:14px;background:var(--card)}
+.label{font-size:13px;color:var(--muted)}.value{font-size:23px;font-weight:700}
+button{padding:10px 14px;border:1px solid var(--border);border-radius:12px;background:#fff;font-size:15px;cursor:pointer;margin:4px 4px 0 0}
+button.primary{background:var(--accent);color:#fff}button:disabled{opacity:.45;cursor:not-allowed}
+.box{padding:11px;border-radius:12px;background:var(--bg);border:1px solid var(--border);margin-top:12px}
+.math{font-family:ui-monospace,monospace;background:#fff;padding:8px;border-radius:9px;margin-top:8px}
+svg{display:block;width:100%;height:auto}.feedback{min-height:24px;margin-top:10px;font-weight:650}
+.good{color:var(--good)}.bad{color:var(--bad)}input[type=range]{width:100%}
+.cm{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.cm div{border:1px solid var(--border);border-radius:10px;padding:8px;text-align:center;background:#fff}
+@media(max-width:800px){.metrics{grid-template-columns:repeat(2,1fr)}.two{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<main>
+  <h1>🐭 Liucian's Precision Pounce</h1>
+  <div class="sub">Set a <strong>decision threshold</strong>. Liucian pounces on anything that looks mouse-like. Too eager: yarn chaos. Too shy: mice escape.</div>
+
+  <div class="grid metrics">
+    <div class="metric"><div class="label">Wave</div><div id="mWave" class="value">1 / 4</div></div>
+    <div class="metric"><div class="label">Kitchen score</div><div id="mScore" class="value">0</div></div>
+    <div class="metric"><div class="label">Precision</div><div id="mP" class="value">—</div></div>
+    <div class="metric"><div class="label">Recall</div><div id="mR" class="value">—</div></div>
+  </div>
+
+  <div class="grid two" style="margin-top:15px">
+    <section class="card">
+      <h2>1. Set the pounce threshold</h2>
+      <div class="tiny">Each object has a mouse-ness score. If score ≥ threshold, Liucian pounces.</div>
+      <svg id="stage" viewBox="0 0 700 280" role="img" aria-label="Kitchen floor with incoming objects">
+        <rect x="0" y="0" width="700" height="280" fill="#f8f8f8"/>
+        <line x1="40" y1="210" x2="660" y2="210" stroke="#9ca3af" stroke-width="3"/>
+        <g id="objects"></g>
+        <g id="cat" transform="translate(90 168)">
+          <ellipse cx="0" cy="20" rx="42" ry="28" fill="#777" stroke="#4b4b4b" stroke-width="3"/>
+          <circle cx="38" cy="0" r="22" fill="#808080" stroke="#4b4b4b" stroke-width="3"/>
+          <path d="M24 -16 L29 -40 L40 -18 Z" fill="#777" stroke="#4b4b4b" stroke-width="3"/>
+          <path d="M39 -18 L54 -39 L57 -8 Z" fill="#777" stroke="#4b4b4b" stroke-width="3"/>
+          <circle cx="33" cy="-2" r="3" fill="#222"/>
+          <circle cx="44" cy="-2" r="3" fill="#222"/>
+          <text x="10" y="72" text-anchor="middle" font-size="13">Liucian</text>
+        </g>
+      </svg>
+      <div class="box">
+        <label for="thr">Threshold: <b id="thrOut">0.55</b></label>
+        <input id="thr" type="range" min="0.15" max="0.90" value="0.55" step="0.05">
+        <div class="tiny">Low threshold = high recall, more false alarms. High threshold = high precision, more missed mice.</div>
+      </div>
+      <button id="goBtn" class="primary" type="button">Start wave</button>
+      <button id="nextBtn" type="button" disabled>Next wave</button>
+      <button id="resetBtn" type="button">Replay kitchen</button>
+      <div id="feedback" class="feedback" aria-live="polite">Choose a threshold, then start the wave.</div>
+    </section>
+
+    <section class="card">
+      <h2>2. Confusion matrix</h2>
+      <div class="cm">
+        <div><div class="tiny">True pounces (TP)</div><div id="tp" class="value">0</div></div>
+        <div><div class="tiny">Yarn disasters (FP)</div><div id="fp" class="value">0</div></div>
+        <div><div class="tiny">Mice escaped (FN)</div><div id="fn" class="value">0</div></div>
+        <div><div class="tiny">Correct ignores (TN)</div><div id="tn" class="value">0</div></div>
+      </div>
+      <div class="box">
+        <b>F1 this wave</b>
+        <div id="f1" class="value">—</div>
+        <div class="tiny">F1 is the harmonic mean of precision and recall.</div>
+      </div>
+      <div class="box">
+        <b>🎯 Challenge</b>
+        <div class="tiny" style="margin-top:6px">Finish 4 waves with a <strong>kitchen score ≥ 80</strong>. Waves change how common mice are.</div>
+        <div id="challenge" class="feedback"></div>
+      </div>
+      <div class="box">
+        <b>Concept</b>
+        <div class="math">precision = TP / (TP + FP)</div>
+        <div class="math">recall = TP / (TP + FN)</div>
+        <div class="tiny" style="margin-top:8px">A classifier is not just “accuracy”. When mice are rare, a high threshold looks tidy but lets pests through. When yarn is everywhere, a low threshold wrecks the kitchen.</div>
+      </div>
+    </section>
+  </div>
+</main>
+<script>
+(() => {
+  const lp = window.LearnPlay || {score(){},answer(){},taskStart(){},taskEnd(){},complete(){}};
+  const $ = (id) => document.getElementById(id);
+  const waves = [
+    { name: "balanced kitchen", mouseP: 0.5, n: 12 },
+    { name: "mouse invasion", mouseP: 0.75, n: 12 },
+    { name: "yarn everywhere", mouseP: 0.25, n: 12 },
+    { name: "tricky overlap", mouseP: 0.45, n: 14 }
+  ];
+  let wave = 0, score = 0, running = false, items = [];
+  let tp = 0, fp = 0, fn = 0, tn = 0;
+
+  function randn() {
+    let u = 0, v = 0;
+    while (!u) u = Math.random();
+    while (!v) v = Math.random();
+    return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+  }
+
+  function makeWave() {
+    const cfg = waves[wave];
+    items = [];
+    for (let i = 0; i < cfg.n; i++) {
+      const isMouse = Math.random() < cfg.mouseP;
+      let s = isMouse ? 0.68 + 0.14 * randn() : 0.34 + 0.14 * randn();
+      if (wave === 3) s = isMouse ? 0.58 + 0.18 * randn() : 0.46 + 0.18 * randn();
+      s = Math.max(0.05, Math.min(0.98, s));
+      items.push({ isMouse, s, x: 170 + i * ((500) / Math.max(cfg.n - 1, 1)) });
+    }
+  }
+
+  function drawIdle() {
+    const g = $("objects");
+    g.innerHTML = "";
+    items.forEach(it => {
+      const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      t.setAttribute("x", it.x);
+      t.setAttribute("y", 198);
+      t.setAttribute("text-anchor", "middle");
+      t.setAttribute("font-size", "28");
+      t.textContent = "❓";
+      g.appendChild(t);
+    });
+  }
+
+  function metrics() {
+    const prec = (tp + fp) ? tp / (tp + fp) : 0;
+    const rec = (tp + fn) ? tp / (tp + fn) : 0;
+    const f1 = (prec + rec) ? (2 * prec * rec) / (prec + rec) : 0;
+    $("tp").textContent = tp; $("fp").textContent = fp;
+    $("fn").textContent = fn; $("tn").textContent = tn;
+    $("mP").textContent = (tp + fp) ? prec.toFixed(2) : "—";
+    $("mR").textContent = (tp + fn) ? rec.toFixed(2) : "—";
+    $("f1").textContent = (tp + fp + fn) ? f1.toFixed(2) : "—";
+    $("mScore").textContent = score;
+    return { prec, rec, f1 };
+  }
+
+  function startWaveView() {
+    makeWave();
+    tp = fp = fn = tn = 0;
+    metrics();
+    $("mWave").textContent = `${wave + 1} / 4`;
+    $("nextBtn").disabled = true;
+    $("goBtn").disabled = false;
+    $("feedback").textContent = `Wave ${wave + 1}: ${waves[wave].name}. Set threshold, then pounce.`;
+    $("feedback").className = "feedback";
+    drawIdle();
+    lp.taskStart("wave-" + wave);
+  }
+
+  function runWave() {
+    if (running) return;
+    running = true;
+    $("goBtn").disabled = true;
+    $("thr").disabled = true;
+    const thr = +$("thr").value;
+    const g = $("objects");
+    g.innerHTML = "";
+    items.forEach((it, idx) => {
+      setTimeout(() => {
+        const pounce = it.s >= thr;
+        if (pounce && it.isMouse) { tp++; score += 10; lp.score(10); }
+        else if (pounce && !it.isMouse) { fp++; score -= 8; lp.score(-8); }
+        else if (!pounce && it.isMouse) { fn++; score -= 5; lp.score(-5); }
+        else tn++;
+        const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        t.setAttribute("x", it.x);
+        t.setAttribute("y", pounce ? 150 : 198);
+        t.setAttribute("text-anchor", "middle");
+        t.setAttribute("font-size", "28");
+        t.textContent = it.isMouse ? "🐭" : "🧶";
+        if (pounce && !it.isMouse) t.setAttribute("opacity", "0.45");
+        g.appendChild(t);
+        if (pounce) {
+          const mark = document.createElementNS("http://www.w3.org/2000/svg", "text");
+          mark.setAttribute("x", it.x);
+          mark.setAttribute("y", 128);
+          mark.setAttribute("text-anchor", "middle");
+          mark.setAttribute("font-size", "14");
+          mark.textContent = it.isMouse ? "✓" : "✗";
+          g.appendChild(mark);
+        }
+        metrics();
+        if (idx === items.length - 1) finishWave();
+      }, 220 * idx);
+    });
+  }
+
+  function finishWave() {
+    running = false;
+    $("thr").disabled = false;
+    const { prec, rec, f1 } = metrics();
+    const ok = f1 >= 0.7;
+    $("feedback").innerHTML = ok
+      ? `Nice pounces! Precision ${prec.toFixed(2)}, recall ${rec.toFixed(2)}, F1 ${f1.toFixed(2)}.`
+      : `Kitchen chaos. Precision ${prec.toFixed(2)}, recall ${rec.toFixed(2)}. Nudge the threshold.`;
+    $("feedback").className = "feedback " + (ok ? "good" : "bad");
+    lp.taskEnd("wave-" + wave);
+    lp.answer({ correct: ok, taskId: "wave-" + wave, points: Math.max(0, Math.round(f1 * 10)) });
+    if (wave < 3) $("nextBtn").disabled = false;
+    else {
+      const pass = score >= 80;
+      $("challenge").innerHTML = pass
+        ? `⭐ Challenge complete! Kitchen score ${score}.`
+        : `Score ${score}. Try a mid threshold (~0.5) on balanced waves, higher when yarn dominates, lower during invasions.`;
+      $("challenge").className = "feedback " + (pass ? "good" : "bad");
+      lp.complete({ score });
+    }
+  }
+
+  $("thr").oninput = () => { $("thrOut").textContent = (+$("thr").value).toFixed(2); };
+  $("goBtn").onclick = runWave;
+  $("nextBtn").onclick = () => { wave++; startWaveView(); };
+  $("resetBtn").onclick = () => {
+    wave = 0; score = 0;
+    $("challenge").textContent = "";
+    startWaveView();
+  };
+  startWaveView();
+})();
+</script>
+</body>
+</html>
