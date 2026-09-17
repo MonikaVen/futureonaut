@@ -135,6 +135,37 @@ def ensure_schema() -> None:
                 "CREATE INDEX IF NOT EXISTS ix_game_drafts_owner_id ON game_drafts (owner_id)"
             )
         )
+        conn.execute(text("ALTER TABLE games ALTER COLUMN owner_id DROP NOT NULL"))
+        conn.execute(
+            text(
+                """
+                DO $$
+                DECLARE
+                    rec RECORD;
+                BEGIN
+                    FOR rec IN
+                        SELECT con.conname, pg_get_constraintdef(con.oid) AS def
+                        FROM pg_constraint con
+                        JOIN pg_class rel ON rel.oid = con.conrelid
+                        WHERE rel.relname = 'games'
+                          AND con.contype = 'f'
+                          AND pg_get_constraintdef(con.oid) ILIKE '%owner_id%'
+                    LOOP
+                        IF rec.def NOT ILIKE '%ON DELETE SET NULL%' THEN
+                            EXECUTE format('ALTER TABLE games DROP CONSTRAINT %I', rec.conname);
+                        END IF;
+                    END LOOP;
+                    IF NOT EXISTS (
+                        SELECT 1 FROM pg_constraint WHERE conname = 'games_owner_id_fkey'
+                    ) THEN
+                        ALTER TABLE games
+                            ADD CONSTRAINT games_owner_id_fkey
+                            FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE SET NULL;
+                    END IF;
+                END $$;
+                """
+            )
+        )
 
 
 @asynccontextmanager

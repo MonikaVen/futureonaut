@@ -17,7 +17,8 @@ type SdkMessage = {
 };
 
 export function PlayPage() {
-  const { gameId } = useParams();
+  const { gameId, ownerSlug, gameSlug } = useParams();
+  const playRef = ownerSlug && gameSlug ? `${ownerSlug}/${gameSlug}` : gameId;
   const navigate = useNavigate();
   const { user } = useAuth();
   const { t, lang, setLang } = useLanguage();
@@ -58,10 +59,10 @@ export function PlayPage() {
   }, []);
 
   useEffect(() => {
-    if (!gameId) return;
+    if (!playRef) return;
     const userKey = user?.id || "guest";
     const current = gameRef.current;
-    if (current && (current.handle === gameId || current.id === gameId) && loadedUserRef.current === userKey) {
+    if (current && (current.handle === playRef || current.id === playRef) && loadedUserRef.current === userKey) {
       return;
     }
     let cancelled = false;
@@ -80,7 +81,8 @@ export function PlayPage() {
     setFrameHeight(null);
     (async () => {
       try {
-        const g = await api<Game>(`/api/games/${gameId}`);
+        const path = playRef.includes("/") ? `/api/games/by/${playRef}` : `/api/games/${playRef}`;
+        const g = await api<Game>(path);
         if (cancelled) return;
         setGame(g);
         loadedUserRef.current = userKey;
@@ -112,13 +114,13 @@ export function PlayPage() {
     return () => {
       cancelled = true;
     };
-  }, [gameId, user, visitorId, navigate]);
+  }, [playRef, user, visitorId, navigate]);
 
   useEffect(() => {
-    if (ready && game?.handle && gameId && game.handle !== gameId) {
+    if (ready && game?.handle && playRef && game.handle !== playRef) {
       navigate(`/play/${game.handle}`, { replace: true });
     }
-  }, [ready, game, gameId, navigate]);
+  }, [ready, game, playRef, navigate]);
 
   useEffect(() => {
     function onMessage(ev: MessageEvent<SdkMessage>) {

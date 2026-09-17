@@ -53,7 +53,7 @@ from app.services.storage import (
     write_template_game,
 )
 from app.services.demo_seed import restore_game_html_files
-from app.services.handles import allocate_handle, resolve_game
+from app.services.handles import allocate_handle, resolve_game, user_slug_for_game
 from app.services.topics import ensure_topic_tag
 
 # Document CSP sandbox (no allow-same-origin) makes game HTML a unique origin even
@@ -326,10 +326,13 @@ def _game_html(game: Game) -> str:
 
 
 def _refresh_handle(db: Session, game: Game, title: str, actor: User) -> None:
-    if game.handle and game.title == title[:200]:
+    if game.handle and "/" in game.handle and game.title == title[:200]:
         return
-    owner = db.get(User, game.owner_id) or actor
-    game.handle = allocate_handle(db, owner, title, exclude_id=game.id)
+    owner = db.get(User, game.owner_id) if game.owner_id else None
+    user_slug = user_slug_for_game(game, owner or actor)
+    game.handle = allocate_handle(
+        db, owner or actor, title, exclude_id=game.id, user_slug=user_slug
+    )
 
 
 def _owned_draft(db: Session, user: User, draft_id: UUID) -> GameDraft:
@@ -713,6 +716,19 @@ def create_edit_draft(
         db.commit()
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return _draft_to_out(draft)
+
+
+@router.get("/by/{owner_slug}/{game_slug}", response_model=GameOut)
+def get_game_by_handle(
+    owner_slug: str,
+    game_slug: str,
+    db: Session = Depends(get_db),
+    user: User | None = Depends(get_optional_user),
+) -> GameOut:
+    game = resolve_game(db, f"{owner_slug}/{game_slug}")
+    if game is None:
+        raise HTTPException(status_code=404, detail="Game not found")
+    return enrich_games(db, [game], user.id if user else None)[0]
 
 
 @router.get("/{game_id}", response_model=GameOut)

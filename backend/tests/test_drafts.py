@@ -271,9 +271,11 @@ class FrameIsolationTests(unittest.TestCase):
         self.assertIn("setGameTheme", play)
         self.assertNotIn("setTheme(nextTheme", play)
         shell = (root / "frontend/src/Shell.tsx").read_text(encoding="utf-8")
+        app = (root / "frontend/src/App.tsx").read_text(encoding="utf-8")
         self.assertIn("nav-tabs", shell)
         self.assertIn("ThemeToggle", shell)
         self.assertLess(shell.index("topnav-bar"), shell.index("nav-tabs"))
+        self.assertIn("/play/:ownerSlug/:gameSlug", app)
 
 
 class EditDraftTests(unittest.TestCase):

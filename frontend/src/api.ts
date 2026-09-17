@@ -16,7 +16,7 @@ export interface Game {
   id: string;
   title: string;
   description: string;
-  owner_id: string;
+  owner_id: string | null;
   source: "upload" | "template" | "ai";
   topic_tags: string[];
   difficulty: number;

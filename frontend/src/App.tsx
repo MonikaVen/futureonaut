@@ -54,6 +54,7 @@ export default function App() {
         <Route path="/register" element={<RegisterPage />} />
         <Route element={<Shell />}>
           <Route path="/" element={<CatalogPage />} />
+          <Route path="/play/:ownerSlug/:gameSlug" element={<PlayPage />} />
           <Route path="/play/:gameId" element={<PlayPage />} />
           <Route
             path="/dashboard"

@@ -17,7 +17,7 @@ def game_to_out(game: Game) -> GameOut:
         id=game.id,
         title=game.title,
         description=game.description,
-        owner_id=game.owner_id,
+        owner_id=getattr(game, "owner_id", None),
         source=game.source,
         topic_tags=game.topic_tags or [],
         difficulty=game.difficulty,

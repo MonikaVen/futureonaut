@@ -288,12 +288,29 @@ def seed_html_pack(db, owner_id) -> None:
 
 
 def backfill_game_handles(db) -> None:
+    from app.services.handles import allocate_handle, migrate_handle, split_handle, username_slug
+
     changed = False
     for game in db.query(Game).all():
-        if game.handle:
+        owner = db.get(User, game.owner_id) if game.owner_id else None
+        migrated = migrate_handle(game, owner)
+        if migrated is None and game.handle:
             continue
-        owner = db.get(User, game.owner_id)
-        game.handle = allocate_handle(db, owner, game.title, exclude_id=game.id)
+        desired = migrated or game.handle
+        parts = split_handle(desired)
+        user_part = parts[0] if parts else username_slug(owner)
+        game_part = parts[1] if parts else None
+        next_handle = allocate_handle(
+            db,
+            owner,
+            game.title,
+            exclude_id=game.id,
+            user_slug=user_part,
+            game_slug=game_part,
+        )
+        if game.handle == next_handle:
+            continue
+        game.handle = next_handle
         db.flush()
         changed = True
     if changed:

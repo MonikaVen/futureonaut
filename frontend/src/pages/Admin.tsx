@@ -78,6 +78,20 @@ export function AdminPage() {
     await load();
   }
 
+  async function removeUser(u: User) {
+    if (!confirm(`Delete ${u.display_name || u.email}? Their games stay in the catalog.`)) return;
+    setBusyId(u.id);
+    setError("");
+    try {
+      await api(`/api/admin/users/${u.id}`, { method: "DELETE" });
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Delete failed");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   async function deleteGame(game: Game) {
     if (!confirm(`Delete “${game.title}”? This also removes play sessions.`)) return;
     setBusyId(game.id);
@@ -292,7 +306,7 @@ export function AdminPage() {
                       </form>
                     ) : (
                       <>
-                        <Link to={`/play/${g.id}`}>{g.title}</Link>
+                        <Link to={g.handle ? `/play/${g.handle}` : `/play/${g.id}`}>{g.title}</Link>
                         <button
                           className="btn secondary btn-sm"
                           type="button"
@@ -375,6 +389,7 @@ export function AdminPage() {
               <th>Email</th>
               <th>Role</th>
               <th>Change</th>
+              <th />
             </tr>
           </thead>
           <tbody>
@@ -393,6 +408,16 @@ export function AdminPage() {
                     <option value="creator">creator</option>
                     <option value="admin">admin</option>
                   </select>
+                </td>
+                <td>
+                  <button
+                    className="btn danger btn-sm"
+                    type="button"
+                    disabled={busyId === u.id}
+                    onClick={() => removeUser(u)}
+                  >
+                    Delete
+                  </button>
                 </td>
               </tr>
             ))}

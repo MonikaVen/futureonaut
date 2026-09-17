@@ -4,6 +4,7 @@ import re
 import unicodedata
 from uuid import UUID, uuid4
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models import Game, User
@@ -30,9 +31,38 @@ def username_slug(user: User | None) -> str:
     return slugify(raw) or "player"
 
 
-def compose_handle_base(user: User | None, title: str) -> str:
-    base = f"{username_slug(user)}-{slugify(title) or 'game'}"
-    return base[:HANDLE_MAX].strip("-") or "player-game"
+def split_handle(handle: str | None) -> tuple[str, str] | None:
+    raw = (handle or "").strip().strip("/")
+    if "/" not in raw:
+        return None
+    user_part, game_part = raw.split("/", 1)
+    user_part = user_part.strip("-") or "player"
+    game_part = game_part.strip("-") or "game"
+    return user_part, game_part
+
+
+def user_slug_for_game(game: Game, user: User | None) -> str:
+    parts = split_handle(getattr(game, "handle", None))
+    if parts:
+        return parts[0]
+    return username_slug(user)
+
+
+def compose_handle_base(
+    user: User | None,
+    title: str,
+    *,
+    user_slug: str | None = None,
+    game_slug: str | None = None,
+) -> str:
+    user_part = slugify(user_slug or "") or username_slug(user)
+    game_part = slugify(game_slug or "") or slugify(title) or "game"
+    room = HANDLE_MAX - len(user_part) - 1
+    if room < 1:
+        user_part = user_part[:40] or "player"
+        room = HANDLE_MAX - len(user_part) - 1
+    game_part = game_part[:room] or "game"
+    return f"{user_part}/{game_part}"
 
 
 def allocate_handle(
@@ -41,8 +71,10 @@ def allocate_handle(
     title: str,
     *,
     exclude_id: UUID | None = None,
+    user_slug: str | None = None,
+    game_slug: str | None = None,
 ) -> str:
-    base = compose_handle_base(user, title)
+    base = compose_handle_base(user, title, user_slug=user_slug, game_slug=game_slug)
     candidate = base
     n = 2
     while True:
@@ -52,11 +84,26 @@ def allocate_handle(
         if q.first() is None:
             return candidate
         suffix = f"-{n}"
-        candidate = f"{base[: HANDLE_MAX - len(suffix)]}{suffix}"
+        cut = HANDLE_MAX - len(suffix)
+        candidate = f"{base[:cut]}{suffix}"
         n += 1
         if n > 40:
             extra = uuid4().hex[:6]
             return f"{base[: HANDLE_MAX - 7]}-{extra}"
+
+
+def migrate_handle(game: Game, user: User | None) -> str | None:
+    """Turn a hyphenated username-gamename handle into username/gamename."""
+    current = (getattr(game, "handle", None) or "").strip()
+    if "/" in current:
+        return None
+    user_part = username_slug(user)
+    game_part = slugify(game.title) or "game"
+    if current and current.startswith(user_part + "-"):
+        rest = current[len(user_part) + 1 :].strip("-")
+        if rest:
+            game_part = rest
+    return compose_handle_base(user, game.title, user_slug=user_part, game_slug=game_part)
 
 
 def play_slug(game: Game) -> str:
@@ -73,4 +120,14 @@ def resolve_game(db: Session, ref: str) -> Game | None:
             return game
     except ValueError:
         pass
-    return db.query(Game).filter(Game.handle == raw.lower()).first()
+    lowered = raw.lower().strip("/")
+    game = db.query(Game).filter(Game.handle == lowered).first()
+    if game is not None:
+        return game
+    if "/" not in lowered:
+        return (
+            db.query(Game)
+            .filter(func.replace(Game.handle, "/", "-") == lowered)
+            .first()
+        )
+    return None

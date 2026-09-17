@@ -63,7 +63,9 @@ class Game(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False, default="")
-    owner_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    owner_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
     source: Mapped[GameSource] = mapped_column(Enum(GameSource), nullable=False)
     topic_tags: Mapped[list[str]] = mapped_column(ARRAY(String), nullable=False, default=list)
     difficulty: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
@@ -75,7 +77,7 @@ class Game(Base):
     handle: Mapped[str | None] = mapped_column(String(120), unique=True, index=True, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
-    owner: Mapped[User] = relationship(back_populates="games")
+    owner: Mapped[User | None] = relationship(back_populates="games")
     sessions: Mapped[list["PlaySession"]] = relationship(back_populates="game")
     views: Mapped[list["GameView"]] = relationship(back_populates="game")
 

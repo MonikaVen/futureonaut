@@ -18,6 +18,7 @@ from app.schemas import (
     UserOut,
     UserRoleUpdate,
 )
+from app.services.accounts import delete_user_keeping_games
 from app.services.game_analytics import build_game_analytics, build_game_analytics_detail
 from app.services.recommendations import recommend_games
 
@@ -167,6 +168,15 @@ def update_role(
     db.commit()
     db.refresh(target)
     return target
+
+
+@admin_router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
+def delete_user(
+    user_id: UUID,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_roles(UserRole.admin)),
+) -> None:
+    delete_user_keeping_games(db, actor=admin, user_id=user_id)
 
 
 @admin_router.get("/stats", response_model=PlatformStats)
