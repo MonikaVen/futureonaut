@@ -20,6 +20,7 @@ class CatalogCurationTests(unittest.TestCase):
     def test_boot_only_seeds_empty_catalog(self) -> None:
         source = inspect.getsource(seed_demo_games)
         self.assertIn("restore_published_html", source)
+        self.assertIn("assign_catalog_to_owner", source)
         self.assertIn("db.query(Game).count() == 0", source)
         self.assertNotIn("prune_games_to_manifest(db)", source)
         self.assertNotIn("refresh_seed_html(db)", source)
@@ -48,6 +49,7 @@ class CatalogCurationTests(unittest.TestCase):
             patch("app.services.demo_seed.restore_missing_template_html"),
             patch("app.services.demo_seed.refresh_game_previews"),
             patch("app.services.demo_seed.backfill_game_handles"),
+            patch("app.services.demo_seed.assign_catalog_to_owner"),
         ):
             seed_demo_games()
         pack.assert_not_called()
@@ -57,6 +59,28 @@ class CatalogCurationTests(unittest.TestCase):
             GameUpdate(title="")
         parsed = GameUpdate(title="Renamed game")
         self.assertEqual(parsed.title, "Renamed game")
+
+    def test_assign_catalog_moves_games_to_futureonaut(self) -> None:
+        from app.services.demo_seed import assign_catalog_to_owner
+
+        owner_id = uuid4()
+        owner = SimpleNamespace(id=owner_id, display_name="futureonaut", email="futureonaut@example.com")
+        game = SimpleNamespace(
+            id=uuid4(),
+            title="Neural Match Lab",
+            handle="example-teacher/neural-match-lab",
+            owner_id=uuid4(),
+        )
+        db = MagicMock()
+        q = MagicMock()
+        q.filter.return_value = q
+        q.first.return_value = None
+        q.all.return_value = [game]
+        db.query.return_value = q
+        assign_catalog_to_owner(db, owner)
+        self.assertEqual(game.owner_id, owner_id)
+        self.assertEqual(game.handle, "futureonaut/neural-match-lab")
+        db.commit.assert_called()
 
 
 if __name__ == "__main__":

@@ -718,6 +718,23 @@ def create_edit_draft(
     return _draft_to_out(draft)
 
 
+@router.post("/{game_id}/snapshot", response_model=GameOut)
+async def update_game_snapshot(
+    game_id: str,
+    icon: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_game_author),
+) -> GameOut:
+    game = _owned_game(db, user, game_id)
+    raw = await icon.read()
+    try:
+        save_game_icon(game_dir(game.id), raw)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    write_game_preview(game)
+    return game_to_out(game)
+
+
 @router.get("/by/{owner_slug}/{game_slug}", response_model=GameOut)
 def get_game_by_handle(
     owner_slug: str,

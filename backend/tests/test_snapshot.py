@@ -178,5 +178,38 @@ class SnapshotTests(unittest.TestCase):
                 self.assertTrue(has_game_screenshot(game.id))
 
 
+class SnapshotEndpointTests(unittest.TestCase):
+    def test_owner_can_replace_snapshot(self) -> None:
+        import asyncio
+        from unittest.mock import AsyncMock, MagicMock
+        from uuid import uuid4
+
+        from app.models import UserRole
+        from app.routers.games import update_game_snapshot
+
+        game_id = uuid4()
+        user_id = uuid4()
+        game = SimpleNamespace(id=game_id, owner_id=user_id, title="Lab")
+        user = SimpleNamespace(id=user_id, role=UserRole.creator)
+        icon = MagicMock()
+        icon.read = AsyncMock(return_value=b"x" * 64)
+
+        async def run():
+            with (
+                patch("app.routers.games._owned_game", return_value=game),
+                patch("app.routers.games.save_game_icon") as save,
+                patch("app.routers.games.write_game_preview") as preview,
+                patch("app.routers.games.game_dir", return_value=Path("/tmp/game")),
+                patch("app.routers.games.game_to_out", return_value=SimpleNamespace(id=game_id)),
+            ):
+                out = await update_game_snapshot(str(game_id), icon, MagicMock(), user)
+            save.assert_called_once()
+            preview.assert_called_once_with(game)
+            return out
+
+        out = asyncio.run(run())
+        self.assertEqual(out.id, game_id)
+
+
 if __name__ == "__main__":
     unittest.main()

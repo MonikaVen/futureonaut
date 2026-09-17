@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 from uuid import uuid4
 
+from app.config import get_settings
 from app.database import SessionLocal
 from app.models import Game, GameDraft, GameSource, User, UserRole
 from app.services.handles import allocate_handle
@@ -72,12 +73,54 @@ def _seed_dir() -> Path:
     return Path(__file__).resolve().parents[2] / "seed_games"
 
 
+def catalog_owner(db) -> User | None:
+    settings = get_settings()
+    email = (settings.creator_email or "").strip().lower()
+    if email:
+        owner = db.query(User).filter(User.email == email).first()
+        if owner is not None:
+            return owner
+    creator = db.query(User).filter(User.role == UserRole.creator).first()
+    if creator is not None:
+        return creator
+    return db.query(User).filter(User.role == UserRole.admin).first()
+
+
+def assign_catalog_to_owner(db, owner: User) -> None:
+    """Move every catalog game to owner and rewrite handles as username/gamename."""
+    from app.services.handles import allocate_handle, split_handle, username_slug
+
+    user_part = username_slug(owner)
+    changed = False
+    for game in db.query(Game).all():
+        if game.owner_id != owner.id:
+            game.owner_id = owner.id
+            changed = True
+        parts = split_handle(game.handle)
+        game_part = parts[1] if parts else None
+        next_handle = allocate_handle(
+            db,
+            owner,
+            game.title,
+            exclude_id=game.id,
+            user_slug=user_part,
+            game_slug=game_part,
+        )
+        if game.handle == next_handle:
+            continue
+        game.handle = next_handle
+        db.flush()
+        changed = True
+    if changed:
+        db.commit()
+
+
 def seed_demo_games() -> None:
     """Load files and previews for the DB catalog. Do not rebuild the list from seed."""
     db = SessionLocal()
     try:
-        admin = db.query(User).filter(User.role == UserRole.admin).first()
-        if admin is None:
+        owner = catalog_owner(db)
+        if owner is None:
             return
 
         if db.query(Game).count() == 0:
@@ -92,18 +135,18 @@ def seed_demo_games() -> None:
                         id=game_id,
                         title=content["title"],
                         description=content["description"],
-                        owner_id=admin.id,
+                        owner_id=owner.id,
                         source=source,
                         topic_tags=content["topic_tags"],
                         difficulty=content["difficulty"],
                         entry_path=entry,
                         template_type=template_type,
                         seed_file=f"template:{template_type}",
-                        handle=allocate_handle(db, admin, content["title"]),
+                        handle=allocate_handle(db, owner, content["title"]),
                     )
                 )
             db.commit()
-            seed_html_pack(db, admin.id)
+            seed_html_pack(db, owner.id)
 
         backfill_seed_files(db)
         normalize_game_topics(db)
@@ -112,6 +155,7 @@ def seed_demo_games() -> None:
         restore_missing_template_html(db)
         refresh_game_previews(db)
         backfill_game_handles(db)
+        assign_catalog_to_owner(db, owner)
     finally:
         db.close()
 

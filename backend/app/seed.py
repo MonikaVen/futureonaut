@@ -61,3 +61,37 @@ def seed_teacher() -> None:
                 db.commit()
     finally:
         db.close()
+
+
+def seed_creator() -> None:
+    """Create the Futureonaut creator login if it does not exist."""
+    settings = get_settings()
+    email = (settings.creator_email or "").strip().lower()
+    if not email or not settings.creator_password:
+        return
+    display_name = (settings.creator_display_name or "futureonaut").strip() or "futureonaut"
+    db = SessionLocal()
+    try:
+        creator = db.query(User).filter(User.email == email).first()
+        if creator is None:
+            db.add(
+                User(
+                    email=email,
+                    password_hash=hash_password(settings.creator_password),
+                    display_name=display_name,
+                    role=UserRole.creator,
+                )
+            )
+            db.commit()
+            return
+        changed = False
+        if creator.role not in (UserRole.admin, UserRole.creator):
+            creator.role = UserRole.creator
+            changed = True
+        if display_name and creator.display_name != display_name:
+            creator.display_name = display_name
+            changed = True
+        if changed:
+            db.commit()
+    finally:
+        db.close()

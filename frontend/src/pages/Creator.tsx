@@ -25,6 +25,9 @@ export function CreatorPage() {
   const [classrooms, setClassrooms] = useState<Classroom[]>([]);
   const [draft, setDraft] = useState<GameDraft | null>(null);
   const [drafts, setDrafts] = useState<GameDraft[]>([]);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [shotBust, setShotBust] = useState<Record<string, number>>({});
 
   async function reload(keepDraft = true) {
     const list = await api<Game[]>("/api/games/mine");
@@ -182,6 +185,53 @@ export function CreatorPage() {
     }
   }
 
+  function startRename(game: Game) {
+    setEditingId(game.id);
+    setEditTitle(game.title);
+  }
+
+  async function saveTitle(game: Game) {
+    const title = editTitle.trim();
+    if (!title) {
+      setError(t("titleRequired"));
+      return;
+    }
+    setBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      await api(`/api/games/${game.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ title }),
+      });
+      setEditingId(null);
+      setMessage(`${t("gameUpdated")} ${title}`);
+      await reload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("renameGame"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function uploadSnapshot(game: Game, file: File) {
+    setBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      const body = new FormData();
+      body.append("icon", file);
+      await api<Game>(`/api/games/${game.id}/snapshot`, { method: "POST", body });
+      setShotBust((current) => ({ ...current, [game.id]: Date.now() }));
+      setMessage(`${t("snapshotUpdated")} ${game.title}`);
+      await reload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("updateSnapshot"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function remove(id: string) {
     if (!confirm("Delete this game?")) return;
     await api(`/api/games/${id}`, { method: "DELETE" });
@@ -334,13 +384,14 @@ export function CreatorPage() {
       )}
 
       <div className="panel">
-        <h2 style={{ fontFamily: "var(--font-display)", marginTop: 0 }}>My games</h2>
+        <h2 style={{ fontFamily: "var(--font-display)", marginTop: 0 }}>{t("myGames")}</h2>
+        <p className="meta">{t("snapshotHelp")}</p>
         <table className="table">
           <thead>
             <tr>
               <th>{t("titleSort")}</th>
               <th>{t("gameHandle")}</th>
-              <th>Source</th>
+              <th>{t("updateSnapshot")}</th>
               <th>{t("level")}</th>
               <th />
             </tr>
@@ -348,11 +399,71 @@ export function CreatorPage() {
           <tbody>
             {games.map((g) => (
               <tr key={g.id}>
-                <td>{g.title}</td>
+                <td>
+                  {editingId === g.id ? (
+                    <form
+                      className="admin-rename"
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        void saveTitle(g);
+                      }}
+                    >
+                      <input
+                        value={editTitle}
+                        onChange={(e) => setEditTitle(e.target.value)}
+                        maxLength={200}
+                        autoFocus
+                        aria-label={t("titleSort")}
+                      />
+                      <button className="btn accent btn-sm" type="submit" disabled={busy}>
+                        {t("saveTitle")}
+                      </button>
+                      <button
+                        className="btn secondary btn-sm"
+                        type="button"
+                        onClick={() => setEditingId(null)}
+                      >
+                        {t("cancelEdit")}
+                      </button>
+                    </form>
+                  ) : (
+                    <div className="creator-title-cell">
+                      <span>{g.title}</span>
+                      <button className="btn secondary btn-sm" type="button" disabled={busy} onClick={() => startRename(g)}>
+                        {t("renameGame")}
+                      </button>
+                    </div>
+                  )}
+                </td>
                 <td>
                   <code className="game-handle">{g.handle || g.id.slice(0, 8)}</code>
                 </td>
-                <td>{g.source}</td>
+                <td>
+                  <div className="creator-shot-actions">
+                    {g.has_screenshot ? (
+                      <img
+                        className="creator-shot"
+                        src={`/share/${g.id}/shot.png?v=${shotBust[g.id] || 1}`}
+                        alt=""
+                      />
+                    ) : null}
+                    <input
+                      id={`shot-${g.id}`}
+                      className="sr-only"
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp,image/gif"
+                      disabled={busy}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        e.target.value = "";
+                        if (file) void uploadSnapshot(g, file);
+                      }}
+                    />
+                    <label className="btn secondary btn-sm" htmlFor={`shot-${g.id}`}>
+                      {t("updateSnapshot")}
+                    </label>
+                  </div>
+                </td>
                 <td>{g.difficulty}</td>
                 <td className="row">
                   <Link className="btn secondary" to={g.handle ? `/play/${g.handle}` : `/play/${g.id}`}>

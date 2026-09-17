@@ -5,7 +5,7 @@ import unittest
 
 from app.config import Settings
 from app.main import lifespan
-from app.seed import DEMO_TEACHER_JOIN_CODE, seed_teacher
+from app.seed import DEMO_TEACHER_JOIN_CODE, seed_creator, seed_teacher
 
 
 class SeedTeacherTests(unittest.TestCase):
@@ -17,6 +17,7 @@ class SeedTeacherTests(unittest.TestCase):
 
     def test_boot_creates_teacher(self) -> None:
         self.assertIn("seed_teacher()", inspect.getsource(lifespan))
+        self.assertIn("seed_creator()", inspect.getsource(lifespan))
         self.assertTrue(callable(seed_teacher))
 
     def test_existing_teacher_password_is_not_reset(self) -> None:
@@ -74,6 +75,63 @@ class SeedTeacherTests(unittest.TestCase):
         hashed.assert_not_called()
         self.assertEqual(admin.password_hash, "keep-admin")
         self.assertEqual(admin.role, UserRole.learner)
+
+
+class SeedCreatorTests(unittest.TestCase):
+    def test_default_creator_credentials(self) -> None:
+        settings = Settings()
+        self.assertEqual(settings.creator_email, "futureonaut@example.com")
+        self.assertEqual(settings.creator_password, "creator12345")
+        self.assertEqual(settings.creator_display_name, "futureonaut")
+
+    def test_existing_creator_password_is_not_reset(self) -> None:
+        from types import SimpleNamespace
+        from unittest.mock import MagicMock, patch
+        from uuid import uuid4
+
+        from app.models import User, UserRole
+
+        creator = SimpleNamespace(
+            id=uuid4(),
+            role=UserRole.creator,
+            password_hash="keep-creator",
+            display_name="futureonaut",
+        )
+        db = MagicMock()
+        db.query.return_value.filter.return_value.first.return_value = creator
+        with (
+            patch("app.seed.SessionLocal", return_value=db),
+            patch("app.seed.hash_password") as hashed,
+        ):
+            seed_creator()
+        hashed.assert_not_called()
+        self.assertEqual(creator.password_hash, "keep-creator")
+        self.assertEqual(creator.role, UserRole.creator)
+
+    def test_promotes_existing_account_to_creator(self) -> None:
+        from types import SimpleNamespace
+        from unittest.mock import MagicMock, patch
+        from uuid import uuid4
+
+        from app.models import UserRole
+
+        user = SimpleNamespace(
+            id=uuid4(),
+            role=UserRole.learner,
+            password_hash="keep-me",
+            display_name="other",
+        )
+        db = MagicMock()
+        db.query.return_value.filter.return_value.first.return_value = user
+        with (
+            patch("app.seed.SessionLocal", return_value=db),
+            patch("app.seed.hash_password") as hashed,
+        ):
+            seed_creator()
+        hashed.assert_not_called()
+        self.assertEqual(user.role, UserRole.creator)
+        self.assertEqual(user.display_name, "futureonaut")
+        db.commit.assert_called()
 
 
 if __name__ == "__main__":
