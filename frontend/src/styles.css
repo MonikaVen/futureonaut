@@ -958,9 +958,14 @@ html[data-theme="dark"] .game-preview.topic-math {
   gap: 0.4rem;
   align-items: center;
 }
-.admin-rename input {
+.admin-rename input,
+.admin-rename textarea {
   flex: 1 1 12rem;
   min-width: 0;
+}
+.admin-rename textarea {
+  flex-basis: 100%;
+  resize: vertical;
 }
 .table td .btn-sm {
   margin-left: 0.5rem;

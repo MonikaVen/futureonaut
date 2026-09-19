@@ -56,6 +56,24 @@ DEMO_QUIZ = {
     ],
 }
 
+# Catalog rows to insert or overwrite from the seed pack on boot.
+# Other curated games stay untouched.
+REUPLOAD_SEED_FILES = (
+    "liucian_3d_world_model.html",
+    "liucian_tokenizer_game_dictionary_training.html",
+    "liucian_overfit_orchard.html",
+    "lucian_world_model_obstacle_aware_future_planning.html",
+    "lucias_ai_lab_full_game.html",
+    "lucias_ai_lab_full_game_lv2_fixed.html",
+    "liucian_precision_pounce.html",
+    "liucian_tokenizer_game_single_challenge.html",
+    "world_model_lab_game.html",
+    "lucias_ai_lab_full_game_classifier_fixed.html",
+    "liucian_tokenizer_game_updated.html",
+    "liucian_gradient_valley.html",
+    "liucian_hungry_bandit.html",
+)
+
 DEMO_MATCH = {
     "title": "Tokenization Match",
     "description": "Match NLP terms with their meanings.",
@@ -170,6 +188,7 @@ def seed_demo_games() -> None:
             seed_html_pack(db, owner.id)
 
         backfill_seed_files(db)
+        reupload_seed_games(db, owner)
         normalize_game_topics(db)
         restore_published_html(db)
         restore_missing_game_files(db)
@@ -305,6 +324,74 @@ def normalize_game_topics(db) -> None:
         db.commit()
 
 
+def _manifest_items() -> list[dict]:
+    manifest_path = _seed_dir() / "manifest.json"
+    if not manifest_path.exists():
+        return []
+    return json.loads(manifest_path.read_text(encoding="utf-8"))
+
+
+def _insert_seed_game(db, owner: User, item: dict, html: str) -> Game:
+    game_id = uuid4()
+    entry = save_uploaded_html(game_id, html, "index.html")
+    title = item.get("title") or item["file"]
+    tags = ensure_topic_tag(
+        item.get("topic_tags") or [],
+        title,
+        item.get("description") or item.get("file") or "",
+    )
+    game = Game(
+        id=game_id,
+        title=title,
+        description=item.get("description") or "",
+        owner_id=owner.id,
+        source=GameSource.upload,
+        topic_tags=tags,
+        difficulty=int(item.get("difficulty") or 1),
+        entry_path=entry,
+        seed_file=item.get("file"),
+        html=html,
+        handle=allocate_handle(db, owner, title),
+    )
+    db.add(game)
+    write_game_preview(game)
+    return game
+
+
+def reupload_seed_games(db, owner: User) -> None:
+    """Insert missing listed labs or rewrite their HTML from the seed pack."""
+    wanted = {name for name in REUPLOAD_SEED_FILES}
+    items = [item for item in _manifest_items() if item.get("file") in wanted]
+    if not items:
+        return
+    games = db.query(Game).all()
+    by_file = {g.seed_file: g for g in games if g.seed_file}
+    by_title = {g.title: g for g in games}
+    changed = False
+    for item in items:
+        src = _seed_dir() / item["file"]
+        if not src.exists():
+            continue
+        html = src.read_text(encoding="utf-8", errors="replace")
+        title = item.get("title") or item["file"]
+        game = by_file.get(item["file"]) or by_title.get(title)
+        if game is None:
+            game = _insert_seed_game(db, owner, item, html)
+            by_file[item["file"]] = game
+            by_title[title] = game
+            changed = True
+            continue
+        entry = save_uploaded_html(game.id, html, "index.html")
+        game.entry_path = entry
+        game.html = html
+        if not game.seed_file:
+            game.seed_file = item["file"]
+        write_game_preview(game)
+        changed = True
+    if changed:
+        db.commit()
+
+
 def seed_html_pack(db, owner_id) -> None:
     """Insert the seed pack once, when the catalog is empty."""
     manifest_path = _seed_dir() / "manifest.json"
@@ -342,6 +429,7 @@ def seed_html_pack(db, owner_id) -> None:
                 difficulty=int(item.get("difficulty") or 1),
                 entry_path=entry,
                 seed_file=seed_file,
+                html=html,
                 handle=allocate_handle(db, owner, title),
             )
         )
