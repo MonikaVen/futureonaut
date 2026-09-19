@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Create a named daily snapshot of Azure Database for PostgreSQL.
-# Keeps on-demand snapshots for 7 days. Automated PITR retention is also 7 days.
+# Keep a week of daily Azure Database for PostgreSQL backups.
+# Burstable SKUs use automated PITR only (no customer on-demand snapshots).
 set -euo pipefail
 
 RG="${RG:-rg-futureonaut}"
@@ -9,20 +9,29 @@ KEEP_DAYS="${KEEP_DAYS:-7}"
 STAMP="${STAMP:-$(date -u +%Y%m%d)}"
 BACKUP_NAME="${BACKUP_NAME:-fo-daily-${STAMP}}"
 
-echo "==> Ensuring automated backup retention is ${KEEP_DAYS} days"
+echo "==> Setting automated backup retention to ${KEEP_DAYS} days"
 az postgres flexible-server update \
   -g "$RG" -n "$PG_SERVER" \
   --backup-retention "$KEEP_DAYS" \
   -o none
 
+TIER=$(az postgres flexible-server show -g "$RG" -n "$PG_SERVER" --query sku.tier -o tsv)
+EARLIEST=$(az postgres flexible-server show -g "$RG" -n "$PG_SERVER" --query backup.earliestRestoreDate -o tsv)
+echo "==> SKU tier: ${TIER}"
+echo "==> Automated daily backups retained ${KEEP_DAYS} days (earliest restore: ${EARLIEST})"
+
+if [[ "${TIER}" == "Burstable" ]]; then
+  echo "==> On-demand named snapshots are not available on Burstable. Daily PITR copies are the snapshots."
+  exit 0
+fi
+
 echo "==> Creating on-demand snapshot ${BACKUP_NAME}"
 if az postgres flexible-server backup show \
-  -g "$RG" -n "$PG_SERVER" --backup-name "$BACKUP_NAME" &>/dev/null; then
+  -g "$RG" -s "$PG_SERVER" -n "$BACKUP_NAME" &>/dev/null; then
   echo "Snapshot ${BACKUP_NAME} already exists"
 else
   az postgres flexible-server backup create \
-    -g "$RG" -n "$PG_SERVER" \
-    --backup-name "$BACKUP_NAME" \
+    -g "$RG" -s "$PG_SERVER" -n "$BACKUP_NAME" \
     -o none
 fi
 
@@ -33,7 +42,7 @@ from datetime import datetime, timedelta, timezone
 
 rg, server, keep = sys.argv[1], sys.argv[2], int(sys.argv[3])
 raw = subprocess.check_output(
-    ["az", "postgres", "flexible-server", "backup", "list", "-g", rg, "-n", server, "-o", "json"],
+    ["az", "postgres", "flexible-server", "backup", "list", "-g", rg, "-s", server, "-o", "json"],
     text=True,
 )
 backups = json.loads(raw)
@@ -50,10 +59,9 @@ for item in backups:
         print(f"deleting {name} ({taken})")
         subprocess.check_call(
             ["az", "postgres", "flexible-server", "backup", "delete",
-             "-g", rg, "-n", server, "--backup-name", name, "--yes"]
+             "-g", rg, "-s", server, "-n", name, "--yes"]
         )
 PY
 
-echo "==> Current snapshots"
-az postgres flexible-server backup list -g "$RG" -n "$PG_SERVER" \
+az postgres flexible-server backup list -g "$RG" -s "$PG_SERVER" \
   --query "[].{name:backupName,type:backupType,completed:completedTime}" -o table

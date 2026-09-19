@@ -33,7 +33,7 @@ Playable AI labs are stored in Postgres (HTML included). The seed pack is used o
 - **Liucian's Gradient Valley** — learning rate on a loss landscape
 - **Liucian's 3D World Model** — configure dynamics so predicted trajectories stay true
 
-Azure Database for PostgreSQL keeps daily backups for 7 days. Named snapshots (`fo-daily-YYYYMMDD`) are created by `infra/db-snapshot.sh` and the `fo-pg-snapshot` job; copies older than a week are deleted.
+Azure Database for PostgreSQL keeps **daily backups for 7 days** (point-in-time restore). `infra/db-snapshot.sh` locks that retention. Named on-demand copies (`fo-daily-YYYYMMDD`) are created on non-burstable SKUs and pruned after a week; the live Burstable server uses the automated daily backups.
 
 ### Local development (without rebuilding frontend)
 
