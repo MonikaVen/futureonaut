@@ -13,6 +13,20 @@
   --font-display: "Syne", "Avenir Next", sans-serif;
   --font-body: "Manrope", "Avenir Next", system-ui, sans-serif;
   --space-page: clamp(1.5rem, 4vw, 3.25rem);
+  --accent-glow: rgba(31, 75, 99, 0.18);
+  --on-accent: #ffffff;
+  --line-strong: rgba(31, 75, 99, 0.35);
+  --fill-subtle: rgba(16, 20, 28, 0.05);
+  --chip-bg: rgba(31, 75, 99, 0.12);
+  --chip-level-bg: rgba(83, 64, 199, 0.12);
+  --chip-level-ink: #4332a8;
+  --preview-lede: #6a7385;
+  --poster-1: #dceaf4;
+  --poster-2: #eef4fa;
+  --poster-3: #e4edf6;
+  --poster-overlay: linear-gradient(180deg, rgba(255, 255, 255, 0.2) 8%, rgba(245, 246, 248, 0.9) 100%);
+  --radius-pill: 999px;
+  --shadow-glow: 0 8px 28px rgba(16, 20, 28, 0.08);
 }
 
 * { box-sizing: border-box; }
@@ -164,32 +178,234 @@ button, input, select, textarea {
 .grid {
   display: grid;
   gap: 1.25rem;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+}
+
+.preview-card-section {
+  margin: 0 0 1.5rem;
 }
 
 .game-tile {
   display: flex;
   flex-direction: column;
-  gap: 0.85rem;
-  padding: 1.4rem 1.35rem 1.35rem;
+  gap: 0;
+  padding: 0;
   border-radius: var(--radius);
   border: 1px solid var(--line);
   background: var(--surface);
+  overflow: hidden;
   min-height: 11rem;
-  transition: border-color 0.2s ease, transform 0.2s ease;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.game-tile-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 0.85rem 1.1rem 1.05rem;
 }
 
 .game-tile:hover {
-  border-color: #c8ced8;
-  transform: translateY(-2px);
+  border-color: var(--line-strong);
+  box-shadow: var(--shadow-glow);
 }
 
 .game-tile h3 {
   font-family: var(--font-display);
   margin: 0;
-  font-size: 1.15rem;
+  font-size: 1.05rem;
   letter-spacing: -0.02em;
-  line-height: 1.25;
+  line-height: 1.3;
+}
+
+.game-preview {
+  --orb-x: 85%;
+  --orb-y: 8%;
+  --poster-fill:
+    radial-gradient(ellipse 90% 80% at var(--orb-x) var(--orb-y), var(--poster-glow, var(--accent-glow)), transparent 58%),
+    linear-gradient(165deg, var(--poster-1) 0%, var(--poster-2) 52%, var(--poster-3) 100%);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 0.4rem;
+  aspect-ratio: 16 / 10;
+  min-height: 11rem;
+  padding: 0.9rem 1rem 0.85rem;
+  text-decoration: none;
+  color: var(--ink);
+  overflow: hidden;
+  isolation: isolate;
+  border-bottom: 1px solid var(--line);
+  background: var(--poster-fill);
+}
+
+.game-preview::before,
+.game-preview::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.game-preview::before {
+  z-index: 0;
+  background: var(--poster-fill);
+  opacity: 0;
+}
+
+.game-preview::after {
+  z-index: 0;
+  background: var(--poster-overlay);
+}
+
+.game-preview > * {
+  position: relative;
+  z-index: 2;
+}
+
+.game-preview > .game-preview-photo {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 38%;
+  pointer-events: none;
+}
+
+.game-preview.has-photo::before {
+  z-index: 1;
+  opacity: 0.42;
+}
+
+.game-preview.has-photo::after {
+  z-index: 1;
+  opacity: 0.4;
+}
+
+.game-preview.topic-ai { --poster-glow: rgba(31, 75, 99, 0.28); }
+.game-preview.topic-physics { --poster-glow: rgba(83, 64, 199, 0.28); }
+.game-preview.topic-math { --poster-glow: rgba(26, 140, 92, 0.24); }
+
+.game-preview-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-bottom: auto;
+}
+
+.game-preview-brand {
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.game-preview-play {
+  width: 1.85rem;
+  height: 1.85rem;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--chip-bg);
+  color: var(--accent);
+  flex-shrink: 0;
+  transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+
+.game-preview-title {
+  font-family: var(--font-display);
+  margin: 0;
+  font-size: 1.12rem;
+  letter-spacing: -0.02em;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.game-preview-lede {
+  margin: 0;
+  color: var(--preview-lede);
+  font-size: 0.92rem;
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.game-preview-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.game-preview-chip {
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  padding: 0.16rem 0.5rem;
+  border-radius: var(--radius-pill);
+  background: var(--chip-bg);
+  color: var(--accent);
+}
+
+.game-preview-chip.level {
+  background: var(--chip-level-bg);
+  color: var(--chip-level-ink);
+}
+
+.game-preview-chip.progress {
+  background: var(--fill-subtle);
+  color: var(--ink);
+}
+
+.game-preview-chip.solved {
+  background: rgba(61, 186, 122, 0.2);
+  color: #237a4b;
+}
+
+.game-preview.is-solved .game-preview-play {
+  background: rgba(61, 186, 122, 0.2);
+  color: #237a4b;
+}
+
+.game-preview-bar {
+  display: block;
+  height: 3px;
+  margin-top: 0.15rem;
+  border-radius: 99px;
+  background: var(--fill-subtle);
+  overflow: hidden;
+}
+
+.game-preview-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.game-preview:hover,
+.game-preview:focus-visible {
+  color: var(--ink);
+}
+
+.game-preview:hover .game-preview-play,
+.game-preview:focus-visible .game-preview-play {
+  background: var(--accent);
+  color: var(--on-accent);
+  transform: scale(1.06);
+}
+
+.tag.focus {
+  background: rgba(83, 64, 199, 0.1);
+  color: #4332a8;
 }
 
 .meta {
@@ -430,5 +646,14 @@ button, input, select, textarea {
     flex-direction: column;
     align-items: flex-start;
     gap: 1rem;
+  }
+
+  .game-tile-body {
+    padding: 0.9rem 0.95rem 1rem;
+  }
+
+  .game-preview {
+    min-height: 12rem;
+    aspect-ratio: 5 / 4;
   }
 }
