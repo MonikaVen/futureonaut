@@ -46,7 +46,7 @@ button:disabled{opacity:.4;cursor:not-allowed}
     </div>
   </header>
   <section class="stage" id="stage">
-    <svg viewBox="0 0 1100 560" preserveAspectRatio="xMidYMid slice">
+    <svg viewBox="0 0 1100 560" preserveAspectRatio="xMidYMid meet">
       <defs>
         <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stop-color="#2a1848"/><stop offset="1" stop-color="#6b2d2a"/>
@@ -89,7 +89,7 @@ button:disabled{opacity:.4;cursor:not-allowed}
   const COLORS = ["#ef6b4a","#f0a202","#3db8c7","#f4f0e6"];
   const BUDGET = 20;
   const kitchens = [[0.18,0.32,0.82,0.48],[0.55,0.22,0.40,0.78],[0.30,0.70,0.28,0.45]];
-  let kitchen=0,left=BUDGET,treats=0,campaign=0,pulls,counts,sums,timer=null,finished=false,streak=0,catX=140;
+  let kitchen=0,left=BUDGET,treats=0,campaign=0,pulls,counts,sums,timer=null,finished=false,streak=0,catX=200;
   const $ = id => document.getElementById(id);
   const svgNS = "http://www.w3.org/2000/svg";
   function el(tag, attrs, parent) {

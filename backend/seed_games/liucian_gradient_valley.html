@@ -45,19 +45,22 @@ input[type=range]{width:150px}
     </div>
   </header>
   <section class="stage">
-    <svg id="plot" viewBox="0 0 1100 560" preserveAspectRatio="xMidYMid slice">
+    <svg id="plot" viewBox="0 0 1100 560" preserveAspectRatio="xMidYMid meet">
       <defs>
         <linearGradient id="dusk" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stop-color="#1b2a58"/><stop offset=".55" stop-color="#4a2a5c"/><stop offset="1" stop-color="#1d3a2a"/>
         </linearGradient>
         <linearGradient id="land" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stop-color="#6aa0d8"/><stop offset="1" stop-color="#21402c"/>
+          <stop offset="0" stop-color="#3d6a4a"/><stop offset="1" stop-color="#14261c"/>
         </linearGradient>
       </defs>
       <rect width="1100" height="560" fill="url(#dusk)"/>
-      <circle cx="160" cy="70" r="8" fill="#f7f0c8" opacity=".7"/>
+      <circle cx="980" cy="70" r="42" fill="#f7e7b0" opacity=".9"/>
+      <path d="M0 210 L80 140 L160 200 L260 120 L360 190 L480 100 L600 180 L720 110 L840 190 L960 130 L1100 200 L1100 560 L0 560 Z" fill="#12182c" opacity=".45"/>
+      <circle cx="160" cy="60" r="3" fill="#fff" opacity=".85"/>
       <circle cx="980" cy="50" r="3" fill="#fff" opacity=".8"/>
       <circle cx="900" cy="90" r="2" fill="#fff" opacity=".7"/>
+      <circle cx="420" cy="48" r="2" fill="#fff" opacity=".65"/>
       <path id="fill" fill="url(#land)" opacity=".95"/>
       <path id="curve" fill="none" stroke="#d7ecff" stroke-width="4"/>
       <g id="trail"></g>
@@ -88,9 +91,9 @@ input[type=range]{width:150px}
 (() => {
   const lp = window.LearnPlay || {score(){},answer(){},taskStart(){},taskEnd(){},complete(){}};
   const $ = id => document.getElementById(id);
-  const xmin=-4.5,xmax=4.5,W=1100,H=430,pad=50,ymax=8.2,baseY=500;
+  const xmin=-4.5,xmax=4.5,W=1100,pad=50,ymax=8.2,baseY=540;
   const sx = x => pad + (x-xmin)/(xmax-xmin)*(W-2*pad);
-  const sy = y => 40 + (1-(Math.min(ymax,Math.max(0,y))/ymax))*(H-40);
+  const sy = y => 200 + (1-(Math.min(ymax,Math.max(0,y))/ymax))*280;
   const levels = [
     {name:"one bowl",L:x=>0.35*(x-1.2)**2+0.4,d:x=>0.7*(x-1.2),start:-3.2,goal:1.2,steps:16,hint:"Single valley. Moderate η. Too large oscillates."},
     {name:"steep walls",L:x=>0.55*(x+0.4)**2+0.35,d:x=>1.1*(x+0.4),start:2.5,goal:-0.4,steps:12,hint:"Steeper bowl. Tiny η runs out of steps."},

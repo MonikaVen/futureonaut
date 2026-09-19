@@ -267,7 +267,10 @@ async def serve_game_file(
         or target_lang == source_lang
         or target_lang not in SUPPORTED_LANGS
     ):
-        return FileResponse(target)
+        return FileResponse(
+            target,
+            headers={"Cache-Control": "no-store, max-age=0"} if is_html else {},
+        )
 
     cache = i18n_cache_path(base, target_lang, file_path)
     if cache.exists():
@@ -290,4 +293,4 @@ async def serve_game_file(
         else:
             html = f'<base href="{base_href}">\n' + html
 
-    return HTMLResponse(content=html)
+    return HTMLResponse(content=html, headers={"Cache-Control": "no-store, max-age=0"})

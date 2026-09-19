@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 from pathlib import Path
 from uuid import uuid4
 
@@ -131,6 +132,9 @@ def refresh_seed_game_files(db) -> None:
             continue
         html = src.read_text(encoding="utf-8", errors="replace")
         save_uploaded_html(game.id, html, game.entry_path or "index.html")
+        i18n_dir = game_dir(game.id) / "i18n"
+        if i18n_dir.exists():
+            shutil.rmtree(i18n_dir)
         desc = item.get("description") or game.description
         if desc and game.description != desc:
             game.description = desc
