@@ -24,9 +24,11 @@ from app.services.i18n import (
     translate_html,
 )
 from app.services.recommendations import game_to_out
+from app.services.demo_seed import persist_game_files
 from app.services.storage import (
     delete_game_files,
     game_dir,
+    materialize_game_files,
     save_uploaded_html,
     save_uploaded_zip,
     write_template_game,
@@ -104,6 +106,7 @@ async def upload_game(
         entry_path=entry,
         source_language=lang,
     )
+    persist_game_files(db, game)
     db.add(game)
     db.commit()
     db.refresh(game)
@@ -143,6 +146,7 @@ def create_from_template(
             json.dumps(content, ensure_ascii=False),
         ),
     )
+    persist_game_files(db, game)
     db.add(game)
     db.commit()
     db.refresh(game)
@@ -184,6 +188,7 @@ async def generate_game(
             json.dumps(content, ensure_ascii=False),
         ),
     )
+    persist_game_files(db, game)
     db.add(game)
     db.commit()
     db.refresh(game)
@@ -255,7 +260,12 @@ async def serve_game_file(
         raise HTTPException(status_code=404, detail="Game not found")
     base = game_dir(game_id).resolve()
     target = (base / file_path).resolve()
-    if not str(target).startswith(str(base)) or not target.is_file():
+    if not str(target).startswith(str(base)):
+        raise HTTPException(status_code=404, detail="File not found")
+    if not target.is_file() and game.files:
+        materialize_game_files(game.id, game.files, game.entry_path or "index.html")
+        target = (base / file_path).resolve()
+    if not target.is_file():
         raise HTTPException(status_code=404, detail="File not found")
 
     source_lang = getattr(game, "source_language", None) or "en"

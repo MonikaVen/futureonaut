@@ -9,7 +9,13 @@ from uuid import uuid4
 from app.database import SessionLocal
 from app.models import Game, GameSource, User, UserRole
 from app.services.i18n import detect_language, extract_visible_text
-from app.services.storage import game_dir, save_uploaded_html, write_template_game
+from app.services.storage import (
+    game_dir,
+    materialize_game_files,
+    save_uploaded_html,
+    snapshot_game_files,
+    write_template_game,
+)
 from app.services.topics import ensure_topic_tag
 
 DEMO_QUIZ = {
@@ -78,7 +84,8 @@ def seed_demo_games() -> None:
         if admin is None:
             return
 
-        if db.query(Game).count() == 0:
+        empty = db.query(Game).count() == 0
+        if empty:
             for template_type, content, source in (
                 ("quiz", DEMO_QUIZ, GameSource.template),
                 ("drag_match", DEMO_MATCH, GameSource.template),
@@ -99,41 +106,107 @@ def seed_demo_games() -> None:
                         source_language=detect_language(
                             content["title"], content["description"]
                         ),
+                        files=snapshot_game_files(game_id),
                     )
                 )
             db.commit()
+            # First empty database only. Later deploys keep whatever is already stored.
+            seed_html_pack(db, admin.id)
 
-        seed_html_pack(db, admin.id)
+        persist_and_hydrate_game_files(db)
         normalize_game_topics(db)
         detect_missing_languages(db)
-        restore_missing_game_files(db)
     finally:
         db.close()
 
 
-def restore_missing_game_files(db) -> None:
-    """Rehydrate game HTML from seed pack when the volume is empty (e.g. Azure ephemeral disk)."""
+def persist_and_hydrate_game_files(db) -> None:
+    """Keep game HTML in Postgres and replay it onto disk. Never overwrite DB files from the seed pack."""
+    changed = False
+    pack = _pack_by_title()
+    for game in db.query(Game).all():
+        stored = dict(game.files or {})
+        if not stored:
+            stored = snapshot_game_files(game.id)
+        if not stored:
+            stored = _files_from_pack(game, pack.get(game.title))
+        if stored and stored != (game.files or {}):
+            game.files = stored
+            changed = True
+        if stored:
+            entry = materialize_game_files(game.id, stored, game.entry_path or "index.html")
+            if entry and entry != game.entry_path:
+                game.entry_path = entry
+                changed = True
+    if changed:
+        db.commit()
+
+
+def _pack_by_title() -> dict:
     manifest_path = _seed_dir() / "manifest.json"
     if not manifest_path.exists():
-        return
-    by_title = {
+        return {}
+    return {
         (item.get("title") or item["file"]): item
         for item in json.loads(manifest_path.read_text(encoding="utf-8"))
     }
-    for game in db.query(Game).all():
-        target = game_dir(game.id) / (game.entry_path or "index.html")
-        if target.exists():
-            continue
-        item = by_title.get(game.title)
-        if item:
-            src = _seed_dir() / item["file"]
-            if src.exists():
-                html = src.read_text(encoding="utf-8", errors="replace")
-                save_uploaded_html(game.id, html, "index.html")
-                continue
-        if game.template_type:
-            # cannot rebuild without content.json; skip
-            continue
+
+
+def _files_from_pack(game: Game, item: dict | None) -> dict:
+    """One-time fill of an existing row whose files blob is empty. Does not insert games."""
+    if not item:
+        return {}
+    src = _seed_dir() / item["file"]
+    if not src.exists():
+        return {}
+    html = src.read_text(encoding="utf-8", errors="replace")
+    save_uploaded_html(game.id, html, "index.html")
+    return snapshot_game_files(game.id)
+
+
+def persist_game_files(db, game: Game) -> None:
+    game.files = snapshot_game_files(game.id)
+    db.add(game)
+
+
+def import_named_lab(db, title: str, owner_id) -> Game | None:
+    """Insert one pack lab if that title is not already in the database."""
+    if db.query(Game).filter(Game.title == title).first():
+        return None
+    item = _pack_by_title().get(title)
+    if not item:
+        return None
+    src = _seed_dir() / item["file"]
+    if not src.exists():
+        return None
+    html = src.read_text(encoding="utf-8", errors="replace")
+    game_id = uuid4()
+    entry = save_uploaded_html(game_id, html, "index.html")
+    tags = ensure_topic_tag(
+        item.get("topic_tags") or [],
+        item.get("title") or "",
+        item.get("file") or "",
+    )
+    game = Game(
+        id=game_id,
+        title=title,
+        description=item.get("description") or "",
+        owner_id=owner_id,
+        source=GameSource.upload,
+        topic_tags=tags,
+        difficulty=int(item.get("difficulty") or 1),
+        entry_path=entry,
+        source_language=detect_language(
+            title,
+            item.get("description") or "",
+            extract_visible_text(html),
+        ),
+        files=snapshot_game_files(game_id),
+    )
+    db.add(game)
+    db.commit()
+    db.refresh(game)
+    return game
 
 
 def normalize_game_topics(db) -> None:
@@ -168,10 +241,10 @@ def detect_missing_languages(db) -> None:
         db.commit()
 
 
-def seed_html_pack(db, owner_id) -> None:
+def seed_html_pack(db, owner_id) -> int:
     manifest_path = _seed_dir() / "manifest.json"
     if not manifest_path.exists():
-        return
+        return 0
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     existing_titles = {g.title for g in db.query(Game.title).all()}
     added = 0
@@ -205,9 +278,11 @@ def seed_html_pack(db, owner_id) -> None:
                     item.get("description") or "",
                     extract_visible_text(html),
                 ),
+                files=snapshot_game_files(game_id),
             )
         )
         existing_titles.add(title)
         added += 1
     if added:
         db.commit()
+    return added

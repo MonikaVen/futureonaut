@@ -25,6 +25,16 @@ Default admin (from `.env`):
 
 Promote a registered learner to **creator** in the Admin panel to unlock upload / template / AI tools.
 
+Playable AI labs are stored in Postgres (HTML included). The seed pack is used only when the database has no games; later deploys hydrate from the database and do not recreate catalog rows.
+
+- **Liucian's Hungry Bandit** — exploration vs exploitation (ε-greedy)
+- **Liucian's Overfit Orchard** — train loss vs test loss
+- **Liucian's Precision Pounce** — thresholds, precision, and recall
+- **Liucian's Gradient Valley** — learning rate on a loss landscape
+- **Liucian's 3D World Model** — configure dynamics so predicted trajectories stay true
+
+Azure Database for PostgreSQL keeps **daily backups for 7 days** (point-in-time restore). `infra/db-snapshot.sh` locks that retention. Named on-demand copies (`fo-daily-YYYYMMDD`) are created on non-burstable SKUs and pruned after a week; the live Burstable server uses the automated daily backups.
+
 ### Local development (without rebuilding frontend)
 
 ```bash

@@ -105,6 +105,58 @@ def write_template_game(game_id: UUID, template_type: str, content: dict) -> str
     return "index.html"
 
 
+SKIP_SNAPSHOT_NAMES = {SDK_MARKER, "_upload.zip"}
+SKIP_SNAPSHOT_DIRS = {"i18n"}
+
+
+def snapshot_game_files(game_id: UUID) -> dict[str, str]:
+    """Read on-disk game files into a JSON-serializable map stored on the game row."""
+    dest = games_root() / str(game_id)
+    if not dest.exists():
+        return {}
+    files: dict[str, str] = {}
+    for path in dest.rglob("*"):
+        if not path.is_file():
+            continue
+        rel = path.relative_to(dest)
+        if any(part in SKIP_SNAPSHOT_DIRS for part in rel.parts):
+            continue
+        if rel.name in SKIP_SNAPSHOT_NAMES:
+            continue
+        raw = path.read_bytes()
+        try:
+            files[str(rel).replace("\\", "/")] = raw.decode("utf-8")
+        except UnicodeDecodeError:
+            import base64
+
+            files[str(rel).replace("\\", "/")] = {
+                "encoding": "base64",
+                "data": base64.b64encode(raw).decode("ascii"),
+            }
+    return files
+
+
+def materialize_game_files(game_id: UUID, files: dict | None, entry_path: str = "index.html") -> str:
+    """Write stored files back to disk and inject the LearnPlay SDK."""
+    dest = game_dir(game_id)
+    for rel, payload in (files or {}).items():
+        safe = Path(rel)
+        if safe.is_absolute() or ".." in safe.parts:
+            continue
+        target = dest / safe
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if isinstance(payload, dict) and payload.get("encoding") == "base64":
+            import base64
+
+            target.write_bytes(base64.b64decode(payload.get("data") or ""))
+        else:
+            target.write_text(str(payload), encoding="utf-8")
+    try:
+        return ensure_sdk_injected(dest, entry_path or "index.html")
+    except FileNotFoundError:
+        return entry_path or "index.html"
+
+
 def delete_game_files(game_id: UUID) -> None:
     dest = games_root() / str(game_id)
     if dest.exists():
