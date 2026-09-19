@@ -13,7 +13,6 @@ export interface Game {
   title: string;
   description: string;
   owner_id: string;
-  owner_name?: string | null;
   source: "upload" | "template" | "ai";
   topic_tags: string[];
   difficulty: number;
@@ -22,15 +21,6 @@ export interface Game {
   source_language?: string;
   created_at: string;
   play_url?: string | null;
-  like_count?: number;
-  comment_count?: number;
-  view_count?: number;
-  liked_by_me?: boolean;
-  completed?: boolean;
-  levels_completed?: number;
-  total_levels?: number | null;
-  progress_pct?: number | null;
-  has_screenshot?: boolean;
 }
 
 export interface Session {

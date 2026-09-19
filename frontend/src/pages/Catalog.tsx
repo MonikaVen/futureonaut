@@ -1,22 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { api, type Game } from "../api";
-import { GameCard } from "../GameCard";
-import { TOPICS, primaryTopic } from "../gameMeta";
 import { useLanguage } from "../language";
 
-const AI_FOCUS_LABELS = [
-  "Computer Vision",
-  "Large Language Models",
-  "Transformers",
-  "Privacy",
-  "Cybersecurity",
-  "Trustworthiness of AI",
-] as const;
+const TOPICS = ["ML", "Physics", "Math"] as const;
 
-function focusLabels(game: Game): string[] {
-  return (game.topic_tags || []).filter((t) =>
-    AI_FOCUS_LABELS.includes(t as (typeof AI_FOCUS_LABELS)[number])
-  );
+function primaryTopic(game: Game): string {
+  const hit = game.topic_tags?.find((t) => TOPICS.includes(t as (typeof TOPICS)[number]));
+  return hit || "ML";
 }
 
 export function CatalogPage() {
@@ -51,7 +42,7 @@ export function CatalogPage() {
       });
     }
     if (topic !== "All") {
-      list = list.filter((g) => primaryTopic(g.topic_tags) === topic);
+      list = list.filter((g) => primaryTopic(g) === topic);
     }
     if (level !== "All") {
       list = list.filter((g) => g.difficulty === Number(level));
@@ -119,19 +110,27 @@ export function CatalogPage() {
         </span>
       </div>
 
-      <section className="preview-card-section" aria-label={t("games")}>
-        <div className="grid">
-          {visible.map((g) => (
-            <GameCard
-              key={g.id}
-              game={g}
-              topic={primaryTopic(g.topic_tags)}
-              focusLabels={focusLabels(g)}
-            />
-          ))}
-          {!visible.length && !error && <p className="meta">No games match these filters.</p>}
-        </div>
-      </section>
+      <div className="grid">
+        {visible.map((g) => (
+          <article key={g.id} className="game-tile">
+            <h3>{g.title}</h3>
+            <p className="meta">{g.description || "No description"}</p>
+            <div className="tags">
+              <span className="tag">{primaryTopic(g)}</span>
+              <span className="tag">Lv {g.difficulty}</span>
+              <span className="tag">
+                {t("detected")}: {(g.source_language || "en").toUpperCase()}
+              </span>
+            </div>
+            <div className="row">
+              <Link className="btn accent" to={`/play/${g.id}`}>
+                {t("play")}
+              </Link>
+            </div>
+          </article>
+        ))}
+        {!visible.length && !error && <p className="meta">No games match these filters.</p>}
+      </div>
     </div>
   );
 }

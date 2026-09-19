@@ -36,7 +36,6 @@ const COPY: Record<LangCode, Record<string, string>> = {
     sort: "Sort",
     language: "Language",
     play: "Play",
-    solved: "Solved",
     translating: "Translating game…",
     detected: "Detected",
     mission:
@@ -59,7 +58,6 @@ const COPY: Record<LangCode, Record<string, string>> = {
     sort: "Rikiuoti",
     language: "Kalba",
     play: "Žaisti",
-    solved: "Išspręsta",
     translating: "Verčiama…",
     detected: "Aptikta",
     mission:
@@ -82,7 +80,6 @@ const COPY: Record<LangCode, Record<string, string>> = {
     sort: "Sortieren",
     language: "Sprache",
     play: "Spielen",
-    solved: "Gelöst",
     translating: "Übersetzung…",
     detected: "Erkannt",
     mission:
@@ -105,7 +102,6 @@ const COPY: Record<LangCode, Record<string, string>> = {
     sort: "Ordenar",
     language: "Idioma",
     play: "Jugar",
-    solved: "Resuelto",
     translating: "Traduciendo…",
     detected: "Detectado",
     mission:
@@ -128,7 +124,6 @@ const COPY: Record<LangCode, Record<string, string>> = {
     sort: "Trier",
     language: "Langue",
     play: "Jouer",
-    solved: "Réussi",
     translating: "Traduction…",
     detected: "Détecté",
     mission:
@@ -151,7 +146,6 @@ const COPY: Record<LangCode, Record<string, string>> = {
     sort: "Sortuj",
     language: "Język",
     play: "Graj",
-    solved: "Rozwiązane",
     translating: "Tłumaczenie…",
     detected: "Wykryto",
     mission:
