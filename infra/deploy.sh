@@ -91,7 +91,7 @@ WEB_FQDN=$(az containerapp show -g "$RG" -n futureonaut-web --query properties.c
 WEB_URL="https://$WEB_FQDN"
 
 az containerapp update -g "$RG" -n futureonaut-api \
-  --set-env-vars "CORS_ORIGINS=$WEB_URL" -o none
+  --set-env-vars "CORS_ORIGINS=$WEB_URL" "PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-$WEB_URL}" -o none
 
 cat > "$ROOT/azure-deploy-out.env" <<EOF
 RG=$RG

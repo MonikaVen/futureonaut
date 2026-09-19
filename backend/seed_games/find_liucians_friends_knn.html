@@ -149,6 +149,7 @@ function render(){
 $('predictBtn').onclick=()=>{
  const pred=render();
  $('feedback').innerHTML=`🐈 Liucian's closest friends vote for <b>${pred}</b>.`;
+ if(window.LearnPlay) LearnPlay.stage(1,1,{complete:true,points:10,label:'KNN vote',id:'knn-predict'});
 };
 $('newBtn').onclick=()=>{
  fluff.value=Math.floor(Math.random()*10)+1;act.value=Math.floor(Math.random()*10)+1;$('feedback').textContent='';render();

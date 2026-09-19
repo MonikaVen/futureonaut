@@ -13,11 +13,17 @@ class Settings(BaseSettings):
     refresh_token_expire_days: int = 14
     admin_email: str = "admin@example.com"
     admin_password: str = "admin12345"
+    teacher_email: str = ""
+    teacher_password: str = ""
+    creator_email: str = ""
+    creator_password: str = ""
+    creator_display_name: str = "futureonaut"
     openai_api_key: str = ""
     openai_base_url: str = "https://api.openai.com/v1"
     openai_model: str = "gpt-4o-mini"
     cors_origins: str = "http://localhost:5173,http://localhost:3000"
     games_dir: str = "data/games"
+    public_base_url: str = ""
 
     @property
     def cors_origin_list(self) -> list[str]:

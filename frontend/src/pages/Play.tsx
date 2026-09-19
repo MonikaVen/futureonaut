@@ -1,8 +1,14 @@
-import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, type Game, type Session } from "../api";
 import { useAuth } from "../auth";
-import { useLanguage } from "../language";
+import { GameShare } from "../GameShare";
+import { GameSocial } from "../GameSocial";
+import { ScoreCard } from "../ScoreCard";
+import { UI_LANGS, useLanguage, type LangCode } from "../language";
+import { useTheme, type Theme } from "../theme";
+import { getVisitorId } from "../visitor";
+import { GameFrame } from "../GameFrame";
 
 type SdkMessage = {
   source?: string;
@@ -11,42 +17,96 @@ type SdkMessage = {
 };
 
 export function PlayPage() {
-  const { gameId } = useParams();
+  const { gameId, ownerSlug, gameSlug } = useParams();
+  const playRef = ownerSlug && gameSlug ? `${ownerSlug}/${gameSlug}` : gameId;
+  const navigate = useNavigate();
   const { user } = useAuth();
-  const { lang, t } = useLanguage();
+  const { t, lang, setLang } = useLanguage();
+  const { theme: platformTheme } = useTheme();
+  const visitorId = useMemo(() => getVisitorId(), []);
   const [game, setGame] = useState<Game | null>(null);
+  const [gameTheme, setGameTheme] = useState<Theme>(platformTheme);
   const [session, setSession] = useState<Session | null>(null);
   const [points, setPoints] = useState(0);
   const [correct, setCorrect] = useState(0);
   const [attempts, setAttempts] = useState(0);
   const [timeMs, setTimeMs] = useState(0);
+  const [completed, setCompleted] = useState(false);
+  const [levelsCompleted, setLevelsCompleted] = useState(0);
+  const [totalLevels, setTotalLevels] = useState<number | null>(null);
   const [error, setError] = useState("");
-  const [frameReady, setFrameReady] = useState(false);
   const [ready, setReady] = useState(false);
+  const [frameHeight, setFrameHeight] = useState<number | null>(null);
+  const frameRef = useRef<HTMLIFrameElement>(null);
+  const iframeSrcRef = useRef("");
+  const iframeGameIdRef = useRef<string | null>(null);
+  const loadedUserRef = useRef<string>("");
+  const gameRef = useRef(game);
+  gameRef.current = game;
+  const prefsRef = useRef({ theme: gameTheme, lang });
+  prefsRef.current = { theme: gameTheme, lang };
+
+  const postPrefs = useCallback((target?: Window | MessageEventSource | null) => {
+    const win = (target && "postMessage" in target ? target : frameRef.current?.contentWindow) as
+      | Window
+      | null
+      | undefined;
+    if (!win || typeof win.postMessage !== "function") return;
+    win.postMessage(
+      { source: "learnplay-host", type: "prefs", payload: { ...prefsRef.current } },
+      "*"
+    );
+  }, []);
 
   useEffect(() => {
-    if (!gameId) return;
+    if (!playRef) return;
+    const userKey = user?.id || "guest";
+    const current = gameRef.current;
+    if (current && (current.handle === playRef || current.id === playRef) && loadedUserRef.current === userKey) {
+      return;
+    }
     let cancelled = false;
-    setFrameReady(false);
+    iframeSrcRef.current = "";
+    iframeGameIdRef.current = null;
+    setGameTheme(platformTheme);
     setReady(false);
     setSession(null);
     setPoints(0);
     setCorrect(0);
     setAttempts(0);
     setTimeMs(0);
+    setCompleted(false);
+    setLevelsCompleted(0);
+    setTotalLevels(null);
+    setFrameHeight(null);
     (async () => {
       try {
-        const g = await api<Game>(`/api/games/${gameId}`);
+        const path = playRef.includes("/") ? `/api/games/by/${playRef}` : `/api/games/${playRef}`;
+        const g = await api<Game>(path);
         if (cancelled) return;
         setGame(g);
-        if (user) {
-          const s = await api<Session>("/api/sessions", {
-            method: "POST",
-            body: JSON.stringify({ game_id: gameId }),
-          });
-          if (!cancelled) setSession(s);
+        loadedUserRef.current = userKey;
+        api(`/api/games/${g.id}/view`, { method: "POST", visitorId }).catch(() => {});
+        const s = user
+          ? await api<Session>("/api/sessions", {
+              method: "POST",
+              body: JSON.stringify({ game_id: g.id }),
+            })
+          : await api<Session>("/api/sessions/guest", {
+              method: "POST",
+              body: JSON.stringify({ game_id: g.id, visitor_id: visitorId }),
+            });
+        if (!cancelled) {
+          setSession(s);
+          setPoints(s.total_points);
+          setCorrect(s.correct_count);
+          setAttempts(s.attempt_count);
+          setTimeMs(s.total_time_ms);
+          setLevelsCompleted(s.levels_completed ?? 0);
+          setTotalLevels(s.total_levels ?? null);
+          setCompleted(Boolean(s.ended_at));
+          setReady(true);
         }
-        if (!cancelled) setReady(true);
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : "Failed to start");
       }
@@ -54,13 +114,45 @@ export function PlayPage() {
     return () => {
       cancelled = true;
     };
-  }, [gameId, user]);
+  }, [playRef, user, visitorId, navigate]);
+
+  useEffect(() => {
+    if (ready && game?.handle && playRef && game.handle !== playRef) {
+      navigate(`/play/${game.handle}`, { replace: true });
+    }
+  }, [ready, game, playRef, navigate]);
 
   useEffect(() => {
     function onMessage(ev: MessageEvent<SdkMessage>) {
+      if (ev.source !== frameRef.current?.contentWindow) return;
       const data = ev.data;
       if (!data || data.source !== "learnplay-sdk" || !data.type) return;
       const payload = data.payload || {};
+
+      if (data.type === "resize") {
+        const height = Number(payload.height);
+        if (Number.isFinite(height) && height > 0) {
+          setFrameHeight(Math.min(16000, Math.max(420, Math.ceil(height) + 12)));
+        }
+        return;
+      }
+
+      if (data.type === "ready") {
+        postPrefs(ev.source as Window);
+        return;
+      }
+
+      if (data.type === "prefs") {
+        const nextTheme = payload.theme;
+        const nextLang = typeof payload.lang === "string" ? payload.lang.slice(0, 2).toLowerCase() : "";
+        if (nextTheme === "dark" || nextTheme === "light") {
+          setGameTheme(nextTheme as Theme);
+        }
+        if (UI_LANGS.some((item) => item.code === nextLang)) {
+          setLang(nextLang as LangCode);
+        }
+        return;
+      }
 
       if (data.type === "score") setPoints((p) => p + Number(payload.delta || 0));
       if (data.type === "answer") {
@@ -72,9 +164,20 @@ export function PlayPage() {
       }
 
       if (!session) return;
+      if (
+        data.type !== "score" &&
+        data.type !== "answer" &&
+        data.type !== "task_time" &&
+        data.type !== "level_complete" &&
+        data.type !== "milestone" &&
+        data.type !== "complete"
+      ) {
+        return;
+      }
       api<Session>(`/api/sessions/${session.id}/events`, {
         method: "POST",
         body: JSON.stringify({ type: data.type, payload }),
+        visitorId: user ? undefined : visitorId,
       })
         .then((s) => {
           setSession(s);
@@ -82,6 +185,13 @@ export function PlayPage() {
           setCorrect(s.correct_count);
           setAttempts(s.attempt_count);
           setTimeMs(s.total_time_ms);
+          setLevelsCompleted(s.levels_completed ?? 0);
+          setTotalLevels(s.total_levels ?? null);
+          if (data.type === "complete" || data.type === "level_complete" || data.type === "milestone" || s.ended_at) {
+            setCompleted(Boolean(s.ended_at) || (
+              (s.total_levels ?? 0) > 0 && (s.levels_completed ?? 0) >= (s.total_levels ?? 0)
+            ));
+          }
         })
         .catch(() => {
           /* ignore transient */
@@ -89,71 +199,108 @@ export function PlayPage() {
     }
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, [session]);
+  }, [session, user, visitorId, postPrefs, setLang]);
+
+  useEffect(() => {
+    postPrefs();
+  }, [gameTheme, lang, ready, postPrefs]);
 
   const src = useMemo(() => {
     if (!game) return "";
-    const needsTranslate = (game.source_language || "en") !== lang;
-    const q = needsTranslate ? `?lang=${encodeURIComponent(lang)}` : "";
-    return `/api/games/${game.id}/files/${game.entry_path}${q}`;
-  }, [game, lang]);
+    if (iframeGameIdRef.current === game.id && iframeSrcRef.current) {
+      return iframeSrcRef.current;
+    }
+    const params = new URLSearchParams({ theme: gameTheme, lang });
+    const next = `/api/games/${game.id}/files/${game.entry_path}?${params.toString()}`;
+    iframeGameIdRef.current = game.id;
+    iframeSrcRef.current = next;
+    return next;
+  }, [game, gameTheme, lang]);
 
   if (error) {
     return (
       <div>
         <div className="error">{error}</div>
-        <Link to="/">Back</Link>
+        <Link to="/">{t("back")}</Link>
       </div>
     );
   }
 
-  if (!game || !ready) return <p className="meta">Starting…</p>;
-
-  const translating = (game.source_language || "en") !== lang && !frameReady;
+  if (!game || !ready) return <p className="meta">{t("starting")}</p>;
 
   return (
     <div className="player-wrap">
-      <div className="row" style={{ justifyContent: "space-between" }}>
-        <div>
-          <h1 style={{ fontFamily: "var(--font-display)", margin: 0 }}>{game.title}</h1>
-          <p className="meta">
-            {game.description} · {t("detected")}: {(game.source_language || "en").toUpperCase()} →{" "}
-            {lang.toUpperCase()}
-          </p>
+      <div className="player-bar">
+        <Link className="player-back" to="/">
+          {t("back")}
+        </Link>
+        <h1 className="player-title">{game.title}</h1>
+        {game.owner_slug ? (
+          <Link className="player-handle" to={`/u/${game.owner_slug}`}>
+            {game.owner_name || game.owner_slug}
+          </Link>
+        ) : game.handle ? (
+          <span className="player-handle">{game.handle}</span>
+        ) : null}
+        <div className="metrics metrics-inline" aria-live="polite">
+          <span>
+            {t("points")} <b>{points}</b>
+          </span>
+          <span>
+            {t("correct")}{" "}
+            <b>
+              {correct}/{attempts}
+            </b>
+          </span>
+          <span>
+            {t("taskTime")} <b>{(timeMs / 1000).toFixed(1)}s</b>
+          </span>
+          {totalLevels || levelsCompleted ? (
+            <span>
+              {t("level")}{" "}
+              <b>
+                {levelsCompleted}
+                {totalLevels ? `/${totalLevels}` : ""}
+              </b>
+            </span>
+          ) : null}
         </div>
-        {user ? (
-          <Link className="btn secondary" to="/dashboard">
-            {t("dashboard")}
-          </Link>
-        ) : (
-          <Link className="btn secondary" to="/login">
-            {t("signInToTrack")}
-          </Link>
-        )}
       </div>
       {!user && <p className="guest-note">{t("guestPlayNote")}</p>}
-      <div className="metrics">
-        <span>
-          Points <b>{points}</b>
-        </span>
-        <span>
-          Correct <b>
-            {correct}/{attempts}
-          </b>
-        </span>
-        <span>
-          Task time <b>{(timeMs / 1000).toFixed(1)}s</b>
-        </span>
+      <div className="row player-tools">
+        <GameSocial
+          game={{
+            ...game,
+            like_count: game.like_count ?? 0,
+            comment_count: game.comment_count ?? 0,
+            liked_by_me: game.liked_by_me ?? false,
+          }}
+          onUpdate={(patch) => setGame((g) => (g ? { ...g, ...patch } : g))}
+          showComments
+        />
+        <GameShare gameId={game.id} title={game.title} description={game.description} />
       </div>
-      {translating && <p className="meta">{t("translating")}</p>}
-      <iframe
-        key={src}
+      <GameFrame
+        ref={frameRef}
         className="frame"
         title={game.title}
         src={src}
-        sandbox="allow-scripts allow-same-origin allow-forms"
-        onLoad={() => setFrameReady(true)}
+        onLoad={() => postPrefs()}
+        style={frameHeight ? { height: frameHeight, minHeight: frameHeight } : undefined}
       />
+      {completed && session && (
+        <div className="player-after">
+          <ScoreCard
+            sessionId={session.id}
+            gameTitle={game.title}
+            points={session.total_points}
+            correct={session.correct_count}
+            attempts={session.attempt_count}
+            levelsCompleted={session.levels_completed}
+            totalLevels={session.total_levels}
+          />
+        </div>
+      )}
     </div>
   );
 }

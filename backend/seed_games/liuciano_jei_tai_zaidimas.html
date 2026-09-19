@@ -413,6 +413,7 @@ function checkCode(){
     feedback.innerHTML = `<span class="good">✓ Teisinga!</span> Liucianas įvykdė tavo sąlygų logiką. +100 taškų.`;
     animate(t.action);
     renderProgressOnly();
+    if(window.LearnPlay) LearnPlay.stage(solved.size, tasks.length, {complete:solved.size===tasks.length,points:100,label:t.title,id:'logic-'+current});
   } else {
     feedback.innerHTML = `<span class="bad">Dar ne visai.</span> Patikrink logiką. Trūksta arba neteisingai panaudota: <code>${missing.slice(0,3).join(", ")}</code>.`;
   }

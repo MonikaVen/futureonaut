@@ -205,6 +205,7 @@ $('checkRule').addEventListener('click',()=>{
   }
   if(ruleChoice==='cheeks'){
     $('ruleFeedback').innerHTML='<span class="good">⭐ Correct. Multiple strong horizontal features on both sides of the cheeks provide much better whisker evidence than one isolated line.</span>';
+    if(window.LearnPlay) LearnPlay.stage(1,1,{complete:true,points:10,label:'Whisker rule',id:'whiskers-cheeks'});
   }else if(ruleChoice==='max'){
     $('ruleFeedback').textContent='Not quite. The strongest line could be an unrelated edge. A higher layer should also use position and repeated pattern evidence.';
   }else{

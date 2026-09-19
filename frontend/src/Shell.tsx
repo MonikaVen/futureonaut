@@ -1,63 +1,118 @@
-import { NavLink, Outlet, Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { NavLink, Outlet, Link, useLocation } from "react-router-dom";
 import { useAuth } from "./auth";
-import { UI_LANGS, useLanguage } from "./language";
+import { BrandLogo } from "./BrandLogo";
+import { AvatarImage } from "./AvatarImage";
+import { LanguageSelect, useLanguage } from "./language";
+import { ThemeToggle, useTheme } from "./theme";
 
 export function Shell() {
   const { user, logout, loading } = useAuth();
-  const { lang, setLang, t } = useLanguage();
-  if (loading) return <div className="app-shell">Loading…</div>;
+  const { t } = useLanguage();
+  const { theme } = useTheme();
+  const location = useLocation();
+  const [navOpen, setNavOpen] = useState(false);
+  const isPlay = location.pathname.startsWith("/play/");
+
+  useEffect(() => {
+    setNavOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    document.body.classList.toggle("nav-open", navOpen);
+    return () => document.body.classList.remove("nav-open");
+  }, [navOpen]);
+
+  useEffect(() => {
+    document.body.classList.toggle("play-focus", isPlay);
+    return () => document.body.classList.remove("play-focus");
+  }, [isPlay]);
+
+  if (loading) {
+    return (
+      <div className="app-shell app-loading">
+        <BrandLogo />
+      </div>
+    );
+  }
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell${isPlay ? " play-focus" : ""}`}>
       <header className="topnav">
-        <NavLink to="/" className="brand">
-          Futureonaut
-        </NavLink>
-        <nav className="nav-links">
-          <NavLink to="/">{t("games")}</NavLink>
-          {user && <NavLink to="/dashboard">{t("dashboard")}</NavLink>}
-          {user && <NavLink to="/recommendations">{t("forYou")}</NavLink>}
-          {user && (user.role === "creator" || user.role === "admin") && (
-            <NavLink to="/creator">{t("creator")}</NavLink>
-          )}
-          {user?.role === "admin" && <NavLink to="/admin">{t("admin")}</NavLink>}
-          <label className="lang-select">
-            <span className="meta">{t("language")}</span>
-            <select
-              value={lang}
-              onChange={(e) => setLang(e.target.value as typeof lang)}
-              aria-label={t("language")}
-            >
-              {UI_LANGS.map((l) => (
-                <option key={l.code} value={l.code}>
-                  {l.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          {user ? (
-            <>
-              <span className="meta">
-                {user.display_name} · {user.role}
-              </span>
-              <button className="btn secondary" type="button" onClick={logout}>
-                {t("logout")}
-              </button>
-            </>
-          ) : (
-            <>
-              <Link to="/login">{t("signIn")}</Link>
-              <Link className="btn accent" to="/register">
-                {t("signUp")}
-              </Link>
-            </>
-          )}
+        <div className="topnav-bar">
+          <NavLink to="/" className="brand">
+            <BrandLogo />
+          </NavLink>
+          <div className="nav-end">
+            <LanguageSelect />
+            <ThemeToggle />
+            {user ? (
+              <div className="nav-user">
+                {user.slug ? (
+                  <Link className="nav-user-link" to={`/u/${user.slug}`} title={t("yourPage")}>
+                    <AvatarImage userId={user.id} name={user.display_name} hasAvatar={Boolean(user.has_avatar)} size={32} />
+                  </Link>
+                ) : (
+                  <AvatarImage userId={user.id} name={user.display_name} hasAvatar={Boolean(user.has_avatar)} size={32} />
+                )}
+                <span className="nav-user-meta">
+                  {user.display_name}
+                  <span className="nav-user-role">{user.role}</span>
+                </span>
+                <button className="btn secondary btn-sm" type="button" onClick={logout}>
+                  {t("logout")}
+                </button>
+              </div>
+            ) : (
+              <div className="nav-auth">
+                <Link className="btn secondary btn-sm" to="/login">
+                  {t("signIn")}
+                </Link>
+                <Link className="btn accent btn-sm" to="/register">
+                  {t("signUp")}
+                </Link>
+              </div>
+            )}
+          </div>
+          <button
+            type="button"
+            className="nav-toggle"
+            aria-expanded={navOpen}
+            aria-controls="main-nav"
+            aria-label={navOpen ? t("closeMenu") : t("openMenu")}
+            onClick={() => setNavOpen((open) => !open)}
+          >
+            <span className="nav-toggle-icon" aria-hidden />
+          </button>
+        </div>
+        <nav id="main-nav" className={`nav-tabs${navOpen ? " open" : ""}`}>
+          <div className="nav-pages">
+            <NavLink to="/">{t("games")}</NavLink>
+            <NavLink to="/creators">{t("creators")}</NavLink>
+            {user && <NavLink to="/dashboard">{t("dashboard")}</NavLink>}
+            {user && <NavLink to="/recommendations">{t("forYou")}</NavLink>}
+            {user && <NavLink to="/classrooms">{t("classrooms")}</NavLink>}
+            {user && (user.can_create_games || user.role === "creator" || user.role === "admin" || user.role === "teacher") && (
+              <NavLink to="/creator">{t("creator")}</NavLink>
+            )}
+            {user?.role === "admin" && <NavLink to="/admin">{t("admin")}</NavLink>}
+          </div>
         </nav>
       </header>
 
-      <section className="mission">
-        <p>{t("mission")}</p>
-      </section>
+      {!isPlay && (
+        <section className={`platform-cover platform-cover-${theme}`} aria-label={t("coverAlt")}>
+          <img
+            className="platform-cover-art"
+            src={theme === "dark" ? "/cover-dark.png" : "/cover.png"}
+            alt=""
+          />
+          <div className="platform-cover-copy">
+            <img className="platform-cover-logo" src="/banner-logo.png" alt="" />
+            <p className="platform-cover-brand">{t("coverBrand")}</p>
+          </div>
+        </section>
+      )}
 
       <Outlet />
     </div>

@@ -1,0 +1,315 @@
+from __future__ import annotations
+
+import json
+import unittest
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock, patch
+
+from fastapi import HTTPException
+
+from app.auth import can_author_games
+from app.models import UserRole
+from app.services.generate import (
+    html_game_prompt,
+    html_revise_prompt,
+    generate_html_game,
+    infer_level_count,
+    infer_title_from_html,
+    revise_html_game,
+)
+from app.services.llm import (
+    STAGE_INSTRUCTIONS,
+    api_key_hint,
+    extract_html,
+    hash_api_key,
+    html_contract_warnings,
+    store_llm_key,
+    validate_generated_html,
+)
+
+
+SAMPLE_HTML = """<!DOCTYPE html>
+<html lang="en">
+<body>
+  <h1>Tokens</h1>
+  <button id="next" data-choice="next">Next</button>
+  <script>
+    const TOTAL = 3;
+    let done = 0;
+    function win() {
+      done = TOTAL;
+      LearnPlay.stage(TOTAL, TOTAL, { complete: true, score: 30, label: "Complete" });
+    }
+    LearnPlay.stage(1, TOTAL, { label: "Warm-up", id: "level-1", points: 10, correct: true });
+  </script>
+</body>
+</html>
+"""
+
+
+class ApiKeyHashTests(unittest.TestCase):
+    def test_hash_is_stable_and_not_plaintext(self) -> None:
+        key = "sk-test-1234567890abcdef"
+        digest = hash_api_key(key)
+        self.assertNotEqual(digest, key)
+        self.assertEqual(len(digest), 64)
+        self.assertEqual(digest, hash_api_key("  " + key + "  "))
+        self.assertEqual(api_key_hint(key), "cdef")
+
+    def test_store_llm_key_writes_hash_only(self) -> None:
+        user = SimpleNamespace(llm_provider=None, llm_api_key_hash=None, llm_api_key_hint=None)
+        store_llm_key(user, "openai", "sk-live-abcdefghijklmnopqrstuv")
+        self.assertEqual(user.llm_provider, "openai")
+        self.assertEqual(user.llm_api_key_hash, hash_api_key("sk-live-abcdefghijklmnopqrstuv"))
+        self.assertNotEqual(user.llm_api_key_hash, "sk-live-abcdefghijklmnopqrstuv")
+        self.assertEqual(user.llm_api_key_hint, "stuv")
+
+
+class AuthorAccessTests(unittest.TestCase):
+    def test_teacher_and_creator_can_author(self) -> None:
+        self.assertTrue(can_author_games(SimpleNamespace(role=UserRole.teacher)))
+        self.assertTrue(can_author_games(SimpleNamespace(role=UserRole.creator)))
+        self.assertTrue(can_author_games(SimpleNamespace(role=UserRole.admin)))
+        self.assertFalse(can_author_games(SimpleNamespace(role=UserRole.learner)))
+
+
+class CallerLlmKeyTests(unittest.TestCase):
+    def test_template_generate_requires_caller_key(self) -> None:
+        from app.schemas import AIGenerateRequest
+        from app.services.generate import _require_caller_llm_key
+
+        with self.assertRaises(HTTPException):
+            _require_caller_llm_key(None, "openai")
+        with self.assertRaises(HTTPException):
+            _require_caller_llm_key("", "openai")
+        parsed = AIGenerateRequest(topic="neurons", template_type="quiz")
+        self.assertIsNone(parsed.api_key)
+        provider, key = _require_caller_llm_key("sk-test-1234567890", "openai")
+        self.assertEqual(provider, "openai")
+        self.assertEqual(key, "sk-test-1234567890")
+
+    def test_classroom_owner_does_not_become_author(self) -> None:
+        db = MagicMock()
+        db.query.return_value.filter.return_value.limit.return_value.first.return_value = (1,)
+        self.assertFalse(can_author_games(SimpleNamespace(role=UserRole.learner, id="u1"), db))
+
+
+class HtmlExtractTests(unittest.TestCase):
+    def test_strips_markdown_fence(self) -> None:
+        html = extract_html("```html\n<!DOCTYPE html><html>ok</html>\n```")
+        self.assertIn("<!DOCTYPE html>", html)
+        self.assertNotIn("```", html)
+
+    def test_validate_requires_stage_and_complete(self) -> None:
+        with self.assertRaises(HTTPException):
+            validate_generated_html("<html><body>hello</body></html>", 3)
+        validated = validate_generated_html(SAMPLE_HTML, 3)
+        self.assertIn("LearnPlay.stage", validated)
+
+    def test_incomplete_html_is_kept_with_warnings(self) -> None:
+        warnings = html_contract_warnings("<html><body>hello</body></html>", 3)
+        self.assertTrue(warnings)
+        self.assertTrue(any("LearnPlay.stage" in w for w in warnings))
+
+    def test_rejects_remote_script(self) -> None:
+        bad = SAMPLE_HTML.replace(
+            "<script>",
+            '<script src="https://evil.example/x.js"></script><script>',
+        )
+        with self.assertRaises(HTTPException):
+            validate_generated_html(bad, 3)
+
+
+class PromptContractTests(unittest.TestCase):
+    def test_generation_prompt_keeps_level_structure(self) -> None:
+        self.assertIn("LearnPlay.stage", STAGE_INSTRUCTIONS)
+        self.assertIn("complete: true", STAGE_INSTRUCTIONS)
+        self.assertIn("TOTAL must never change", STAGE_INSTRUCTIONS)
+        system, user = html_game_prompt(
+            title="Cat pixels",
+            topic="CNNs",
+            difficulty=2,
+            level_count=4,
+            levels_brief="1 warm-up\n2 filter\n3 map\n4 boss",
+            language="en",
+            style_guidelines="Use orange buttons and a calm voice.",
+        )
+        self.assertIn("LearnPlay.stage", system)
+        payload = json.loads(user)
+        self.assertEqual(payload["level_count"], 4)
+        self.assertEqual(payload["style_guidelines"], "Use orange buttons and a calm voice.")
+        self.assertTrue(any("TOTAL = 4" in rule for rule in payload["requirements"]))
+        self.assertTrue(any("complete: true" in rule for rule in payload["requirements"]))
+        self.assertTrue(any("real graded task" in rule for rule in payload["requirements"]))
+        self.assertTrue(any("style_guidelines" in rule for rule in payload["requirements"]))
+
+
+class HtmlDraftLoopTests(unittest.IsolatedAsyncioTestCase):
+    async def test_generate_keeps_html_when_hooks_are_missing(self) -> None:
+        incomplete = "<!DOCTYPE html><html><body><h1>Draft</h1></body></html>"
+        with patch("app.services.generate.chat_complete", AsyncMock(return_value=incomplete)):
+            html, warnings = await generate_html_game(
+                title="Draft",
+                topic="AI",
+                difficulty=2,
+                level_count=3,
+                levels_brief="1 warm-up\n2 practice\n3 boss check",
+                language="en",
+                api_key="sk-test-1234567890",
+                provider="openai",
+            )
+        self.assertIn("<h1>Draft</h1>", html)
+        self.assertTrue(warnings)
+
+    async def test_revise_sends_current_html_and_teacher_note(self) -> None:
+        chat = AsyncMock(return_value=SAMPLE_HTML)
+        with patch("app.services.generate.chat_complete", chat):
+            html, warnings = await revise_html_game(
+                html="<html><body>old copy</body></html>",
+                message="Make level 2 a matching task",
+                level_count=3,
+                title="Tokens",
+                api_key="sk-test-1234567890",
+                provider="openai",
+                history=[{"role": "user", "content": "earlier note"}],
+            )
+        self.assertIn("LearnPlay.stage", html)
+        self.assertEqual(warnings, [])
+        payload = json.loads(chat.call_args.kwargs["user"])
+        self.assertEqual(payload["teacher_request"], "Make level 2 a matching task")
+        self.assertIn("old copy", payload["current_html"])
+        self.assertEqual(chat.call_args.kwargs["history"], [{"role": "user", "content": "earlier note"}])
+        system, user = html_revise_prompt(
+            html="<html></html>",
+            message="nudge",
+            level_count=3,
+            title="Tokens",
+        )
+        self.assertIn("LearnPlay.stage", system)
+        self.assertIn("nudge", user)
+
+
+class ChatPromptTests(unittest.TestCase):
+    def test_infers_level_count_and_title(self) -> None:
+        self.assertEqual(infer_level_count("Make 5 levels about gravity"), 5)
+        self.assertEqual(infer_level_count("a short quiz"), 4)
+        self.assertEqual(
+            infer_title_from_html("<html><title> Gravity Lab </title></html>", "fallback"),
+            "Gravity Lab",
+        )
+
+
+class ChatCompleteTests(unittest.IsolatedAsyncioTestCase):
+    async def test_openai_compatible_reads_message_content(self) -> None:
+        from app.services.llm import chat_complete
+
+        response = MagicMock()
+        response.status_code = 200
+        response.json.return_value = {"choices": [{"message": {"content": SAMPLE_HTML}}]}
+        response.text = ""
+        client = AsyncMock()
+        client.post.return_value = response
+        client.__aenter__.return_value = client
+        client.__aexit__.return_value = False
+        with patch("app.services.llm.httpx.AsyncClient", return_value=client):
+            text = await chat_complete(
+                provider="openai",
+                api_key="sk-test-1234567890",
+                system="sys",
+                user="do it",
+            )
+        self.assertIn("LearnPlay.stage", text)
+        kwargs = client.post.call_args.kwargs
+        self.assertIn("Authorization", kwargs["headers"])
+        self.assertEqual(kwargs["json"]["messages"][0]["role"], "system")
+        self.assertEqual(kwargs["json"]["max_tokens"], 8192)
+        self.assertNotIn("max_completion_tokens", kwargs["json"])
+
+    async def test_gpt5_uses_max_completion_tokens(self) -> None:
+        from app.services.llm import chat_complete, openai_chat_payload, uses_max_completion_tokens
+
+        self.assertTrue(uses_max_completion_tokens("gpt-5"))
+        self.assertTrue(uses_max_completion_tokens("o3-mini"))
+        self.assertFalse(uses_max_completion_tokens("gpt-4o-mini"))
+        payload = openai_chat_payload(model="gpt-5-mini", system="sys", messages=[{"role": "user", "content": "hi"}])
+        self.assertIn("max_completion_tokens", payload)
+        self.assertNotIn("max_tokens", payload)
+        self.assertNotIn("temperature", payload)
+
+        response = MagicMock()
+        response.status_code = 200
+        response.json.return_value = {"choices": [{"message": {"content": SAMPLE_HTML}}]}
+        response.text = ""
+        client = AsyncMock()
+        client.post.return_value = response
+        client.__aenter__.return_value = client
+        client.__aexit__.return_value = False
+        with patch("app.services.llm.httpx.AsyncClient", return_value=client):
+            await chat_complete(
+                provider="openai",
+                api_key="sk-test-1234567890",
+                system="sys",
+                user="do it",
+                model="gpt-5",
+            )
+        body = client.post.call_args.kwargs["json"]
+        self.assertEqual(body["max_completion_tokens"], 16384)
+        self.assertNotIn("max_tokens", body)
+
+    async def test_retries_when_model_rejects_max_tokens(self) -> None:
+        from app.services.llm import chat_complete
+
+        rejected = MagicMock()
+        rejected.status_code = 400
+        rejected.text = (
+            '{"error":{"message":"Unsupported parameter: \'max_tokens\' is not supported '
+            'with this model. Use \'max_completion_tokens\' instead.","code":"unsupported_parameter"}}'
+        )
+        rejected.json.return_value = {"error": {"message": rejected.text}}
+        ok = MagicMock()
+        ok.status_code = 200
+        ok.json.return_value = {"choices": [{"message": {"content": SAMPLE_HTML}}]}
+        ok.text = ""
+        client = AsyncMock()
+        client.post.side_effect = [rejected, ok]
+        client.__aenter__.return_value = client
+        client.__aexit__.return_value = False
+        with patch("app.services.llm.httpx.AsyncClient", return_value=client):
+            text = await chat_complete(
+                provider="openai",
+                api_key="sk-test-1234567890",
+                system="sys",
+                user="do it",
+                model="gpt-4o-mini",
+            )
+        self.assertIn("LearnPlay.stage", text)
+        self.assertEqual(client.post.call_count, 2)
+        second = client.post.call_args_list[1].kwargs["json"]
+        self.assertIn("max_completion_tokens", second)
+        self.assertNotIn("max_tokens", second)
+
+    async def test_claude_reads_text_blocks(self) -> None:
+        from app.services.llm import chat_complete
+
+        response = MagicMock()
+        response.status_code = 200
+        response.json.return_value = {"content": [{"type": "text", "text": SAMPLE_HTML}]}
+        response.text = ""
+        client = AsyncMock()
+        client.post.return_value = response
+        client.__aenter__.return_value = client
+        client.__aexit__.return_value = False
+        with patch("app.services.llm.httpx.AsyncClient", return_value=client):
+            text = await chat_complete(
+                provider="claude",
+                api_key="sk-ant-1234567890",
+                system="sys",
+                user="do it",
+            )
+        self.assertIn("complete: true", text)
+        headers = client.post.call_args.kwargs["headers"]
+        self.assertIn("x-api-key", headers)
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -305,7 +305,7 @@ function commit(){
   const collision=dist(agent,obstacle)<obstacle.r+12;
   let r=(before-after)*0.05-risk*2;
   if(collision){r-=8;gameOver=true;document.getElementById('message').innerHTML='<b>Collision.</b> Reset and use imagined futures to avoid it.'}
-  if(after<goal.r+14){r+=12;gameOver=true;document.getElementById('message').innerHTML='<b>Goal reached!</b> You used a world model to plan before acting.'}
+  if(after<goal.r+14){r+=12;gameOver=true;document.getElementById('message').innerHTML='<b>Goal reached!</b> You used a world model to plan before acting.';if(window.LearnPlay)LearnPlay.stage(1,1,{complete:true,points:12,label:'Goal reached',id:'world-lab-goal'})}
   totalReward+=r;
   rollouts=[];
   document.getElementById('reward').textContent=totalReward.toFixed(2);

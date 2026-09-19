@@ -245,8 +245,10 @@
     const goal=Number(target.value);
     challengeMessage.textContent=`Draw a closed shape with perimeter ${goal} units.`;
     if(closed) {
-      if(Math.abs(p-goal)<0.05) feedback.textContent=`⭐ Perfect! Liucian says your perimeter is exactly ${fmt(p)} units.`;
-      else feedback.textContent=`Your perimeter is ${fmt(p)} units. Target: ${goal}. Try changing the shape.`;
+      if(Math.abs(p-goal)<0.05){
+        feedback.textContent=`⭐ Perfect! Liucian says your perimeter is exactly ${fmt(p)} units.`;
+        if(window.LearnPlay) LearnPlay.stage(1,1,{complete:true,points:10,label:'Perimeter match',id:'perimeter'});
+      } else feedback.textContent=`Your perimeter is ${fmt(p)} units. Target: ${goal}. Try changing the shape.`;
     } else feedback.textContent='';
   }
 

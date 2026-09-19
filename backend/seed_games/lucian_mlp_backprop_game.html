@@ -407,10 +407,17 @@ function showLevel(n){
 }
 document.querySelectorAll('.level-btn').forEach(b=>b.addEventListener('click',()=>showLevel(+b.dataset.level)));
 function completeLevel(n){
+  markLevel(n);
+  showLevel(Math.min(7,n+1));
+}
+function markLevel(n){
+  const first=!completed.has(n);
   completed.add(n);
   const b=document.querySelector(`.level-btn[data-level="${n}"]`);
   if(b)b.classList.add('done');
-  showLevel(Math.min(7,n+1));
+  if(first && window.LearnPlay){
+    LearnPlay.stage(completed.size, 7, {complete:completed.size>=7,points:10,label:'Level '+n,id:'mlp-'+n});
+  }
 }
 window.completeLevel=completeLevel;
 
@@ -705,7 +712,7 @@ Decision = ${yhat>=0.5 ? 'PLAY' : 'NAP'}`;
     $('forwardMath').textContent=`ŷ = sigmoid(z₂) = 1 / (1 + e^(−z₂)) = ${yhat.toFixed(4)}`;
     drawForwardActivationVisuals(z1[0], h[0], z2, yhat);
     $('outSigmoidCaption').textContent=`Sigmoid maps z₂=${z2.toFixed(2)} to probability ŷ=${yhat.toFixed(3)}. Values near 1 mean strong confidence in PLAY.`;
-    completed.add(2); document.querySelector('[data-level="2"]').classList.add('done');
+    markLevel(2);
   }else{
     forwardStep=-1;
     resetForward();
@@ -737,7 +744,7 @@ function updateLoss(){
   $('lossProgress').style.width=prog+'%';
   if(loss<.01){
     $('lossMessage').innerHTML='<span class="good"><b>Great!</b> Lucian is now very close to the target. Loss is small.</span>';
-    completed.add(3); document.querySelector('[data-level="3"]').classList.add('done');
+    markLevel(3);
   }else $('lossMessage').textContent='Move ŷ closer to 1.00 to reduce the loss.';
 }
 $('predSlider').addEventListener('input',updateLoss); updateLoss();
@@ -820,7 +827,7 @@ dL/dz₂ = dL/dŷ × dŷ/dz₂ = ${b.dL_dz2.toFixed(4)}`;
     $('backLog').textContent=lines.join('\n');
     $('backMath').textContent=`For each first-layer weight:
 ∂L/∂wⱼᵢ = (∂L/∂z₁ⱼ)xᵢ`;
-    completed.add(4); document.querySelector('[data-level="4"]').classList.add('done');
+    markLevel(4);
   }else{
     backStep=-1;
     resetBackprop();
@@ -941,7 +948,7 @@ $('gdStep').addEventListener('click',()=>{
   $('gdLog').textContent=`Updated weight to ${nw.toFixed(4)}. New loss = ${loss.toFixed(5)}.`;
   if(loss<.002){
     $('gdLog').innerHTML=`<span class="good">Excellent. The point is now very close to the minimum of the loss curve.</span>`;
-    completed.add(5); document.querySelector('[data-level="5"]').classList.add('done');
+    markLevel(5);
   }
 });
 
@@ -1018,7 +1025,7 @@ function trainEpoch(){
   $('trainLog').textContent=`Epoch ${epoch}: loss ${avg.toFixed(4)}, accuracy ${Math.round(acc*100)}%.`;
   if(acc===1 && avg<.2){
     $('trainLog').innerHTML=`<span class="good">🎉 Lucian learned the training examples! Epoch ${epoch}, loss ${avg.toFixed(4)}, accuracy 100%.</span>`;
-    completed.add(6); document.querySelector('[data-level="6"]').classList.add('done');
+    markLevel(6);
   }
   drawLoss();
 }
@@ -1079,7 +1086,7 @@ document.querySelectorAll('.quiz-option').forEach(btn=>btn.addEventListener('cli
   $('quizMsg').innerHTML=ok
     ? '<span class="good"><b>Correct.</b> Backpropagation computes gradients; optimizer.step() uses them to update weights.</span>'
     : '<span class="bad">Not quite. Think about the gradients flowing backward from the loss.</span>';
-  if(ok){completed.add(7);document.querySelector('[data-level="7"]').classList.add('done');}
+  if(ok) markLevel(7);
 }));
 
 resetForward();

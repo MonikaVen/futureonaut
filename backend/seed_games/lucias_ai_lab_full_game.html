@@ -206,7 +206,18 @@ function correctNow(){
  if(i===9) return local.answer && local.answer.startsWith("Human approval");
 }
 function reward(){
- if(!state.completed.includes(state.level)){state.completed.push(state.level);state.stars+=100;state.badges+=1}
+ const firstTime=!state.completed.includes(state.level);
+ if(firstTime){state.completed.push(state.level);state.stars+=100;state.badges+=1}
+ if(window.LearnPlay){
+   LearnPlay.stage(state.completed.length,10,{
+     complete:firstTime && state.completed.length>=10,
+     points:firstTime?100:0,
+     label:levels[state.level].title,
+     id:"level-"+state.level,
+     score:state.stars,
+     levelsCompleted:state.completed.length
+   });
+ }
  feedback.className="feedback ok";feedback.textContent="Correct! +100 ⭐  Badge unlocked 🏆";
  luciaStatus.textContent="Level complete ✓";levelMeter.style.width="100%";luciaExplain.textContent="Great work. Lucia learned this concept.";
  save();renderNav();toast("Level complete!");setTimeout(()=>{
