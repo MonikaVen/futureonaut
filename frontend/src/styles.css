@@ -327,6 +327,10 @@ button, input, select, textarea {
 
 .player-title .meta {
   margin: 0.15rem 0 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: min(42rem, 70vw);
 }
 
 .app-shell.play-mode {

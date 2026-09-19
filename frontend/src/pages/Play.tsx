@@ -118,7 +118,7 @@ export function PlayPage() {
           <h1>{game.title}</h1>
           <p className="meta">
             {t("detected")}: {(game.source_language || "en").toUpperCase()} → {lang.toUpperCase()}
-            {!user ? ` · ${t("guestPlayNote")}` : ""}
+            {!user ? " · Guest — not saved" : ""}
           </p>
         </div>
         <div className="metrics">
