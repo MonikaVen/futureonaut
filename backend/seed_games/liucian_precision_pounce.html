@@ -3,234 +3,185 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Liucian's Precision Pounce — Precision vs Recall</title>
+<title>Liucian's Precision Pounce</title>
 <style>
-:root{--bg:#f7f7f8;--card:#fff;--text:#1f2937;--muted:#6b7280;--border:#d1d5db;--accent:#4b5563;--good:#237a4b;--bad:#b42318}
-*{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,sans-serif;color:var(--text);background:#fff}
-main{max-width:1080px;margin:auto;padding:22px}h1{margin:0 0 6px}h2{margin:0 0 8px;font-size:18px}
-.sub,.tiny{color:var(--muted)}.sub{margin-bottom:16px}.tiny{font-size:13px}
-.grid{display:grid;gap:14px}.metrics{grid-template-columns:repeat(4,1fr)}.two{grid-template-columns:1.15fr .85fr}
-.card,.metric{border:1px solid var(--border);border-radius:16px;padding:14px;background:var(--card)}
-.label{font-size:13px;color:var(--muted)}.value{font-size:23px;font-weight:700}
-button{padding:10px 14px;border:1px solid var(--border);border-radius:12px;background:#fff;font-size:15px;cursor:pointer;margin:4px 4px 0 0}
-button.primary{background:var(--accent);color:#fff}button:disabled{opacity:.45;cursor:not-allowed}
-.box{padding:11px;border-radius:12px;background:var(--bg);border:1px solid var(--border);margin-top:12px}
-.math{font-family:ui-monospace,monospace;background:#fff;padding:8px;border-radius:9px;margin-top:8px}
-svg{display:block;width:100%;height:auto}.feedback{min-height:24px;margin-top:10px;font-weight:650}
-.good{color:var(--good)}.bad{color:var(--bad)}input[type=range]{width:100%}
-.cm{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
-.cm div{border:1px solid var(--border);border-radius:10px;padding:8px;text-align:center;background:#fff}
-@media(max-width:800px){.metrics{grid-template-columns:repeat(2,1fr)}.two{grid-template-columns:1fr}}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;overflow:hidden;font-family:Manrope,Inter,system-ui,sans-serif;color:#2a1d16}
+body{background:#2a1b16}
+.app{height:100%;display:grid;grid-template-rows:52px minmax(0,1fr) 62px;grid-template-columns:minmax(0,1fr) 250px;gap:8px;padding:8px}
+.hud,.dock{grid-column:1/-1}
+.hud{display:flex;align-items:center;gap:10px;padding:0 8px;color:#f8e6d2}
+.brand{font-weight:800}
+.pills{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto}
+.pill{background:#3b241c;border:1px solid #6a4032;border-radius:999px;padding:5px 10px;font-size:12px}
+.pill b{color:#fff}
+.stage{position:relative;border-radius:18px;overflow:hidden;min-height:0}
+.stage svg{width:100%;height:100%;display:block}
+.rail{background:#3b241c;border:1px solid #6a4032;border-radius:16px;padding:10px 12px;color:#f8e6d2;display:flex;flex-direction:column;gap:8px;min-height:0}
+.rail h2{margin:0;font-size:13px;color:#f0b36a}
+.tiny{font-size:12px;line-height:1.35;color:#e7c8b0}
+.math{font-family:ui-monospace,monospace;font-size:11px;background:#241410;border-radius:8px;padding:6px 8px}
+.cm{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.cm div{background:#241410;border-radius:8px;padding:6px;text-align:center;font-size:12px}
+.cm b{display:block;font-size:18px}
+.dock{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+button{border:0;border-radius:10px;padding:8px 12px;font-weight:700;cursor:pointer;background:#6a4032;color:#fff}
+button.primary{background:#e07a2f}button.ghost{background:#3b241c;color:#f8e6d2}
+button:disabled{opacity:.4;cursor:not-allowed}
+label.sl{color:#f8e6d2;font-size:12px;display:flex;align-items:center;gap:8px}
+input[type=range]{width:150px}
+.fb{flex:1;min-width:160px;font-size:13px;font-weight:700;color:#f8e6d2}
+.good{color:#9be37a}.bad{color:#ffb3a6}
+@media(max-width:860px){.app{grid-template-columns:1fr;grid-template-rows:48px minmax(0,1fr) auto 70px}.rail{max-height:92px}}
 </style>
 </head>
 <body>
-<main>
-  <h1>🐭 Liucian's Precision Pounce</h1>
-  <div class="sub">Set a <strong>decision threshold</strong>. Liucian pounces on anything that looks mouse-like. Too eager: yarn chaos. Too shy: mice escape.</div>
-
-  <div class="grid metrics">
-    <div class="metric"><div class="label">Wave</div><div id="mWave" class="value">1 / 4</div></div>
-    <div class="metric"><div class="label">Kitchen score</div><div id="mScore" class="value">0</div></div>
-    <div class="metric"><div class="label">Precision</div><div id="mP" class="value">—</div></div>
-    <div class="metric"><div class="label">Recall</div><div id="mR" class="value">—</div></div>
-  </div>
-
-  <div class="grid two" style="margin-top:15px">
-    <section class="card">
-      <h2>1. Set the pounce threshold</h2>
-      <div class="tiny">Each object has a mouse-ness score. If score ≥ threshold, Liucian pounces.</div>
-      <svg id="stage" viewBox="0 0 700 280" role="img" aria-label="Kitchen floor with incoming objects">
-        <rect x="0" y="0" width="700" height="280" fill="#f8f8f8"/>
-        <line x1="40" y1="210" x2="660" y2="210" stroke="#9ca3af" stroke-width="3"/>
-        <g id="objects"></g>
-        <g id="cat" transform="translate(90 168)">
-          <ellipse cx="0" cy="20" rx="42" ry="28" fill="#777" stroke="#4b4b4b" stroke-width="3"/>
-          <circle cx="38" cy="0" r="22" fill="#808080" stroke="#4b4b4b" stroke-width="3"/>
-          <path d="M24 -16 L29 -40 L40 -18 Z" fill="#777" stroke="#4b4b4b" stroke-width="3"/>
-          <path d="M39 -18 L54 -39 L57 -8 Z" fill="#777" stroke="#4b4b4b" stroke-width="3"/>
-          <circle cx="33" cy="-2" r="3" fill="#222"/>
-          <circle cx="44" cy="-2" r="3" fill="#222"/>
-          <text x="10" y="72" text-anchor="middle" font-size="13">Liucian</text>
-        </g>
-      </svg>
-      <div class="box">
-        <label for="thr">Threshold: <b id="thrOut">0.55</b></label>
-        <input id="thr" type="range" min="0.15" max="0.90" value="0.55" step="0.05">
-        <div class="tiny">Low threshold = high recall, more false alarms. High threshold = high precision, more missed mice.</div>
-      </div>
-      <button id="goBtn" class="primary" type="button">Start wave</button>
-      <button id="nextBtn" type="button" disabled>Next wave</button>
-      <button id="resetBtn" type="button">Replay kitchen</button>
-      <div id="feedback" class="feedback" aria-live="polite">Choose a threshold, then start the wave.</div>
-    </section>
-
-    <section class="card">
-      <h2>2. Confusion matrix</h2>
-      <div class="cm">
-        <div><div class="tiny">True pounces (TP)</div><div id="tp" class="value">0</div></div>
-        <div><div class="tiny">Yarn disasters (FP)</div><div id="fp" class="value">0</div></div>
-        <div><div class="tiny">Mice escaped (FN)</div><div id="fn" class="value">0</div></div>
-        <div><div class="tiny">Correct ignores (TN)</div><div id="tn" class="value">0</div></div>
-      </div>
-      <div class="box">
-        <b>F1 this wave</b>
-        <div id="f1" class="value">—</div>
-        <div class="tiny">F1 is the harmonic mean of precision and recall.</div>
-      </div>
-      <div class="box">
-        <b>🎯 Challenge</b>
-        <div class="tiny" style="margin-top:6px">Finish 4 waves with a <strong>kitchen score ≥ 80</strong>. Waves change how common mice are.</div>
-        <div id="challenge" class="feedback"></div>
-      </div>
-      <div class="box">
-        <b>Concept</b>
-        <div class="math">precision = TP / (TP + FP)</div>
-        <div class="math">recall = TP / (TP + FN)</div>
-        <div class="tiny" style="margin-top:8px">A classifier is not just “accuracy”. When mice are rare, a high threshold looks tidy but lets pests through. When yarn is everywhere, a low threshold wrecks the kitchen.</div>
-      </div>
-    </section>
-  </div>
-</main>
+<div class="app">
+  <header class="hud">
+    <div class="brand">🐭 Precision Pounce</div>
+    <div class="pills">
+      <span class="pill">Wave <b id="mWave">1/4</b></span>
+      <span class="pill">Score <b id="mScore">0</b></span>
+      <span class="pill">Prec <b id="mP">—</b></span>
+      <span class="pill">Recall <b id="mR">—</b></span>
+      <span class="pill">F1 <b id="f1">—</b></span>
+    </div>
+  </header>
+  <section class="stage">
+    <svg id="stage" viewBox="0 0 1100 560" preserveAspectRatio="xMidYMid slice">
+      <defs>
+        <linearGradient id="room" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#f3d2a6"/><stop offset="1" stop-color="#c48a55"/>
+        </linearGradient>
+        <pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse">
+          <rect width="40" height="40" fill="#e8c089"/><rect width="20" height="20" fill="#d9ae72"/><rect x="20" y="20" width="20" height="20" fill="#d9ae72"/>
+        </pattern>
+      </defs>
+      <rect width="1100" height="560" fill="url(#room)"/>
+      <rect x="0" y="300" width="1100" height="260" fill="url(#tile)"/>
+      <rect x="0" y="292" width="1100" height="12" fill="#8a5a32"/>
+      <line id="thrLine" x1="210" y1="80" x2="210" y2="280" stroke="#e07a2f" stroke-width="4" stroke-dasharray="6 5"/>
+      <g id="bars"></g>
+      <g id="objects"></g>
+      <g id="cat"></g>
+    </svg>
+  </section>
+  <aside class="rail">
+    <h2>Threshold call</h2>
+    <div class="tiny">Bar height is mouse-ness. Pounce if score ≥ threshold. Space starts the wave.</div>
+    <div class="cm">
+      <div>TP <b id="tp">0</b></div><div>FP <b id="fp">0</b></div>
+      <div>FN <b id="fn">0</b></div><div>TN <b id="tn">0</b></div>
+    </div>
+    <div class="math">prec = TP/(TP+FP) · rec = TP/(TP+FN)</div>
+    <div class="tiny" id="challenge">Kitchen score ≥ 80 across 4 waves.</div>
+  </aside>
+  <footer class="dock">
+    <label class="sl">Threshold <b id="thrOut">0.55</b>
+      <input id="thr" type="range" min="0.15" max="0.90" value="0.55" step="0.05">
+    </label>
+    <button class="primary" id="goBtn" type="button">Start wave</button>
+    <button class="ghost" id="nextBtn" type="button" disabled>Next wave</button>
+    <button class="ghost" id="resetBtn" type="button">Replay</button>
+    <div class="fb" id="feedback">Set the line, then pounce.</div>
+  </footer>
+</div>
 <script>
 (() => {
   const lp = window.LearnPlay || {score(){},answer(){},taskStart(){},taskEnd(){},complete(){}};
-  const $ = (id) => document.getElementById(id);
+  const $ = id => document.getElementById(id);
   const waves = [
-    { name: "balanced kitchen", mouseP: 0.5, n: 12 },
-    { name: "mouse invasion", mouseP: 0.75, n: 12 },
-    { name: "yarn everywhere", mouseP: 0.25, n: 12 },
-    { name: "tricky overlap", mouseP: 0.45, n: 14 }
+    {name:"balanced kitchen",mouseP:.5,n:12},
+    {name:"mouse invasion",mouseP:.75,n:12},
+    {name:"yarn everywhere",mouseP:.25,n:12},
+    {name:"tricky overlap",mouseP:.45,n:14}
   ];
-  let wave = 0, score = 0, running = false, items = [];
-  let tp = 0, fp = 0, fn = 0, tn = 0;
-
-  function randn() {
-    let u = 0, v = 0;
-    while (!u) u = Math.random();
-    while (!v) v = Math.random();
-    return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+  let wave=0,score=0,running=false,items=[],tp=0,fp=0,fn=0,tn=0,hop=false;
+  function add(tag,attrs,p){const e=document.createElementNS("http://www.w3.org/2000/svg",tag);Object.entries(attrs).forEach(([k,v])=>e.setAttribute(k,v));p.appendChild(e);return e}
+  function randn(){let u=0,v=0;while(!u)u=Math.random();while(!v)v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v)}
+  function drawCat(){
+    const g=$("cat"); g.innerHTML="";
+    const y = hop ? 250 : 318, x=120;
+    add("ellipse",{cx:x,cy:y+22,rx:48,ry:30,fill:"#8a6a4f"},g);
+    add("circle",{cx:x+36,cy:y,r:24,fill:"#9a7758"},g);
+    add("path",{d:`M${x+20} ${y-18} L${x+24} ${y-42} L${x+40} ${y-14} Z`,fill:"#8a6a4f"},g);
+    add("path",{d:`M${x+38} ${y-16} L${x+56} ${y-40} L${x+58} ${y-8} Z`,fill:"#8a6a4f"},g);
+    add("circle",{cx:x+32,cy:y-2,r:3,fill:"#22170f"},g);
+    add("circle",{cx:x+44,cy:y-2,r:3,fill:"#22170f"},g);
+    const t=add("text",{x,y:y+62,"text-anchor":"middle",fill:"#4a2a1c","font-size":13,"font-weight":800},g); t.textContent="Liucian";
   }
-
-  function makeWave() {
-    const cfg = waves[wave];
-    items = [];
-    for (let i = 0; i < cfg.n; i++) {
-      const isMouse = Math.random() < cfg.mouseP;
+  function makeWave(){
+    const cfg=waves[wave]; items=[];
+    for(let i=0;i<cfg.n;i++){
+      const isMouse=Math.random()<cfg.mouseP;
       let s = isMouse ? 0.68 + 0.14 * randn() : 0.34 + 0.14 * randn();
       if (wave === 3) s = isMouse ? 0.58 + 0.18 * randn() : 0.46 + 0.18 * randn();
-      s = Math.max(0.05, Math.min(0.98, s));
-      items.push({ isMouse, s, x: 170 + i * ((500) / Math.max(cfg.n - 1, 1)) });
+      s=Math.max(.05,Math.min(.98,s));
+      items.push({isMouse,s,x:250+i*((780)/Math.max(cfg.n-1,1))});
     }
   }
-
-  function drawIdle() {
-    const g = $("objects");
-    g.innerHTML = "";
-    items.forEach(it => {
-      const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
-      t.setAttribute("x", it.x);
-      t.setAttribute("y", 198);
-      t.setAttribute("text-anchor", "middle");
-      t.setAttribute("font-size", "28");
-      t.textContent = "❓";
-      g.appendChild(t);
+  function thrX(){return 210 + (+$("thr").value)*720}
+  function drawBars(reveal){
+    const g=$("bars"); g.innerHTML="";
+    $("thrLine").setAttribute("x1",thrX()); $("thrLine").setAttribute("x2",thrX());
+    items.forEach(it=>{
+      const h=it.s*180;
+      add("rect",{x:it.x-10,y:280-h,width:20,height:h,rx:6,fill:it.s>=+$("thr").value?"#e07a2f":"#8a5a32",opacity:.85},g);
+    });
+    const og=$("objects"); og.innerHTML="";
+    items.forEach(it=>{
+      const t=add("text",{x:it.x,y:268,"text-anchor":"middle","font-size":26},og);
+      t.textContent = reveal ? (it.isMouse?"🐭":"🧶") : "•";
     });
   }
-
-  function metrics() {
-    const prec = (tp + fp) ? tp / (tp + fp) : 0;
-    const rec = (tp + fn) ? tp / (tp + fn) : 0;
-    const f1 = (prec + rec) ? (2 * prec * rec) / (prec + rec) : 0;
-    $("tp").textContent = tp; $("fp").textContent = fp;
-    $("fn").textContent = fn; $("tn").textContent = tn;
-    $("mP").textContent = (tp + fp) ? prec.toFixed(2) : "—";
-    $("mR").textContent = (tp + fn) ? rec.toFixed(2) : "—";
-    $("f1").textContent = (tp + fp + fn) ? f1.toFixed(2) : "—";
-    $("mScore").textContent = score;
-    return { prec, rec, f1 };
+  function metrics(){
+    const prec=(tp+fp)?tp/(tp+fp):0, rec=(tp+fn)?tp/(tp+fn):0, f1=(prec+rec)?(2*prec*rec)/(prec+rec):0;
+    $("tp").textContent=tp; $("fp").textContent=fp; $("fn").textContent=fn; $("tn").textContent=tn;
+    $("mP").textContent=(tp+fp)?prec.toFixed(2):"—"; $("mR").textContent=(tp+fn)?rec.toFixed(2):"—";
+    $("f1").textContent=(tp+fp+fn)?f1.toFixed(2):"—"; $("mScore").textContent=score;
+    return {prec,rec,f1};
   }
-
-  function startWaveView() {
-    makeWave();
-    tp = fp = fn = tn = 0;
-    metrics();
-    $("mWave").textContent = `${wave + 1} / 4`;
-    $("nextBtn").disabled = true;
-    $("goBtn").disabled = false;
-    $("feedback").textContent = `Wave ${wave + 1}: ${waves[wave].name}. Set threshold, then pounce.`;
-    $("feedback").className = "feedback";
-    drawIdle();
-    lp.taskStart("wave-" + wave);
+  function startWaveView(){
+    makeWave(); tp=fp=fn=tn=0; hop=false; metrics();
+    $("mWave").textContent=`${wave+1}/4`; $("nextBtn").disabled=true; $("goBtn").disabled=false; $("thr").disabled=false;
+    $("feedback").textContent=`${waves[wave].name}. Bars show mouse-ness.`; $("feedback").className="fb";
+    drawBars(false); drawCat(); lp.taskStart("wave-"+wave);
   }
-
-  function runWave() {
-    if (running) return;
-    running = true;
-    $("goBtn").disabled = true;
-    $("thr").disabled = true;
-    const thr = +$("thr").value;
-    const g = $("objects");
-    g.innerHTML = "";
-    items.forEach((it, idx) => {
-      setTimeout(() => {
-        const pounce = it.s >= thr;
-        if (pounce && it.isMouse) { tp++; score += 10; lp.score(10); }
-        else if (pounce && !it.isMouse) { fp++; score -= 8; lp.score(-8); }
-        else if (!pounce && it.isMouse) { fn++; score -= 5; lp.score(-5); }
-        else tn++;
-        const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
-        t.setAttribute("x", it.x);
-        t.setAttribute("y", pounce ? 150 : 198);
-        t.setAttribute("text-anchor", "middle");
-        t.setAttribute("font-size", "28");
-        t.textContent = it.isMouse ? "🐭" : "🧶";
-        if (pounce && !it.isMouse) t.setAttribute("opacity", "0.45");
-        g.appendChild(t);
-        if (pounce) {
-          const mark = document.createElementNS("http://www.w3.org/2000/svg", "text");
-          mark.setAttribute("x", it.x);
-          mark.setAttribute("y", 128);
-          mark.setAttribute("text-anchor", "middle");
-          mark.setAttribute("font-size", "14");
-          mark.textContent = it.isMouse ? "✓" : "✗";
-          g.appendChild(mark);
-        }
-        metrics();
-        if (idx === items.length - 1) finishWave();
-      }, 220 * idx);
-    });
+  function runWave(){
+    if(running) return; running=true; $("goBtn").disabled=true; $("thr").disabled=true;
+    const thr=+$("thr").value; let i=0;
+    const tick=()=>{
+      if(i>=items.length){ finishWave(); return; }
+      const it=items[i], pounce=it.s>=thr; hop=pounce;
+      if(pounce&&it.isMouse){tp++;score+=10;lp.score(10)}
+      else if(pounce&&!it.isMouse){fp++;score-=8;lp.score(-8)}
+      else if(!pounce&&it.isMouse){fn++;score-=5;lp.score(-5)}
+      else tn++;
+      drawBars(true); drawCat(); metrics();
+      i++; setTimeout(tick, 160);
+    };
+    tick();
   }
-
-  function finishWave() {
-    running = false;
-    $("thr").disabled = false;
-    const { prec, rec, f1 } = metrics();
-    const ok = f1 >= 0.7;
-    $("feedback").innerHTML = ok
-      ? `Nice pounces! Precision ${prec.toFixed(2)}, recall ${rec.toFixed(2)}, F1 ${f1.toFixed(2)}.`
-      : `Kitchen chaos. Precision ${prec.toFixed(2)}, recall ${rec.toFixed(2)}. Nudge the threshold.`;
-    $("feedback").className = "feedback " + (ok ? "good" : "bad");
-    lp.taskEnd("wave-" + wave);
-    lp.answer({ correct: ok, taskId: "wave-" + wave, points: Math.max(0, Math.round(f1 * 10)) });
-    if (wave < 3) $("nextBtn").disabled = false;
+  function finishWave(){
+    running=false; hop=false; drawCat(); $("thr").disabled=false;
+    const {prec,rec,f1}=metrics(); const ok=f1>=.7;
+    $("feedback").innerHTML=ok?`Nice pounces. P ${prec.toFixed(2)} R ${rec.toFixed(2)} F1 ${f1.toFixed(2)}.`:`Kitchen chaos. Nudge the threshold.`;
+    $("feedback").className="fb "+(ok?"good":"bad");
+    lp.taskEnd("wave-"+wave);
+    lp.answer({correct:ok,taskId:"wave-"+wave,points:Math.max(0,Math.round(f1*10))});
+    if(wave<3) $("nextBtn").disabled=false;
     else {
-      const pass = score >= 80;
-      $("challenge").innerHTML = pass
-        ? `⭐ Challenge complete! Kitchen score ${score}.`
-        : `Score ${score}. Try a mid threshold (~0.5) on balanced waves, higher when yarn dominates, lower during invasions.`;
-      $("challenge").className = "feedback " + (pass ? "good" : "bad");
-      lp.complete({ score });
+      const pass=score>=80;
+      $("challenge").innerHTML=pass?`⭐ Kitchen score ${score}.`:`Score ${score}. Mid threshold on balanced, higher vs yarn, lower in invasions.`;
+      $("challenge").className=pass?"good":"bad";
+      lp.complete({score});
     }
   }
-
-  $("thr").oninput = () => { $("thrOut").textContent = (+$("thr").value).toFixed(2); };
-  $("goBtn").onclick = runWave;
-  $("nextBtn").onclick = () => { wave++; startWaveView(); };
-  $("resetBtn").onclick = () => {
-    wave = 0; score = 0;
-    $("challenge").textContent = "";
-    startWaveView();
-  };
+  $("thr").oninput=()=>{ $("thrOut").textContent=(+$("thr").value).toFixed(2); drawBars(false); };
+  $("goBtn").onclick=runWave;
+  $("nextBtn").onclick=()=>{wave++; startWaveView()};
+  $("resetBtn").onclick=()=>{wave=0;score=0;$("challenge").textContent="Kitchen score ≥ 80 across 4 waves.";startWaveView()};
+  window.addEventListener("keydown",e=>{ if(e.key===" "||e.key==="Enter"){ e.preventDefault(); runWave(); }});
   startWaveView();
 })();
 </script>

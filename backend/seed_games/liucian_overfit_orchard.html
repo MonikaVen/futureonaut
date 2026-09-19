@@ -3,273 +3,199 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Liucian's Overfit Orchard — Train vs Test</title>
+<title>Liucian's Overfit Orchard</title>
 <style>
-:root{--bg:#f7f7f8;--card:#fff;--text:#1f2937;--muted:#6b7280;--border:#d1d5db;--accent:#4b5563;--good:#237a4b;--bad:#b42318}
-*{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,sans-serif;color:var(--text);background:#fff}
-main{max-width:1080px;margin:auto;padding:22px}h1{margin:0 0 6px}h2{margin:0 0 8px;font-size:18px}
-.sub,.tiny{color:var(--muted)}.sub{margin-bottom:16px}.tiny{font-size:13px}
-.grid{display:grid;gap:14px}.metrics{grid-template-columns:repeat(4,1fr)}.two{grid-template-columns:1.2fr .8fr}
-.card,.metric{border:1px solid var(--border);border-radius:16px;padding:14px;background:var(--card)}
-.label{font-size:13px;color:var(--muted)}.value{font-size:23px;font-weight:700}
-button{padding:10px 14px;border:1px solid var(--border);border-radius:12px;background:#fff;font-size:15px;cursor:pointer;margin:4px 4px 0 0}
-button.primary{background:var(--accent);color:#fff}button:disabled{opacity:.45;cursor:not-allowed}
-.box{padding:11px;border-radius:12px;background:var(--bg);border:1px solid var(--border);margin-top:12px}
-.math{font-family:ui-monospace,monospace;background:#fff;padding:8px;border-radius:9px;margin-top:8px}
-svg{display:block;width:100%;height:auto}.feedback{min-height:24px;margin-top:10px;font-weight:650}
-.good{color:var(--good)}.bad{color:var(--bad)}input[type=range]{width:100%}
-.legend{display:flex;gap:10px;flex-wrap:wrap;margin:8px 0}
-.pill{border:1px solid var(--border);border-radius:999px;padding:6px 10px;font-size:13px}
-@media(max-width:800px){.metrics{grid-template-columns:repeat(2,1fr)}.two{grid-template-columns:1fr}}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;overflow:hidden;font-family:Manrope,Inter,system-ui,sans-serif;color:#1f2a1c}
+body{background:#142014}
+.app{height:100%;display:grid;grid-template-rows:52px minmax(0,1fr) 62px;grid-template-columns:minmax(0,1fr) 250px;gap:8px;padding:8px}
+.hud,.dock{grid-column:1/-1}
+.hud{display:flex;align-items:center;gap:10px;padding:0 8px;color:#eaf4dc}
+.brand{font-weight:800}
+.pills{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto}
+.pill{background:#243224;border:1px solid #3d5340;border-radius:999px;padding:5px 10px;font-size:12px}
+.pill b{color:#fff}
+.stage{position:relative;border-radius:18px;overflow:hidden;min-height:0}
+.stage svg{width:100%;height:100%;display:block}
+.rail{background:#1d2b1d;border:1px solid #3d5340;border-radius:16px;padding:10px 12px;color:#eaf4dc;display:flex;flex-direction:column;gap:8px;min-height:0}
+.rail h2{margin:0;font-size:13px;color:#c6e37a}
+.tiny{font-size:12px;line-height:1.35;color:#c9d6b4}
+.math{font-family:ui-monospace,monospace;font-size:11px;background:#121c12;border-radius:8px;padding:6px 8px}
+.dock{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+button{border:0;border-radius:10px;padding:8px 12px;font-weight:700;cursor:pointer;background:#355035;color:#fff}
+button.primary{background:#6fa52e}button.ghost{background:#243224;color:#eaf4dc}
+button:disabled{opacity:.4;cursor:not-allowed}
+label.sl{color:#eaf4dc;font-size:12px;display:flex;align-items:center;gap:8px;min-width:220px}
+input[type=range]{width:140px}
+.fb{flex:1;min-width:160px;font-size:13px;font-weight:700;color:#eaf4dc}
+.good{color:#9be37a}.bad{color:#ffb3a6}
+.meter{height:8px;background:#121c12;border-radius:99px;overflow:hidden}
+.meter i{display:block;height:100%;background:#c6e37a}
+@media(max-width:860px){.app{grid-template-columns:1fr;grid-template-rows:48px minmax(0,1fr) auto 70px}.rail{max-height:88px}}
 </style>
 </head>
 <body>
-<main>
-  <h1>🌳 Liucian's Overfit Orchard</h1>
-  <div class="sub">Fit a curve to <strong>training apples</strong>, then harvest a <strong>held-out orchard</strong>. A wiggly memory of every apple often loses to a simpler pattern.</div>
-
-  <div class="grid metrics">
-    <div class="metric"><div class="label">Orchard</div><div id="mLevel" class="value">1 / 3</div></div>
-    <div class="metric"><div class="label">Curve degree</div><div id="mDeg" class="value">2</div></div>
-    <div class="metric"><div class="label">Train loss</div><div id="mTrain" class="value">—</div></div>
-    <div class="metric"><div class="label">Test loss</div><div id="mTest" class="value">hidden</div></div>
-  </div>
-
-  <div class="grid two" style="margin-top:15px">
-    <section class="card">
-      <h2>1. Grow a harvest curve</h2>
-      <div class="tiny">Dots are training apples. The dashed line is the true growth pattern. Ghost apples appear only when you harvest.</div>
-      <div class="legend">
-        <span class="pill">● Training apples</span>
-        <span class="pill">◌ Test apples (after harvest)</span>
-        <span class="pill">— Your fit</span>
-        <span class="pill">- - True pattern</span>
-      </div>
-      <svg id="plot" viewBox="0 0 680 420" role="img" aria-label="Scatter plot of apples versus hours in the sun">
-        <rect x="58" y="28" width="580" height="340" rx="14" fill="#f8f8f8" stroke="#d1d5db"/>
-        <g id="grid"></g>
-        <path id="truth" fill="none" stroke="#9ca3af" stroke-width="2" stroke-dasharray="6 5"/>
-        <path id="fit" fill="none" stroke="#111827" stroke-width="3"/>
-        <g id="pts"></g>
-        <text x="348" y="400" text-anchor="middle" font-size="13" fill="#6b7280">Hours in the sun →</text>
-        <text x="18" y="210" text-anchor="middle" font-size="13" fill="#6b7280" transform="rotate(-90 18 210)">Apple plumpness →</text>
-      </svg>
-      <div class="box">
-        <label for="deg">Memory / degree: <b id="degOut">2</b> (1 = simple line, 8 = memorizes wiggles)</label>
-        <input id="deg" type="range" min="1" max="8" value="2" step="1">
-      </div>
-      <button id="harvestBtn" class="primary" type="button">🍎 Harvest test orchard</button>
-      <button id="nextBtn" type="button" disabled>Next orchard</button>
-      <button id="resetBtn" type="button">Replay</button>
-      <div id="feedback" class="feedback" aria-live="polite">Slide degree, watch train loss, then harvest to reveal test apples.</div>
-    </section>
-
-    <section class="card">
-      <h2>2. Why test data matters</h2>
-      <div class="box">
-        <b>🎯 Challenge</b>
-        <div class="tiny" style="margin-top:6px">On each orchard, harvest with <strong>test loss ≤ 0.12</strong>. High degree often looks perfect on training apples and fails on new trees.</div>
-        <div>Orchards won: <strong id="won">0 / 3</strong></div>
-        <div id="challenge" class="feedback"></div>
-      </div>
-      <div class="box">
-        <b>Liucian's notebook</b>
-        <div id="note" class="tiny" style="margin-top:6px">A model that only repeats the training set is like Liucian memorizing which apple hung on which branch — useless in the next row of trees.</div>
-      </div>
-      <div class="box">
-        <b>Concept</b>
-        <div class="math">ŷ(x) = w₀ + w₁x + … + w_d xᵈ</div>
-        <div class="math">train MSE vs test MSE</div>
-        <div class="tiny" style="margin-top:8px"><strong>Overfitting</strong> is when train loss keeps dropping while test loss rises. Prefer the degree that generalizes, not the one that memorizes the outlier.</div>
-      </div>
-    </section>
-  </div>
-</main>
+<div class="app">
+  <header class="hud">
+    <div class="brand">🌳 Overfit Orchard</div>
+    <div class="pills">
+      <span class="pill">Orchard <b id="mLevel">1/3</b></span>
+      <span class="pill">Degree <b id="mDeg">2</b></span>
+      <span class="pill">Train loss <b id="mTrain">—</b></span>
+      <span class="pill">Test loss <b id="mTest">hidden</b></span>
+      <span class="pill">Won <b id="won">0/3</b></span>
+    </div>
+  </header>
+  <section class="stage">
+    <svg id="plot" viewBox="0 0 1100 560" preserveAspectRatio="xMidYMid slice">
+      <defs>
+        <linearGradient id="dawn" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#f3c27a"/><stop offset=".45" stop-color="#7eb3d4"/><stop offset="1" stop-color="#2f5a38"/>
+        </linearGradient>
+      </defs>
+      <rect width="1100" height="560" fill="url(#dawn)"/>
+      <ellipse cx="180" cy="430" rx="160" ry="40" fill="#2a4a2e"/>
+      <ellipse cx="880" cy="450" rx="200" ry="46" fill="#274528"/>
+      <path d="M70 390 C90 300 130 300 140 390 Z" fill="#1e3a22"/>
+      <path d="M960 410 C980 300 1040 300 1050 410 Z" fill="#1e3a22"/>
+      <circle cx="980" cy="78" r="34" fill="#ffe7a3"/>
+      <rect x="70" y="70" width="800" height="400" rx="16" fill="#f7f1df" opacity=".88"/>
+      <g id="grid"></g>
+      <path id="truth" fill="none" stroke="#7a8a6a" stroke-width="2" stroke-dasharray="7 6"/>
+      <path id="fit" fill="none" stroke="#1f4d24" stroke-width="4" stroke-linecap="round"/>
+      <g id="stems"></g>
+      <g id="pts"></g>
+      <text x="470" y="492" text-anchor="middle" font-size="13" fill="#355035">Hours in the sun →</text>
+      <text x="28" y="280" text-anchor="middle" font-size="13" fill="#355035" transform="rotate(-90 28 280)">Plumpness →</text>
+    </svg>
+  </section>
+  <aside class="rail">
+    <h2>Train vs test</h2>
+    <div class="tiny">Solid apples are training. Harvest reveals ghost apples. A wiggly curve can memorize the odd high apple.</div>
+    <div>Train<div class="meter"><i id="trainBar"></i></div></div>
+    <div>Test<div class="meter"><i id="testBar"></i></div></div>
+    <div class="math">ŷ = w₀ + w₁x + … + w_d xᵈ</div>
+    <div class="tiny" id="note">Keys: − / + change degree. Enter harvests.</div>
+    <div class="tiny" id="challenge"></div>
+  </aside>
+  <footer class="dock">
+    <label class="sl">Memory / degree <b id="degOut">2</b>
+      <input id="deg" type="range" min="1" max="8" value="2" step="1">
+    </label>
+    <button class="primary" id="harvestBtn" type="button">Harvest</button>
+    <button class="ghost" id="nextBtn" type="button" disabled>Next orchard</button>
+    <button class="ghost" id="resetBtn" type="button">Replay</button>
+    <div class="fb" id="feedback">Fit the training apples, then harvest.</div>
+  </footer>
+</div>
 <script>
 (() => {
   const lp = window.LearnPlay || {score(){},answer(){},taskStart(){},taskEnd(){},complete(){}};
-  const $ = (id) => document.getElementById(id);
-  const left = 58, top = 28, w = 580, h = 340;
-  const sx = (x) => left + x * w;
-  const sy = (y) => top + h - y * h;
-  let level = 0, harvested = false, wins = 0, train = [], test = [], coefs = [];
+  const $ = id => document.getElementById(id);
+  const left=90, top=86, w=760, h=360;
+  const sx = x => left + x * w;
+  const sy = y => top + h - y * h;
+  let level=0, harvested=false, wins=0, train=[], test=[], coefs=[];
   const levels = [
-    { noise: 0.06, outlier: true, nTrain: 12, nTest: 10, label: "calm orchard" },
-    { noise: 0.10, outlier: true, nTrain: 12, nTest: 10, label: "windy orchard" },
-    { noise: 0.14, outlier: true, nTrain: 10, nTest: 10, label: "messy orchard" }
+    {noise:.06,outlier:true,nTrain:12,nTest:10,label:"calm orchard"},
+    {noise:.10,outlier:true,nTrain:12,nTest:10,label:"windy orchard"},
+    {noise:.14,outlier:true,nTrain:10,nTest:10,label:"messy orchard"}
   ];
-
-  function truth(x) { return 0.18 + 0.62 * x + 0.12 * Math.sin(6.2 * x); }
-
-  function addSvg(tag, attrs, parent) {
-    const e = document.createElementNS("http://www.w3.org/2000/svg", tag);
-    Object.entries(attrs).forEach(([k, v]) => e.setAttribute(k, v));
-    parent.appendChild(e);
-    return e;
-  }
-
-  function randn() {
-    let u = 0, v = 0;
-    while (!u) u = Math.random();
-    while (!v) v = Math.random();
-    return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
-  }
-
-  function sample(n, noise, outlier) {
-    const pts = [];
-    for (let i = 0; i < n; i++) {
-      const x = 0.06 + 0.88 * Math.random();
-      let y = truth(x) + noise * randn();
-      y = Math.max(0.02, Math.min(0.98, y));
-      pts.push({ x, y });
-    }
-    if (outlier) {
-      pts[0] = { x: 0.22 + Math.random() * 0.15, y: 0.92 };
-    }
+  function truth(x){return .18+.62*x+.12*Math.sin(6.2*x)}
+  function add(tag,attrs,p){const e=document.createElementNS("http://www.w3.org/2000/svg",tag);Object.entries(attrs).forEach(([k,v])=>e.setAttribute(k,v));p.appendChild(e);return e}
+  function randn(){let u=0,v=0;while(!u)u=Math.random();while(!v)v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v)}
+  function sample(n,noise,outlier){
+    const pts=[];
+    for(let i=0;i<n;i++){const x=.06+.88*Math.random();pts.push({x,y:Math.max(.02,Math.min(.98,truth(x)+noise*randn())),out:false})}
+    if(outlier) pts[0]={x:.22+Math.random()*.15,y:.92,out:true};
     return pts;
   }
-
-  function solve(A, b) {
-    const n = b.length;
-    const M = A.map((row, i) => row.concat([b[i]]));
-    for (let i = 0; i < n; i++) {
-      let max = i;
-      for (let r = i + 1; r < n; r++) if (Math.abs(M[r][i]) > Math.abs(M[max][i])) max = r;
-      [M[i], M[max]] = [M[max], M[i]];
-      const piv = M[i][i] || 1e-12;
-      for (let c = i; c <= n; c++) M[i][c] /= piv;
-      for (let r = 0; r < n; r++) {
-        if (r === i) continue;
-        const f = M[r][i];
-        for (let c = i; c <= n; c++) M[r][c] -= f * M[i][c];
-      }
+  function solve(A,b){
+    const n=b.length,M=A.map((row,i)=>row.concat([b[i]]));
+    for(let i=0;i<n;i++){
+      let max=i; for(let r=i+1;r<n;r++) if(Math.abs(M[r][i])>Math.abs(M[max][i])) max=r;
+      [M[i],M[max]]=[M[max],M[i]]; const piv=M[i][i]||1e-12;
+      for(let c=i;c<=n;c++) M[i][c]/=piv;
+      for(let r=0;r<n;r++){if(r===i)continue;const f=M[r][i]; for(let c=i;c<=n;c++) M[r][c]-=f*M[i][c]}
     }
-    return M.map(row => row[n]);
+    return M.map(row=>row[n]);
   }
-
-  function fit(pts, deg) {
-    const m = deg + 1;
-    const A = Array.from({ length: m }, () => Array(m).fill(0));
-    const b = Array(m).fill(0);
-    pts.forEach(p => {
-      const row = [];
-      let v = 1;
-      for (let j = 0; j < m; j++) { row.push(v); v *= p.x; }
-      for (let j = 0; j < m; j++) {
-        b[j] += row[j] * p.y;
-        for (let k = 0; k < m; k++) A[j][k] += row[j] * row[k];
-      }
-    });
-    for (let j = 0; j < m; j++) A[j][j] += 1e-5;
-    return solve(A, b);
+  function fit(pts,deg){
+    const m=deg+1,A=Array.from({length:m},()=>Array(m).fill(0)),b=Array(m).fill(0);
+    pts.forEach(p=>{const row=[];let v=1;for(let j=0;j<m;j++){row.push(v);v*=p.x}
+      for(let j=0;j<m;j++){b[j]+=row[j]*p.y; for(let k=0;k<m;k++) A[j][k]+=row[j]*row[k]}});
+    for(let j=0;j<m;j++) A[j][j]+=1e-5;
+    return solve(A,b);
   }
-
-  function pred(x, c) {
-    let y = 0, v = 1;
-    for (let j = 0; j < c.length; j++) { y += c[j] * v; v *= x; }
-    return y;
+  function pred(x,c){let y=0,v=1;for(let j=0;j<c.length;j++){y+=c[j]*v;v*=x}return y}
+  function mse(pts,c){return pts.reduce((s,p)=>s+(pred(p.x,c)-p.y)**2,0)/pts.length}
+  function pathFor(fn){let d="";for(let i=0;i<=90;i++){const x=i/90,y=Math.max(-.04,Math.min(1.04,fn(x)));d+=(i?"L":"M")+sx(x)+" "+sy(y)+" "}return d}
+  function apple(p,g,ghost){
+    const x=sx(p.x),y=sy(p.y);
+    add("line",{x1:x,y1:y-8,x2:x,y2:y-16,stroke:"#2f5a38","stroke-width":2},g);
+    add("ellipse",{cx:x,cy:y,rx:ghost?8:7,ry:ghost?9:8,fill:ghost?"none":(p.out?"#d94b3a":"#d4553a"),stroke:p.out?"#7a1d14":"#2f5a38","stroke-width":ghost?2:1.5,"stroke-dasharray":ghost?"4 3":"0"},g);
   }
-
-  function mse(pts, c) {
-    if (!pts.length) return 0;
-    return pts.reduce((s, p) => s + (pred(p.x, c) - p.y) ** 2, 0) / pts.length;
+  function draw(){
+    const deg=+$("deg").value; coefs=fit(train,deg);
+    const tr=mse(train,coefs);
+    $("mDeg").textContent=deg; $("degOut").textContent=deg; $("mTrain").textContent=tr.toFixed(3);
+    $("fit").setAttribute("d",pathFor(x=>pred(x,coefs)));
+    $("truth").setAttribute("d",pathFor(truth));
+    const stems=$("stems"); stems.innerHTML="";
+    train.forEach(p=>add("line",{x1:sx(p.x),y1:sy(p.y),x2:sx(p.x),y2:sy(Math.max(0,Math.min(1,pred(p.x,coefs)))),stroke:"#8aa078","stroke-width":1.2,opacity:.7},stems));
+    const g=$("pts"); g.innerHTML="";
+    train.forEach(p=>apple(p,g,false));
+    $("trainBar").style.width=Math.min(100,tr*400)+"%";
+    if(harvested){
+      test.forEach(p=>apple(p,g,true));
+      const te=mse(test,coefs);
+      $("mTest").textContent=te.toFixed(3);
+      $("testBar").style.width=Math.min(100,te*400)+"%";
+    } else { $("mTest").textContent="hidden"; $("testBar").style.width="0%"; }
   }
-
-  function pathFor(fn) {
-    let d = "";
-    for (let i = 0; i <= 80; i++) {
-      const x = i / 80;
-      const y = Math.max(-0.05, Math.min(1.05, fn(x)));
-      d += (i ? "L" : "M") + sx(x) + " " + sy(y) + " ";
+  const grid=$("grid");
+  for(let i=0;i<=5;i++){
+    add("line",{x1:left+(i/5)*w,y1:top,x2:left+(i/5)*w,y2:top+h,stroke:"#d7d0b8"},grid);
+    add("line",{x1:left,y1:top+(i/5)*h,x2:left+w,y2:top+(i/5)*h,stroke:"#d7d0b8"},grid);
+  }
+  function startLevel(){
+    const cfg=levels[level];
+    train=sample(cfg.nTrain,cfg.noise,cfg.outlier); test=sample(cfg.nTest,cfg.noise,false);
+    harvested=false; $("nextBtn").disabled=true; $("harvestBtn").disabled=false; $("deg").disabled=false;
+    $("mLevel").textContent=`${level+1}/3`;
+    $("feedback").textContent=`${cfg.label}: fit, then harvest. Red apple is an outlier.`;
+    $("feedback").className="fb"; $("note").textContent="Watch train loss as you add wiggles.";
+    lp.taskStart("orchard-"+level); draw();
+  }
+  $("deg").oninput=()=>{if(!harvested) draw()};
+  function harvest(){
+    if(harvested) return;
+    harvested=true; $("deg").disabled=true; draw();
+    const te=mse(test,coefs), tr=mse(train,coefs), ok=te<=.12;
+    if(ok) wins++; $("won").textContent=`${wins}/3`;
+    $("harvestBtn").disabled=true;
+    $("feedback").innerHTML=ok?`🍎 Good harvest. Test ${te.toFixed(3)} / train ${tr.toFixed(3)}.`:`🍂 Overfit. Test ${te.toFixed(3)} vs train ${tr.toFixed(3)}.`;
+    $("feedback").className="fb "+(ok?"good":"bad");
+    $("note").textContent=tr+.03<te?"Classic overfit: training looks great, new trees do not.":"Train and test are close — the pattern is real.";
+    lp.taskEnd("orchard-"+level);
+    lp.answer({correct:ok,taskId:"orchard-"+level,points:ok?15:4});
+    lp.score(ok?15:4);
+    if(level===2){
+      const pass=wins>=2;
+      $("challenge").innerHTML=pass?`⭐ ${wins}/3 generalized.`:`Won ${wins}/3. Try degree 2–3.`;
+      $("challenge").className=pass?"good":"bad";
+      lp.complete({score:wins*15});
     }
-    return d;
+    if(level<2) $("nextBtn").disabled=false;
   }
-
-  function draw() {
-    const deg = +$("deg").value;
-    coefs = fit(train, deg);
-    const tr = mse(train, coefs);
-    $("mDeg").textContent = deg;
-    $("degOut").textContent = deg;
-    $("mTrain").textContent = tr.toFixed(3);
-    $("fit").setAttribute("d", pathFor(x => pred(x, coefs)));
-    $("truth").setAttribute("d", pathFor(truth));
-    const g = $("pts");
-    g.innerHTML = "";
-    train.forEach(p => addSvg("circle", { cx: sx(p.x), cy: sy(p.y), r: 6, fill: "#4b5563", stroke: "#111827", "stroke-width": 1.5 }, g));
-    if (harvested) {
-      test.forEach(p => addSvg("circle", { cx: sx(p.x), cy: sy(p.y), r: 7, fill: "none", stroke: "#6b7280", "stroke-width": 2 }, g));
-      $("mTest").textContent = mse(test, coefs).toFixed(3);
-    } else {
-      $("mTest").textContent = "hidden";
-    }
-  }
-
-  function startLevel() {
-    const cfg = levels[level];
-    train = sample(cfg.nTrain, cfg.noise, cfg.outlier);
-    test = sample(cfg.nTest, cfg.noise, false);
-    harvested = false;
-    $("nextBtn").disabled = true;
-    $("harvestBtn").disabled = false;
-    $("mLevel").textContent = `${level + 1} / 3`;
-    $("feedback").textContent = `Orchard ${level + 1} (${cfg.label}): fit the training apples, then harvest.`;
-    $("note").textContent = "Watch train loss as you add wiggles. Harvest is the only honest score.";
-    lp.taskStart("orchard-" + level);
-    draw();
-  }
-
-  const grid = $("grid");
-  for (let i = 0; i <= 5; i++) {
-    const x = left + (i / 5) * w, y = top + (i / 5) * h;
-    addSvg("line", { x1: x, y1: top, x2: x, y2: top + h, stroke: "#e5e7eb" }, grid);
-    addSvg("line", { x1: left, y1: y, x2: left + w, y2: y, stroke: "#e5e7eb" }, grid);
-  }
-
-  $("deg").oninput = () => { if (!harvested) draw(); };
-  $("harvestBtn").onclick = () => {
-    harvested = true;
-    draw();
-    const te = mse(test, coefs);
-    const tr = mse(train, coefs);
-    const ok = te <= 0.12;
-    if (ok) wins++;
-    $("won").textContent = `${wins} / 3`;
-    $("harvestBtn").disabled = true;
-    $("nextBtn").disabled = level >= 2;
-    $("feedback").innerHTML = ok
-      ? `🍎 Good harvest! Test loss ${te.toFixed(3)} (train ${tr.toFixed(3)}). The curve generalized.`
-      : `🍂 Test loss ${te.toFixed(3)} vs train ${tr.toFixed(3)}. The model memorized training apples, including the odd one.`;
-    $("feedback").className = "feedback " + (ok ? "good" : "bad");
-    $("note").textContent = tr + 0.03 < te
-      ? "Classic overfit: training looks great, new trees do not."
-      : "Train and test are close — that usually means the pattern is real.";
-    lp.taskEnd("orchard-" + level);
-    lp.answer({ correct: ok, taskId: "orchard-" + level, points: ok ? 15 : 4 });
-    if (ok) lp.score(15); else lp.score(4);
-    if (level === 2) {
-      const pass = wins >= 2;
-      $("challenge").innerHTML = pass
-        ? `⭐ Challenge complete — ${wins}/3 orchards generalized.`
-        : `Won ${wins}/3. Try degree 2–3 instead of 7–8.`;
-      $("challenge").className = "feedback " + (pass ? "good" : "bad");
-      lp.complete({ score: wins * 15 });
-    }
-    if (level < 2) $("nextBtn").disabled = false;
-  };
-  $("nextBtn").onclick = () => {
-    $("feedback").className = "feedback";
-    level++;
-    startLevel();
-  };
-  $("resetBtn").onclick = () => {
-    level = 0; wins = 0;
-    $("won").textContent = "0 / 3";
-    $("challenge").textContent = "";
-    $("feedback").className = "feedback";
-    startLevel();
-  };
-
+  $("harvestBtn").onclick=harvest;
+  $("nextBtn").onclick=()=>{level++; startLevel()};
+  $("resetBtn").onclick=()=>{level=0;wins=0;$("won").textContent="0/3";$("challenge").textContent="";startLevel()};
+  window.addEventListener("keydown",e=>{
+    if(e.key==="+"||e.key==="=") {$("deg").value=Math.min(8,+$("deg").value+1); if(!harvested) draw()}
+    if(e.key==="-"||e.key==="_") {$("deg").value=Math.max(1,+$("deg").value-1); if(!harvested) draw()}
+    if(e.key==="Enter") harvest();
+  });
   startLevel();
 })();
 </script>

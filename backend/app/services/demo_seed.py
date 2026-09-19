@@ -104,11 +104,39 @@ def seed_demo_games() -> None:
             db.commit()
 
         seed_html_pack(db, admin.id)
+        refresh_seed_game_files(db)
         normalize_game_topics(db)
         detect_missing_languages(db)
         restore_missing_game_files(db)
     finally:
         db.close()
+
+
+def refresh_seed_game_files(db) -> None:
+    """Overwrite seeded HTML from the pack so graphic/gameplay updates land on restart."""
+    manifest_path = _seed_dir() / "manifest.json"
+    if not manifest_path.exists():
+        return
+    by_title = {
+        (item.get("title") or item["file"]): item
+        for item in json.loads(manifest_path.read_text(encoding="utf-8"))
+    }
+    changed = False
+    for game in db.query(Game).all():
+        item = by_title.get(game.title)
+        if not item:
+            continue
+        src = _seed_dir() / item["file"]
+        if not src.exists():
+            continue
+        html = src.read_text(encoding="utf-8", errors="replace")
+        save_uploaded_html(game.id, html, game.entry_path or "index.html")
+        desc = item.get("description") or game.description
+        if desc and game.description != desc:
+            game.description = desc
+        changed = True
+    if changed:
+        db.commit()
 
 
 def restore_missing_game_files(db) -> None:
