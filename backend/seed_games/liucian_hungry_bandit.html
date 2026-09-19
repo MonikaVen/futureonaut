@@ -185,7 +185,7 @@ button.primary{background:var(--accent);color:#fff}button:disabled{opacity:.45;c
       correct: treats >= 12,
       taskId: "kitchen-" + kitchen,
     });
-    lp.stage(kitchen + 1, 3, {complete: kitchen >= 2, points: treats, label: "Kitchen " + (kitchen + 1), id: "kitchen-" + kitchen});
+    if (window.LearnPlay) LearnPlay.stage(kitchen + 1, 3, {complete: kitchen >= 2, points: treats, label: "Kitchen " + (kitchen + 1), id: "kitchen-" + kitchen});
     $("feedback").innerHTML =
       `Kitchen done. Best bowl was <b>${NAMES[best]}</b> (p = ${oracle().toFixed(2)}). You got <b>${treats}</b> treats. Regret ≈ ${regret.toFixed(1)}.`;
     if (kitchen < 2) $("nextBtn").disabled = false;

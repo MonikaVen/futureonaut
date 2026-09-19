@@ -164,9 +164,11 @@ class CatalogCurationTests(unittest.TestCase):
             patch("app.services.demo_seed.write_game_preview"),
             patch("app.services.demo_seed._insert_seed_game") as insert,
         ):
-            hungry = SimpleNamespace(exists=lambda: True)
+            hungry = MagicMock()
+            hungry.exists.return_value = True
             hungry.read_text.return_value = "<html>new bandit</html>"
-            valley = SimpleNamespace(exists=lambda: True)
+            valley = MagicMock()
+            valley.exists.return_value = True
             valley.read_text.return_value = "<html>new valley</html>"
             seed_dir.return_value.__truediv__.side_effect = lambda name: (
                 hungry if name == "liucian_hungry_bandit.html" else valley

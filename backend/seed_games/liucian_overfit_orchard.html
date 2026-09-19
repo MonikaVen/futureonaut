@@ -247,7 +247,7 @@ svg{display:block;width:100%;height:auto}.feedback{min-height:24px;margin-top:10
     lp.taskEnd("orchard-" + level);
     lp.answer({ correct: ok, taskId: "orchard-" + level, points: ok ? 15 : 4 });
     if (ok) lp.score(15); else lp.score(4);
-    lp.stage(wins, 3, {complete: level === 2, points: ok ? 15 : 4, label: "Orchard " + (level + 1), id: "orchard-" + level});
+    if (window.LearnPlay) LearnPlay.stage(wins, 3, {complete: level === 2, points: ok ? 15 : 4, label: "Orchard " + (level + 1), id: "orchard-" + level});
     if (level === 2) {
       const pass = wins >= 2;
       $("challenge").innerHTML = pass

@@ -212,7 +212,7 @@ svg{display:block;width:100%;height:auto}.feedback{min-height:24px;margin-top:10
     $("feedback").className = "feedback " + (ok ? "good" : "bad");
     lp.taskEnd("wave-" + wave);
     lp.answer({ correct: ok, taskId: "wave-" + wave, points: Math.max(0, Math.round(f1 * 10)) });
-    lp.stage(wave + 1, waves.length, {complete: wave + 1 >= waves.length, points: Math.max(0, Math.round(f1 * 10)), label: waves[wave].name, id: "wave-" + wave});
+    if (window.LearnPlay) LearnPlay.stage(wave + 1, waves.length, {complete: wave + 1 >= waves.length, points: Math.max(0, Math.round(f1 * 10)), label: waves[wave].name, id: "wave-" + wave});
     if (wave < 3) $("nextBtn").disabled = false;
     else {
       const pass = score >= 80;

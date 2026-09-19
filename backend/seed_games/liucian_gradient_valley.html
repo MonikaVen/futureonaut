@@ -201,7 +201,7 @@ svg{display:block;width:100%;height:auto}.feedback{min-height:24px;margin-top:10
     lp.taskEnd("valley-" + level);
     lp.answer({ correct: true, taskId: "valley-" + level, points: 20 });
     lp.score(20);
-    lp.stage(wins, 3, {complete: wins >= 3, points: 20, label: "Valley " + (level + 1), id: "valley-" + level});
+    if (window.LearnPlay) LearnPlay.stage(wins, 3, {complete: wins >= 3, points: 20, label: "Valley " + (level + 1), id: "valley-" + level});
     if (level < 2) $("nextBtn").disabled = false;
     else wrap();
   }

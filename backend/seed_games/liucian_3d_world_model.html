@@ -387,7 +387,7 @@ select{padding:6px 8px;border:1px solid var(--border);border-radius:8px;backgrou
       lp.answer({correct: true, taskId: "room-" + (room + 1), points: 20 + bonus});
       lp.score(20 + bonus);
       lp.taskEnd("room-" + (room + 1));
-      lp.stage(wins, 3, {complete: wins >= 3, points: 20 + bonus, label: "Room " + (room + 1), id: "room-" + (room + 1)});
+      if (window.LearnPlay) LearnPlay.stage(wins, 3, {complete: wins >= 3, points: 20 + bonus, label: "Room " + (room + 1), id: "room-" + (room + 1)});
       if (wins >= 3) {
         $("challenge").className = "feedback good";
         $("challenge").textContent = "All rooms solved. The configured dynamics matched the hidden world.";
