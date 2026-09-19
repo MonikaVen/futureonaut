@@ -32,7 +32,6 @@ New playable AI labs (seeded automatically):
 - **Liucian's Precision Pounce** — thresholds, precision, and recall
 - **Liucian's Gradient Valley** — learning rate on a loss landscape
 
-The play page uses a wide, full-height window so these games stay on one screen.
 
 ### Local development (without rebuilding frontend)
 

@@ -1,15 +1,14 @@
-import { NavLink, Outlet, Link, useLocation } from "react-router-dom";
+import { NavLink, Outlet, Link } from "react-router-dom";
 import { useAuth } from "./auth";
 import { UI_LANGS, useLanguage } from "./language";
 
 export function Shell() {
   const { user, logout, loading } = useAuth();
   const { lang, setLang, t } = useLanguage();
-  const playing = useLocation().pathname.startsWith("/play/");
   if (loading) return <div className="app-shell">Loading…</div>;
 
   return (
-    <div className={playing ? "app-shell play-mode" : "app-shell"}>
+    <div className="app-shell">
       <header className="topnav">
         <NavLink to="/" className="brand">
           Futureonaut
@@ -56,11 +55,9 @@ export function Shell() {
         </nav>
       </header>
 
-      {!playing && (
-        <section className="mission">
-          <p>{t("mission")}</p>
-        </section>
-      )}
+      <section className="mission">
+        <p>{t("mission")}</p>
+      </section>
 
       <Outlet />
     </div>

@@ -113,26 +113,13 @@ export function PlayPage() {
 
   return (
     <div className="player-wrap">
-      <div className="player-bar">
-        <div className="player-title">
-          <h1>{game.title}</h1>
+      <div className="row" style={{ justifyContent: "space-between" }}>
+        <div>
+          <h1 style={{ fontFamily: "var(--font-display)", margin: 0 }}>{game.title}</h1>
           <p className="meta">
-            {t("detected")}: {(game.source_language || "en").toUpperCase()} → {lang.toUpperCase()}
-            {!user ? " · Guest — not saved" : ""}
+            {game.description} · {t("detected")}: {(game.source_language || "en").toUpperCase()} →{" "}
+            {lang.toUpperCase()}
           </p>
-        </div>
-        <div className="metrics">
-          <span>
-            Points <b>{points}</b>
-          </span>
-          <span>
-            Correct <b>
-              {correct}/{attempts}
-            </b>
-          </span>
-          <span>
-            Task time <b>{(timeMs / 1000).toFixed(1)}s</b>
-          </span>
         </div>
         {user ? (
           <Link className="btn secondary" to="/dashboard">
@@ -143,6 +130,20 @@ export function PlayPage() {
             {t("signInToTrack")}
           </Link>
         )}
+      </div>
+      {!user && <p className="guest-note">{t("guestPlayNote")}</p>}
+      <div className="metrics">
+        <span>
+          Points <b>{points}</b>
+        </span>
+        <span>
+          Correct <b>
+            {correct}/{attempts}
+          </b>
+        </span>
+        <span>
+          Task time <b>{(timeMs / 1000).toFixed(1)}s</b>
+        </span>
       </div>
       {translating && <p className="meta">{t("translating")}</p>}
       <iframe
