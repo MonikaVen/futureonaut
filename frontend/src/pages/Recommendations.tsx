@@ -23,6 +23,7 @@ export function RecommendationsPage() {
         {items.map((r) => (
           <article key={r.game.id} className="game-tile">
             <h3>{r.game.title}</h3>
+            {r.game.owner_name && <p className="meta">by {r.game.owner_name}</p>}
             <p className="meta">{r.reason}</p>
             <div className="tags">
               <span className="tag">Lv {r.game.difficulty}</span>
