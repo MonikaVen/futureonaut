@@ -13,6 +13,9 @@ class Settings(BaseSettings):
     refresh_token_expire_days: int = 14
     admin_email: str = "admin@example.com"
     admin_password: str = "admin12345"
+    creator_email: str = "futureonaut@example.com"
+    creator_password: str = "futureonaut"
+    creator_name: str = "Futureonaut"
     openai_api_key: str = ""
     openai_base_url: str = "https://api.openai.com/v1"
     openai_model: str = "gpt-4o-mini"

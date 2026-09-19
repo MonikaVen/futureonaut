@@ -18,12 +18,21 @@ docker compose up --build
 
 Open **http://localhost:3080**
 
-Default admin (from `.env`):
+Default accounts (from `.env`):
 
-- Email: `admin@example.com`
-- Password: `admin12345`
+- Admin: `admin@example.com` / `admin12345`
+- Creator **Futureonaut**: `futureonaut@example.com` / `futureonaut`
 
-Promote a registered learner to **creator** in the Admin panel to unlock upload / template / AI tools.
+Seeded HTML labs are published as Futureonaut. Sign in as that creator to manage them. Promote any other registered learner to **creator** in the Admin panel to unlock upload / template / AI tools.
+
+New playable AI labs (seeded automatically):
+
+- **Liucian's Hungry Bandit** — exploration vs exploitation (ε-greedy)
+- **Liucian's Overfit Orchard** — train loss vs test loss
+- **Liucian's Precision Pounce** — thresholds, precision, and recall
+- **Liucian's Gradient Valley** — learning rate on a loss landscape
+- **Liucian's 3D World Model** — configure dynamics so predicted obstacle and target trajectories stay true
+
 
 ### Local development (without rebuilding frontend)
 

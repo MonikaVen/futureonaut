@@ -15,6 +15,7 @@ def game_to_out(game: Game) -> GameOut:
         title=game.title,
         description=game.description,
         owner_id=game.owner_id,
+        owner_name=game.owner.display_name if getattr(game, "owner", None) else None,
         source=game.source,
         topic_tags=game.topic_tags or [],
         difficulty=game.difficulty,
@@ -60,7 +61,7 @@ def recommend_games(db: Session, user_id: UUID, limit: int = 8) -> list[Recommen
     )[:5]
     avg_diff = round(difficulty_sum / difficulty_n) if difficulty_n else 1
 
-    all_games = db.query(Game).order_by(Game.created_at.desc()).all()
+    all_games = db.query(Game).options(joinedload(Game.owner)).order_by(Game.created_at.desc()).all()
     scored: list[RecommendationOut] = []
 
     for game in all_games:

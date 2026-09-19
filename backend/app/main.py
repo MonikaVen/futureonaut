@@ -9,7 +9,7 @@ from app.config import get_settings
 from app.database import Base, engine
 from app.routers import auth, games, sessions
 from app.routers.dashboard import admin_router, router as dashboard_router
-from app.seed import seed_admin
+from app.seed import seed_admin, seed_futureonaut
 from app.services.demo_seed import seed_demo_games
 
 
@@ -30,6 +30,7 @@ async def lifespan(_: FastAPI):
     Base.metadata.create_all(bind=engine)
     ensure_schema()
     seed_admin()
+    seed_futureonaut()
     seed_demo_games()
     yield
 
