@@ -7,7 +7,7 @@
 <style>
 :root{--bg:#f7f7f8;--card:#fff;--text:#1f2937;--muted:#6b7280;--border:#d1d5db;--accent:#4b5563;--good:#237a4b;--bad:#b42318;--gold:#c27a1a}
 *{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,sans-serif;color:var(--text);background:#fff}
-main{max-width:1100px;margin:auto;padding:22px}h1{margin:0 0 6px}h2{margin:0 0 8px;font-size:18px}
+main{max-width:1100px;margin:auto;padding:14px 16px 18px}h1{margin:0 0 6px;font-size:28px}h2{margin:0 0 8px;font-size:18px}
 .sub,.tiny{color:var(--muted)}.sub{margin-bottom:16px}.tiny{font-size:13px}
 .grid{display:grid;gap:14px}.metrics{grid-template-columns:repeat(4,1fr)}.two{grid-template-columns:1.2fr .8fr}
 .card,.metric{border:1px solid var(--border);border-radius:16px;padding:14px;background:var(--card)}
@@ -43,7 +43,7 @@ select{padding:6px 8px;border:1px solid var(--border);border-radius:8px;backgrou
     <section class="card">
       <h2>1. Imagine, then walk</h2>
       <div class="tiny">Drag the room to look around. Yellow = your imagined path. Purple ghosts = people your world model expects. The real mouse and people only move when you commit.</div>
-      <canvas id="view" width="760" height="460" aria-label="3D room with Liucian, furniture, moving people, and a mouse"></canvas>
+      <canvas id="view" width="760" height="520" aria-label="3D room with Liucian, furniture, moving people, and a mouse"></canvas>
       <div class="legend">
         <span><span class="dot" style="background:#d8a66d"></span>Liucian</span>
         <span><span class="dot" style="background:#d8dce7"></span>Mouse</span>
@@ -156,7 +156,7 @@ select{padding:6px 8px;border:1px solid var(--border);border-radius:8px;backgrou
 
   let room = 0, wins = 0, score = 0, moves = 18, over = false;
   let cat, people, mouse, selected = 0, rollouts = [], lastErr = null, lastGhost = null;
-  const cam = {yaw: 0.42, pitch: 0.52, dist: 13.2};
+  const cam = {yaw: 0.28, pitch: 0.98, dist: 11.2};
 
   function wm() {
     return {
@@ -433,8 +433,8 @@ select{padding:6px 8px;border:1px solid var(--border);border-radius:8px;backgrou
     let ry = dy * cp - rz * sp;
     rz = dy * sp + rz * cp;
     rz += cam.dist;
-    const f = 520 / Math.max(0.8, rz);
-    return {x: W * 0.5 + rx * f, y: H * 0.58 - ry * f, d: rz};
+    const f = 640 / Math.max(0.8, rz);
+    return {x: W * 0.52 + rx * f, y: H * 0.62 - ry * f, d: rz};
   }
 
   function strokePoly(pts, fill, stroke, width) {
@@ -488,19 +488,31 @@ select{padding:6px 8px;border:1px solid var(--border);border-radius:8px;backgrou
   }
 
   function drawFloor() {
-    ctx.fillStyle = "#e8edf3";
+    const sky = ctx.createLinearGradient(0, 0, 0, H * 0.45);
+    sky.addColorStop(0, "#9eb4c9");
+    sky.addColorStop(1, "#cfd8e3");
+    ctx.fillStyle = sky;
     ctx.fillRect(0, 0, W, H);
-    for (let x = -4.5; x <= 4.5; x += 1.5) {
-      const a = project(x, 0, -4.5), b = project(x, 0, 4.5);
-      ctx.strokeStyle = "#d5dde6"; ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    for (let xi = -5; xi < 5; xi += 1) {
+      for (let zi = -5; zi < 5; zi += 1) {
+        const tile = [
+          project(xi, 0, zi), project(xi + 1, 0, zi), project(xi + 1, 0, zi + 1), project(xi, 0, zi + 1),
+        ];
+        const light = ((xi + zi) & 1) === 0;
+        strokePoly(tile, light ? "#e7edf4" : "#c5d0dc", "#9aa8b8", 0.6);
+      }
     }
-    for (let z = -4.5; z <= 4.5; z += 1.5) {
-      const a = project(-4.5, 0, z), b = project(4.5, 0, z);
-      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    const back = [project(-5, 0, -5), project(5, 0, -5), project(5, 2.1, -5), project(-5, 2.1, -5)];
+    strokePoly(back, "rgba(150,166,184,.62)", "#6f7d8d", 1.2);
+  }
+
+  function drawShadow(x, z, r) {
+    const pts = [];
+    for (let i = 0; i < 10; i++) {
+      const a = (i / 10) * Math.PI * 2;
+      pts.push(project(x + Math.cos(a) * r, 0.02, z + Math.sin(a) * r));
     }
-    const wall = [project(-4.7, 0, -4.7), project(4.7, 0, -4.7), project(4.7, 1.6, -4.7), project(-4.7, 1.6, -4.7)];
-    strokePoly(wall, "rgba(210,218,228,.55)", "#c5ced8", 1);
+    strokePoly(pts, "rgba(31,41,55,.22)", null, 0);
   }
 
   function drawPath(pts, color, width, dash) {
@@ -520,18 +532,29 @@ select{padding:6px 8px;border:1px solid var(--border);border-radius:8px;backgrou
     const sprites = [];
     furniture.forEach((o) => sprites.push({d: project(o.x, o.h / 2, o.z).d, draw: () => o.kind === "cyl" ? drawCyl(o.x, o.z, o.r, o.h, o.color) : drawBox(o)}));
     people.forEach((p) => sprites.push({d: project(p.x, 0.7, p.z).d, draw: () => {
+      drawShadow(p.x, p.z, PERSON_R + 0.12);
       drawCyl(p.x, p.z, PERSON_R, 1.15, "#b997ff");
       const tip = project(p.x + p.vx * 1.4, 0.7, p.z + p.vz * 1.4);
       const base = project(p.x, 0.7, p.z);
       ctx.strokeStyle = "#5b21b6"; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.moveTo(base.x, base.y); ctx.lineTo(tip.x, tip.y); ctx.stroke();
     }}));
-    sprites.push({d: project(mouse.x, 0.2, mouse.z).d, draw: () => drawCyl(mouse.x, mouse.z, MOUSE_R, 0.28, "#e5e7eb")});
+    sprites.push({d: project(mouse.x, 0.2, mouse.z).d, draw: () => {
+      drawShadow(mouse.x, mouse.z, MOUSE_R + 0.1);
+      drawCyl(mouse.x, mouse.z, MOUSE_R, 0.28, "#f3f4f6");
+      const q = project(mouse.x, 0.55, mouse.z);
+      ctx.fillStyle = "#111827"; ctx.font = "12px Inter,system-ui,sans-serif";
+      ctx.fillText("mouse", q.x - 16, q.y);
+    }});
     sprites.push({d: project(cat.x, 0.3, cat.z).d, draw: () => {
+      drawShadow(cat.x, cat.z, 0.42);
       drawBox({x: cat.x, z: cat.z, w: 0.7, d: 0.42, h: 0.38, color: "#d8a66d"});
       const hx = cat.x + Math.cos(cat.yaw) * 0.28;
       const hz = cat.z + Math.sin(cat.yaw) * 0.28;
       drawCyl(hx, hz, 0.2, 0.42, "#e0b27a");
+      const q = project(cat.x, 0.7, cat.z);
+      ctx.fillStyle = "#111827"; ctx.font = "12px Inter,system-ui,sans-serif";
+      ctx.fillText("Liucian", q.x - 18, q.y);
     }});
     const chosen = rollouts.find((r) => r.a === selected);
     rollouts.forEach((r) => {
