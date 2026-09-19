@@ -63,6 +63,7 @@ class Game(Base):
     entry_path: Mapped[str] = mapped_column(String(500), nullable=False, default="index.html")
     template_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
     source_language: Mapped[str] = mapped_column(String(16), nullable=False, default="en")
+    files: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     owner: Mapped[User] = relationship(back_populates="games")

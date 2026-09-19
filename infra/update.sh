@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Rebuild and roll out Futureonaut web + API containers.
-# Does not create, replace, or reseed PostgreSQL. DATABASE_URL and other
-# existing Container App environment variables are left unchanged.
+# Does not create, replace, or reseed PostgreSQL. Games already stored in
+# the database are kept; the seed pack is not replayed. DATABASE_URL and
+# other existing Container App environment variables are left unchanged.
 set -euo pipefail
 
 RG="${RG:-rg-futureonaut}"

@@ -35,6 +35,7 @@ az postgres flexible-server create \
   --admin-user "$PG_ADMIN" --admin-password "$PG_PASSWORD" \
   --sku-name Standard_B1ms --tier Burstable --storage-size 32 \
   --version 16 --public-access 0.0.0.0-255.255.255.255 \
+  --backup-retention 7 \
   --yes -o none
 az postgres flexible-server db create -g "$RG" -s "$PG_SERVER" -d futureonaut -o none
 PG_HOST=$(az postgres flexible-server show -g "$RG" -n "$PG_SERVER" --query fullyQualifiedDomainName -o tsv)

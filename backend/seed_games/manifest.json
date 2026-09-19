@@ -56,7 +56,7 @@
   {
     "file": "liucian_gradient_valley.html",
     "title": "Liucian Gradient Valley",
-    "description": "Slide Liucian down a loss landscape. Pick a learning rate that reaches the fish without flying off the ridge — including a local-minimum trap.",
+    "description": "Slide Liucian down a loss landscape. Pick a learning rate that reaches the fish without flying off the ridge \u2014 including a local-minimum trap.",
     "topic_tags": [
       "ML",
       "optimization",
@@ -67,7 +67,7 @@
   {
     "file": "liucian_hungry_bandit.html",
     "title": "Liucian Hungry Bandit",
-    "description": "Explore or exploit: a 20-pounce multi-armed bandit. Beat the bowls, watch ε-greedy, and keep regret low across three kitchens.",
+    "description": "Explore or exploit: a 20-pounce multi-armed bandit. Beat the bowls, watch \u03b5-greedy, and keep regret low across three kitchens.",
     "topic_tags": [
       "ML",
       "reinforcement-learning",
@@ -330,6 +330,17 @@
     "file": "world_model_lab_game.html",
     "title": "World Model Lab Game",
     "description": "Interactive Liucian learning game: World Model Lab Game.",
+    "topic_tags": [
+      "Physics",
+      "world-models",
+      "planning"
+    ],
+    "difficulty": 3
+  },
+  {
+    "file": "liucian_3d_world_model.html",
+    "title": "Liucian 3D World Model",
+    "description": "Configure a 3D world model of moving people and the mouse. You catch dinner only if those predicted trajectories match reality.",
     "topic_tags": [
       "Physics",
       "world-models",

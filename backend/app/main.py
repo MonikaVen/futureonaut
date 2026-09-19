@@ -21,6 +21,7 @@ def ensure_schema() -> None:
                 "NOT NULL DEFAULT 'en'"
             )
         )
+        conn.execute(text("ALTER TABLE games ADD COLUMN IF NOT EXISTS files JSONB NOT NULL DEFAULT '{}'::jsonb"))
 
 
 @asynccontextmanager
