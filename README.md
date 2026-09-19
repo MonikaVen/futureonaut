@@ -25,6 +25,13 @@ Default admin (from `.env`):
 
 Promote a registered learner to **creator** in the Admin panel to unlock upload / template / AI tools.
 
+New playable AI labs (seeded automatically):
+
+- **Liucian's Hungry Bandit** — exploration vs exploitation (ε-greedy)
+- **Liucian's Overfit Orchard** — train loss vs test loss
+- **Liucian's Precision Pounce** — thresholds, precision, and recall
+- **Liucian's Gradient Valley** — learning rate on a loss landscape
+
 ### Local development (without rebuilding frontend)
 
 ```bash

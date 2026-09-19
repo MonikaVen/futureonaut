@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Liucian's Gradient Valley — Learning Rate</title>
+<style>
+:root{--bg:#f7f7f8;--card:#fff;--text:#1f2937;--muted:#6b7280;--border:#d1d5db;--accent:#4b5563;--good:#237a4b;--bad:#b42318}
+*{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,sans-serif;color:var(--text);background:#fff}
+main{max-width:1080px;margin:auto;padding:22px}h1{margin:0 0 6px}h2{margin:0 0 8px;font-size:18px}
+.sub,.tiny{color:var(--muted)}.sub{margin-bottom:16px}.tiny{font-size:13px}
+.grid{display:grid;gap:14px}.metrics{grid-template-columns:repeat(4,1fr)}.two{grid-template-columns:1.2fr .8fr}
+.card,.metric{border:1px solid var(--border);border-radius:16px;padding:14px;background:var(--card)}
+.label{font-size:13px;color:var(--muted)}.value{font-size:23px;font-weight:700}
+button{padding:10px 14px;border:1px solid var(--border);border-radius:12px;background:#fff;font-size:15px;cursor:pointer;margin:4px 4px 0 0}
+button.primary{background:var(--accent);color:#fff}button:disabled{opacity:.45;cursor:not-allowed}
+.box{padding:11px;border-radius:12px;background:var(--bg);border:1px solid var(--border);margin-top:12px}
+.math{font-family:ui-monospace,monospace;background:#fff;padding:8px;border-radius:9px;margin-top:8px}
+svg{display:block;width:100%;height:auto}.feedback{min-height:24px;margin-top:10px;font-weight:650}
+.good{color:var(--good)}.bad{color:var(--bad)}input[type=range]{width:100%}
+@media(max-width:800px){.metrics{grid-template-columns:repeat(2,1fr)}.two{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<main>
+  <h1>⛰️ Liucian's Gradient Valley</h1>
+  <div class="sub">Slide Liucian down a <strong>loss landscape</strong> with gradient descent. The <strong>learning rate</strong> is the step size: too tiny and dinner waits forever; too huge and Liucian flies off the ridge.</div>
+
+  <div class="grid metrics">
+    <div class="metric"><div class="label">Valley</div><div id="mLevel" class="value">1 / 3</div></div>
+    <div class="metric"><div class="label">Steps left</div><div id="mSteps" class="value">18</div></div>
+    <div class="metric"><div class="label">Loss</div><div id="mLoss" class="value">—</div></div>
+    <div class="metric"><div class="label">Learning rate</div><div id="mLr" class="value">0.30</div></div>
+  </div>
+
+  <div class="grid two" style="margin-top:15px">
+    <section class="card">
+      <h2>1. Descend to the fish</h2>
+      <div class="tiny">Gradient descent always walks downhill. Your job is picking a step size that actually arrives.</div>
+      <svg id="plot" viewBox="0 0 700 360" role="img" aria-label="Loss valley with Liucian sliding toward a minimum">
+        <rect x="0" y="0" width="700" height="360" fill="#f8f8f8"/>
+        <path id="curve" fill="none" stroke="#6b7280" stroke-width="3"/>
+        <g id="fish"></g>
+        <g id="cat"></g>
+        <text x="350" y="348" text-anchor="middle" font-size="13" fill="#6b7280">parameter x →</text>
+      </svg>
+      <div class="box">
+        <label for="lr">Learning rate η: <b id="lrOut">0.30</b></label>
+        <input id="lr" type="range" min="0.02" max="1.20" value="0.30" step="0.02">
+      </div>
+      <button id="stepBtn" class="primary" type="button">Take one step</button>
+      <button id="runBtn" type="button">Run remaining</button>
+      <button id="nextBtn" type="button" disabled>Next valley</button>
+      <button id="resetBtn" type="button">Replay</button>
+      <div id="feedback" class="feedback" aria-live="polite">Aim for the fish at the bottom of the valley.</div>
+    </section>
+
+    <section class="card">
+      <h2>2. What the step is doing</h2>
+      <div class="box">
+        <b>Update</b>
+        <div class="math" id="upd">x ← x − η · dL/dx</div>
+        <div class="tiny" style="margin-top:6px">The gradient points uphill. We subtract it so Liucian walks toward lower loss.</div>
+      </div>
+      <div class="box">
+        <b>🎯 Challenge</b>
+        <div class="tiny" style="margin-top:6px">Reach the fish in all 3 valleys without flying off. Valley 3 has a local trap — tiny η gets stuck; huge η explodes; a moderate η can skip to the deep bowl.</div>
+        <div>Valleys solved: <strong id="won">0 / 3</strong></div>
+        <div id="challenge" class="feedback"></div>
+      </div>
+      <div class="box">
+        <b>Hint</b>
+        <div class="tiny" id="hint">Valley 1 is a single bowl. A moderate η (about 0.25–0.45) is usually enough.</div>
+      </div>
+    </section>
+  </div>
+</main>
+<script>
+(() => {
+  const lp = window.LearnPlay || {score(){},answer(){},taskStart(){},taskEnd(){},complete(){}};
+  const $ = (id) => document.getElementById(id);
+  const xmin = -4.5, xmax = 4.5, W = 700, H = 300, pad = 36, ymax = 8.2;
+  const sx = (x) => pad + (x - xmin) / (xmax - xmin) * (W - 2 * pad);
+  const sy = (y) => 20 + (1 - (Math.min(ymax, Math.max(0, y)) / ymax)) * (H - 30);
+
+  const levels = [
+    {
+      name: "one bowl",
+      L: (x) => 0.35 * (x - 1.2) ** 2 + 0.4,
+      d: (x) => 0.7 * (x - 1.2),
+      start: -3.2,
+      goal: 1.2,
+      steps: 16,
+      hint: "Single valley. Moderate η. Too large and Liucian oscillates past the fish."
+    },
+    {
+      name: "steep walls",
+      L: (x) => 0.55 * (x + 0.4) ** 2 + 0.35,
+      d: (x) => 1.1 * (x + 0.4),
+      start: 2.5,
+      goal: -0.4,
+      steps: 12,
+      hint: "Steeper bowl. A tiny η runs out of steps. A moderate η still lands."
+    },
+    {
+      name: "local trap",
+      L: (x) => 0.14 * (x * x - 2.6) ** 2 + 0.12 * x + 0.4,
+      d: (x) => 0.56 * x * (x * x - 2.6) + 0.12,
+      start: 3.0,
+      goal: -1.64,
+      steps: 24,
+      hint: "Two bowls. Tiny η falls into the shallow right bowl. Moderate η can skip to the deep left fish. Huge η flies off."
+    }
+  ];
+
+  let level = 0, x, steps, done = false, wins = 0, running = false;
+
+  function addSvg(tag, attrs, parent) {
+    const e = document.createElementNS("http://www.w3.org/2000/svg", tag);
+    Object.entries(attrs).forEach(([k, v]) => e.setAttribute(k, v));
+    parent.appendChild(e);
+    return e;
+  }
+
+  function draw() {
+    const lv = levels[level];
+    let d = "";
+    for (let i = 0; i <= 120; i++) {
+      const xv = xmin + (xmax - xmin) * i / 120;
+      const y = Math.min(ymax, lv.L(xv));
+      d += (i ? "L" : "M") + sx(xv) + " " + sy(y) + " ";
+    }
+    $("curve").setAttribute("d", d);
+    const fish = $("fish");
+    fish.innerHTML = "";
+    const gx = sx(lv.goal), gy = sy(lv.L(lv.goal));
+    const ft = addSvg("text", { x: gx, y: gy - 8, "text-anchor": "middle", "font-size": 22 }, fish);
+    ft.textContent = "🐟";
+    const cat = $("cat");
+    cat.innerHTML = "";
+    const cx = sx(x), cy = sy(lv.L(x));
+    addSvg("circle", { cx, cy: cy - 6, r: 14, fill: "#6b7280", stroke: "#111827", "stroke-width": 3 }, cat);
+    const lb = addSvg("text", { x: cx, y: cy - 24, "text-anchor": "middle", "font-size": 12, fill: "#111827" }, cat);
+    lb.textContent = "Liucian";
+    $("mLoss").textContent = lv.L(x).toFixed(2);
+    $("mSteps").textContent = steps;
+    $("mLevel").textContent = `${level + 1} / 3`;
+    $("mLr").textContent = (+$("lr").value).toFixed(2);
+    $("lrOut").textContent = (+$("lr").value).toFixed(2);
+  }
+
+  function startLevel() {
+    const lv = levels[level];
+    x = lv.start;
+    steps = lv.steps;
+    done = false;
+    running = false;
+    $("nextBtn").disabled = true;
+    $("stepBtn").disabled = false;
+    $("runBtn").disabled = false;
+    $("hint").textContent = lv.hint;
+    $("feedback").className = "feedback";
+    $("feedback").textContent = `Valley ${level + 1}: ${lv.name}. Walk downhill to the fish.`;
+    lp.taskStart("valley-" + level);
+    draw();
+  }
+
+  function step() {
+    if (done) return false;
+    const lv = levels[level];
+    const eta = +$("lr").value;
+    const g = lv.d(x);
+    const nx = x - eta * g;
+    $("upd").textContent = `x ← ${x.toFixed(2)} − ${eta.toFixed(2)} · (${g.toFixed(2)}) = ${nx.toFixed(2)}`;
+    x = nx;
+    steps--;
+    draw();
+    if (!isFinite(x) || Math.abs(x) > 5.2) {
+      fail("Liucian flew off the ridge. Huge learning rates explode.");
+      return false;
+    }
+    if (Math.abs(x - lv.goal) < 0.28) {
+      succeed();
+      return false;
+    }
+    if (steps <= 0) {
+      fail("Out of steps. The learning rate was too small, or Liucian got stuck in a local bowl.");
+      return false;
+    }
+    return true;
+  }
+
+  function succeed() {
+    done = true;
+    wins++;
+    $("won").textContent = `${wins} / 3`;
+    $("stepBtn").disabled = true;
+    $("runBtn").disabled = true;
+    $("feedback").className = "feedback good";
+    $("feedback").textContent = "🐟 Liucian reached the fish. Gradient descent worked.";
+    lp.taskEnd("valley-" + level);
+    lp.answer({ correct: true, taskId: "valley-" + level, points: 20 });
+    lp.score(20);
+    if (level < 2) $("nextBtn").disabled = false;
+    else wrap();
+  }
+
+  function fail(msg) {
+    done = true;
+    $("stepBtn").disabled = true;
+    $("runBtn").disabled = true;
+    $("feedback").className = "feedback bad";
+    $("feedback").textContent = msg;
+    lp.taskEnd("valley-" + level);
+    lp.answer({ correct: false, taskId: "valley-" + level, points: 0 });
+    if (level < 2) $("nextBtn").disabled = false;
+    else wrap();
+  }
+
+  function wrap() {
+    const pass = wins >= 2;
+    $("challenge").innerHTML = pass
+      ? `⭐ Challenge complete — ${wins}/3 valleys.`
+      : `Solved ${wins}/3. Try smaller η on steep walls, and a slightly larger η to escape the trap.`;
+    $("challenge").className = "feedback " + (pass ? "good" : "bad");
+    lp.complete({ score: wins * 20 });
+  }
+
+  let timer = null;
+  function run() {
+    if (running || done) return;
+    running = true;
+    timer = setInterval(() => {
+      const more = step();
+      if (!more) {
+        clearInterval(timer);
+        running = false;
+      }
+    }, 220);
+  }
+
+  $("lr").oninput = () => {
+    $("mLr").textContent = (+$("lr").value).toFixed(2);
+    $("lrOut").textContent = (+$("lr").value).toFixed(2);
+  };
+  $("stepBtn").onclick = () => { if (!running) step(); };
+  $("runBtn").onclick = run;
+  $("nextBtn").onclick = () => { clearInterval(timer); running = false; level++; startLevel(); };
+  $("resetBtn").onclick = () => {
+    clearInterval(timer); running = false;
+    level = 0; wins = 0;
+    $("won").textContent = "0 / 3";
+    $("challenge").textContent = "";
+    startLevel();
+  };
+
+  startLevel();
+})();
+</script>
+</body>
+</html>
