@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import inspect
+import json
 import unittest
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -11,6 +12,7 @@ from pydantic import ValidationError
 from app.models import UserRole
 from app.schemas import GameUpdate
 from app.services.demo_seed import (
+    REUPLOAD_SEED_FILES,
     prune_games_to_manifest,
     refresh_seed_html,
     seed_demo_games,
@@ -22,6 +24,7 @@ class CatalogCurationTests(unittest.TestCase):
         source = inspect.getsource(seed_demo_games)
         self.assertIn("restore_published_html", source)
         self.assertIn("assign_catalog_to_owner", source)
+        self.assertIn("reupload_seed_games", source)
         self.assertIn("db.query(Game).count() == 0", source)
         self.assertNotIn("prune_games_to_manifest(db)", source)
         self.assertNotIn("refresh_seed_html(db)", source)
@@ -30,6 +33,7 @@ class CatalogCurationTests(unittest.TestCase):
         self.assertIn("seed_html_pack", empty_branch)
         self.assertNotIn("seed_html_pack", rest)
         self.assertNotIn("seed_html_pack", before)
+        self.assertIn("reupload_seed_games", rest)
 
     def test_prune_and_refresh_do_not_touch_catalog(self) -> None:
         prune_games_to_manifest(SimpleNamespace())
@@ -44,6 +48,7 @@ class CatalogCurationTests(unittest.TestCase):
             patch("app.services.demo_seed.SessionLocal", return_value=db),
             patch("app.services.demo_seed.seed_html_pack") as pack,
             patch("app.services.demo_seed.backfill_seed_files"),
+            patch("app.services.demo_seed.reupload_seed_games"),
             patch("app.services.demo_seed.normalize_game_topics"),
             patch("app.services.demo_seed.restore_published_html"),
             patch("app.services.demo_seed.restore_missing_game_files"),
@@ -119,6 +124,70 @@ class CatalogCurationTests(unittest.TestCase):
         self.assertEqual(game.owner_id, other.id)
         self.assertEqual(game.handle, "other/game")
         self.assertTrue(settings.catalog_assigned)
+
+    def test_reupload_updates_html_and_inserts_missing(self) -> None:
+        from app.services.demo_seed import reupload_seed_games
+
+        owner = SimpleNamespace(id=uuid4(), display_name="futureonaut", email="futureonaut@example.com")
+        existing = SimpleNamespace(
+            id=uuid4(),
+            title="Liucian Hungry Bandit",
+            seed_file="liucian_hungry_bandit.html",
+            entry_path="index.html",
+            html="<html>old</html>",
+        )
+        db = MagicMock()
+        db.query.return_value.all.return_value = [existing]
+        item = {
+            "file": "liucian_hungry_bandit.html",
+            "title": "Liucian Hungry Bandit",
+            "description": "Explore or exploit",
+            "topic_tags": ["AI"],
+            "difficulty": 2,
+        }
+        with (
+            patch(
+                "app.services.demo_seed._manifest_items",
+                return_value=[
+                    item,
+                    {
+                        "file": "liucian_gradient_valley.html",
+                        "title": "Liucian Gradient Valley",
+                        "description": "Loss landscape",
+                        "topic_tags": ["AI"],
+                        "difficulty": 2,
+                    },
+                ],
+            ),
+            patch("app.services.demo_seed._seed_dir") as seed_dir,
+            patch("app.services.demo_seed.save_uploaded_html", return_value="index.html"),
+            patch("app.services.demo_seed.write_game_preview"),
+            patch("app.services.demo_seed._insert_seed_game") as insert,
+        ):
+            hungry = MagicMock()
+            hungry.exists.return_value = True
+            hungry.read_text.return_value = "<html>new bandit</html>"
+            valley = MagicMock()
+            valley.exists.return_value = True
+            valley.read_text.return_value = "<html>new valley</html>"
+            seed_dir.return_value.__truediv__.side_effect = lambda name: (
+                hungry if name == "liucian_hungry_bandit.html" else valley
+            )
+            inserted = SimpleNamespace(id=uuid4(), title="Liucian Gradient Valley", seed_file="liucian_gradient_valley.html")
+            insert.return_value = inserted
+            reupload_seed_games(db, owner)
+        self.assertEqual(existing.html, "<html>new bandit</html>")
+        insert.assert_called_once()
+        db.commit.assert_called()
+
+    def test_reupload_files_are_in_the_seed_pack(self) -> None:
+        from pathlib import Path
+
+        seed_dir = Path(__file__).resolve().parents[1] / "seed_games"
+        manifest = {item["file"] for item in json.loads((seed_dir / "manifest.json").read_text(encoding="utf-8"))}
+        for name in REUPLOAD_SEED_FILES:
+            self.assertIn(name, manifest, name)
+            self.assertTrue((seed_dir / name).is_file(), name)
 
 
 if __name__ == "__main__":

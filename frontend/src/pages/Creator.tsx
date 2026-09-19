@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { api, type Classroom, type CreatorStyle, type Game, type GameAnalytics, type GameAnalyticsDetail, type GameDraft } from "../api";
 import { AvatarEditor } from "../AvatarEditor";
@@ -28,6 +28,13 @@ export function CreatorPage() {
   const [drafts, setDrafts] = useState<GameDraft[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [upTitle, setUpTitle] = useState("");
+  const [upDescription, setUpDescription] = useState("");
+  const [upTags, setUpTags] = useState("AI");
+  const [upDifficulty, setUpDifficulty] = useState(2);
+  const [upFile, setUpFile] = useState<File | null>(null);
+  const [upShot, setUpShot] = useState<File | null>(null);
   const [shotBust, setShotBust] = useState<Record<string, number>>({});
   const [styleSource, setStyleSource] = useState<"futureonaut" | "custom">("futureonaut");
   const [customStyle, setCustomStyle] = useState("");
@@ -212,6 +219,7 @@ export function CreatorPage() {
   function startRename(game: Game) {
     setEditingId(game.id);
     setEditTitle(game.title);
+    setEditDescription(game.description || "");
   }
 
   async function saveTitle(game: Game) {
@@ -226,13 +234,69 @@ export function CreatorPage() {
     try {
       await api(`/api/games/${game.id}`, {
         method: "PATCH",
-        body: JSON.stringify({ title }),
+        body: JSON.stringify({ title, description: editDescription.trim() }),
       });
       setEditingId(null);
       setMessage(`${t("gameUpdated")} ${title}`);
       await reload();
     } catch (err) {
       setError(err instanceof Error ? err.message : t("renameGame"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function uploadNewGame(e: FormEvent) {
+    e.preventDefault();
+    if (!upFile) {
+      setError(t("uploadGameFile"));
+      return;
+    }
+    const title = upTitle.trim();
+    if (!title) {
+      setError(t("titleRequired"));
+      return;
+    }
+    setBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      const body = new FormData();
+      body.append("title", title);
+      body.append("description", upDescription.trim());
+      body.append("topic_tags", upTags);
+      body.append("difficulty", String(upDifficulty));
+      body.append("file", upFile);
+      if (upShot) body.append("icon", upShot);
+      const game = await api<Game>("/api/games/upload", { method: "POST", body });
+      setUpTitle("");
+      setUpDescription("");
+      setUpTags("AI");
+      setUpDifficulty(2);
+      setUpFile(null);
+      setUpShot(null);
+      setMessage(`${t("gamePublished")} ${game.title}`);
+      await reload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("uploadGame"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function replaceFiles(game: Game, file: File, icon?: File | null) {
+    setBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      const body = new FormData();
+      body.append("file", file);
+      if (icon) body.append("icon", icon);
+      await api<Game>(`/api/games/${game.id}/files`, { method: "POST", body });
+      setMessage(`${t("gameFilesUpdated")} ${game.title}`);
+      await reload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("replaceGameFiles"));
     } finally {
       setBusy(false);
     }
@@ -503,6 +567,57 @@ export function CreatorPage() {
         </div>
       )}
 
+      <div className="panel" style={{ marginBottom: 16 }}>
+        <h2 style={{ fontFamily: "var(--font-display)", marginTop: 0 }}>{t("uploadGame")}</h2>
+        <p className="meta">{t("uploadGameHelp")}</p>
+        <form className="form" onSubmit={uploadNewGame}>
+          <label>
+            {t("titleSort")}
+            <input value={upTitle} onChange={(e) => setUpTitle(e.target.value)} maxLength={200} required />
+          </label>
+          <label>
+            {t("descriptionLabel")}
+            <textarea rows={3} value={upDescription} onChange={(e) => setUpDescription(e.target.value)} />
+          </label>
+          <label>
+            {t("topic")}
+            <input value={upTags} onChange={(e) => setUpTags(e.target.value)} placeholder="AI, Computer Vision" />
+          </label>
+          <label>
+            {t("level")}
+            <select value={upDifficulty} onChange={(e) => setUpDifficulty(Number(e.target.value))}>
+              {[1, 2, 3, 4, 5].map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            {t("uploadGameFile")}
+            <input
+              type="file"
+              accept=".html,.htm,.zip,text/html,application/zip"
+              onChange={(e) => setUpFile(e.target.files?.[0] || null)}
+              required
+            />
+          </label>
+          <label>
+            {t("updateSnapshot")}
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif"
+              onChange={(e) => setUpShot(e.target.files?.[0] || null)}
+            />
+          </label>
+          <div className="form-actions">
+            <button className="btn accent" type="submit" disabled={busy || !upFile}>
+              {t("uploadGame")}
+            </button>
+          </div>
+        </form>
+      </div>
+
       <div className="panel">
         <h2 style={{ fontFamily: "var(--font-display)", marginTop: 0 }}>{t("myGames")}</h2>
         <p className="meta">{t("snapshotHelp")}</p>
@@ -535,8 +650,14 @@ export function CreatorPage() {
                         autoFocus
                         aria-label={t("titleSort")}
                       />
+                      <textarea
+                        rows={2}
+                        value={editDescription}
+                        onChange={(e) => setEditDescription(e.target.value)}
+                        aria-label={t("descriptionLabel")}
+                      />
                       <button className="btn accent btn-sm" type="submit" disabled={busy}>
-                        {t("saveTitle")}
+                        {t("saveListing")}
                       </button>
                       <button
                         className="btn secondary btn-sm"
@@ -550,7 +671,7 @@ export function CreatorPage() {
                     <div className="creator-title-cell">
                       <span>{g.title}</span>
                       <button className="btn secondary btn-sm" type="button" disabled={busy} onClick={() => startRename(g)}>
-                        {t("renameGame")}
+                        {t("editListing")}
                       </button>
                     </div>
                   )}
@@ -581,6 +702,21 @@ export function CreatorPage() {
                     />
                     <label className="btn secondary btn-sm" htmlFor={`shot-${g.id}`}>
                       {t("updateSnapshot")}
+                    </label>
+                    <input
+                      id={`files-${g.id}`}
+                      className="sr-only"
+                      type="file"
+                      accept=".html,.htm,.zip,text/html,application/zip"
+                      disabled={busy}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        e.target.value = "";
+                        if (file) void replaceFiles(g, file);
+                      }}
+                    />
+                    <label className="btn secondary btn-sm" htmlFor={`files-${g.id}`}>
+                      {t("replaceGameFiles")}
                     </label>
                   </div>
                 </td>

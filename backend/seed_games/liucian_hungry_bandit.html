@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Liucian's Hungry Bandit — Explore or Exploit</title>
+<style>
+:root{--bg:#f7f7f8;--card:#fff;--text:#1f2937;--muted:#6b7280;--border:#d1d5db;--accent:#4b5563;--good:#237a4b;--bad:#b42318;--gold:#c27a1a}
+*{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,sans-serif;color:var(--text);background:#fff}
+main{max-width:1080px;margin:auto;padding:22px}h1{margin:0 0 6px}h2{margin:0 0 8px;font-size:18px}
+.sub,.tiny{color:var(--muted)}.sub{margin-bottom:16px}.tiny{font-size:13px}
+.grid{display:grid;gap:14px}.metrics{grid-template-columns:repeat(4,1fr)}.two{grid-template-columns:1.15fr .85fr}
+.card,.metric{border:1px solid var(--border);border-radius:16px;padding:14px;background:var(--card)}
+.label{font-size:13px;color:var(--muted)}.value{font-size:23px;font-weight:700}
+button{padding:10px 14px;border:1px solid var(--border);border-radius:12px;background:#fff;font-size:15px;cursor:pointer;margin:4px 4px 0 0}
+button.primary{background:var(--accent);color:#fff}button:disabled{opacity:.45;cursor:not-allowed}
+.bowls{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:12px}
+.bowl{border:2px solid var(--border);border-radius:16px;padding:12px 8px 14px;text-align:center;background:#fafafa;cursor:pointer;min-height:170px}
+.bowl:hover{border-color:#9ca3af}.bowl.chosen{border-color:#111827;background:#f3f4f6}
+.bowl.best{box-shadow:0 0 0 3px #bbf7d0}.art{font-size:42px;line-height:1;margin:8px 0}
+.spark{display:inline-block;animation:pop .35s ease}.bar{height:8px;background:#e5e7eb;border-radius:99px;overflow:hidden;margin-top:6px}
+.fill{height:100%;background:#6b7280;width:0}.good{color:var(--good)}.bad{color:var(--bad)}
+.box{padding:11px;border-radius:12px;background:var(--bg);border:1px solid var(--border);margin-top:12px}
+.math{font-family:ui-monospace,monospace;background:#fff;padding:8px;border-radius:9px;margin-top:8px}
+.feedback{min-height:24px;margin-top:10px;font-weight:650}
+@keyframes pop{from{transform:scale(.6)}to{transform:scale(1)}}
+@media(max-width:800px){.metrics,.bowls{grid-template-columns:repeat(2,1fr)}.two{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<main>
+  <h1>🍽️ Liucian's Hungry Bandit</h1>
+  <div class="sub">A <strong>multi-armed bandit</strong> game: explore unknown bowls, then exploit the tastiest one. Limited pounces — every try counts.</div>
+
+  <div class="grid metrics">
+    <div class="metric"><div class="label">Kitchen</div><div id="mKitchen" class="value">1 / 3</div></div>
+    <div class="metric"><div class="label">Pounces left</div><div id="mLeft" class="value">20</div></div>
+    <div class="metric"><div class="label">Treats collected</div><div id="mTreats" class="value">0</div></div>
+    <div class="metric"><div class="label">Regret vs oracle</div><div id="mRegret" class="value">0</div></div>
+  </div>
+
+  <div class="grid two" style="margin-top:15px">
+    <section class="card">
+      <h2>Choose a bowl</h2>
+      <div class="tiny">True treat rates are hidden. Early pounces should explore. Later pounces should exploit the leader.</div>
+      <div id="bowls" class="bowls"></div>
+      <div id="feedback" class="feedback" aria-live="polite">Liucian is hungry. Pick a bowl!</div>
+      <div style="margin-top:10px">
+        <button id="aiBtn" type="button">🤖 Watch ε-greedy (ε = 0.2)</button>
+        <button id="greedyBtn" type="button">😴 Watch greedy</button>
+        <button id="stopBtn" type="button" disabled>Stop AI</button>
+        <button id="nextBtn" type="button" class="primary" disabled>Next kitchen</button>
+        <button id="resetBtn" type="button">New kitchens</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>What the numbers mean</h2>
+      <div class="box">
+        <b>Running average</b>
+        <div class="tiny">How often that bowl paid off so far. Early averages are noisy.</div>
+        <div id="avgs" style="margin-top:8px"></div>
+      </div>
+      <div class="box">
+        <b>🎯 Challenge</b>
+        <div class="tiny" style="margin-top:6px">Collect at least <strong>30 treats across 3 kitchens</strong> (20 pounces each).</div>
+        <div>Total campaign treats: <strong id="campaign">0</strong></div>
+        <div id="challenge" class="feedback"></div>
+      </div>
+      <div class="box">
+        <b>Concept</b>
+        <div class="math">Q(a) ≈ average reward of action a</div>
+        <div class="math">ε-greedy: explore with chance ε, else pick argmax Q</div>
+        <div class="tiny" style="margin-top:8px">Regret is how many treats you lost versus always picking the best bowl. Greedy play can lock onto a lucky early bowl. A little exploration usually wins.</div>
+      </div>
+    </section>
+  </div>
+</main>
+<script>
+(() => {
+  const lp = window.LearnPlay || {score(){},answer(){},taskStart(){},taskEnd(){},complete(){},stage(){}};
+  const NAMES = ["Salmon","Chicken","Tuna","Milk"];
+  const ICONS = ["🐟","🍗","🐠","🥛"];
+  const BUDGET = 20;
+  const kitchens = [
+    [0.18, 0.32, 0.82, 0.48],
+    [0.55, 0.22, 0.40, 0.78],
+    [0.30, 0.70, 0.28, 0.45]
+  ];
+  let kitchen = 0, left = BUDGET, treats = 0, campaign = 0, pulls, counts, sums, timer = null, finished = false;
+
+  const $ = (id) => document.getElementById(id);
+
+  function shuffleRates(src) {
+    const rates = src.slice();
+    for (let i = rates.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [rates[i], rates[j]] = [rates[j], rates[i]];
+    }
+    return rates;
+  }
+
+  function startKitchen() {
+    pulls = shuffleRates(kitchens[kitchen]);
+    counts = [0,0,0,0];
+    sums = [0,0,0,0];
+    left = BUDGET;
+    treats = 0;
+    finished = false;
+    $("nextBtn").disabled = true;
+    $("mKitchen").textContent = `${kitchen + 1} / 3`;
+    $("feedback").textContent = `Kitchen ${kitchen + 1}: bowls were shuffled. Explore first!`;
+    lp.taskStart("kitchen-" + kitchen);
+    render(null);
+  }
+
+  function avg(i) {
+    return counts[i] ? (sums[i] / counts[i]) : 0;
+  }
+
+  function oracle() {
+    return Math.max(...pulls);
+  }
+
+  function render(flash) {
+    $("mLeft").textContent = left;
+    $("mTreats").textContent = treats;
+    const regret = (BUDGET - left) * oracle() - treats;
+    $("mRegret").textContent = Math.max(0, regret).toFixed(1);
+    $("campaign").textContent = campaign + (finished ? 0 : treats);
+    const host = $("bowls");
+    host.innerHTML = "";
+    pulls.forEach((_, i) => {
+      const el = document.createElement("button");
+      el.type = "button";
+      el.className = "bowl" + (flash && flash.i === i ? " chosen" : "");
+      const a = avg(i);
+      el.innerHTML = `<div class="tiny">${NAMES[i]}</div>
+        <div class="art">${flash && flash.i === i ? (flash.win ? '<span class="spark">✨</span>' : "😿") : ICONS[i]}</div>
+        <div><b>${counts[i]}</b> tries</div>
+        <div class="tiny">avg ${counts[i] ? a.toFixed(2) : "—"}</div>
+        <div class="bar"><div class="fill" style="width:${Math.round(a*100)}%"></div></div>`;
+      el.disabled = left <= 0 || !!timer || finished;
+      el.onclick = () => pounce(i, false);
+      host.appendChild(el);
+    });
+    if (finished) {
+      const best = pulls.indexOf(oracle());
+      host.children[best]?.classList.add("best");
+    }
+    $("avgs").innerHTML = pulls.map((_, i) =>
+      `${ICONS[i]} ${NAMES[i]}: ${counts[i] ? avg(i).toFixed(2) : "no data yet"}`
+    ).join("<br>");
+  }
+
+  function pounce(i, fromAi) {
+    if (left <= 0 || finished) return;
+    const win = Math.random() < pulls[i];
+    counts[i]++; sums[i] += win ? 1 : 0;
+    left--;
+    if (win) {
+      treats++;
+      lp.score(2);
+    }
+    lp.answer({ correct: win, taskId: `k${kitchen}-b${i}`, points: win ? 2 : 0 });
+    $("feedback").innerHTML = win
+      ? `✨ ${NAMES[i]} paid off! Liucian got a treat.`
+      : `😿 ${NAMES[i]} was empty this time.`;
+    render({ i, win });
+    if (left === 0) endKitchen();
+  }
+
+  function endKitchen() {
+    finished = true;
+    clearInterval(timer); timer = null;
+    $("stopBtn").disabled = true;
+    $("aiBtn").disabled = true;
+    $("greedyBtn").disabled = true;
+    const best = pulls.indexOf(oracle());
+    [...document.querySelectorAll(".bowl")][best]?.classList.add("best");
+    const regret = BUDGET * oracle() - treats;
+    campaign += treats;
+    lp.taskEnd("kitchen-" + kitchen);
+    lp.answer({
+      correct: treats >= 12,
+      taskId: "kitchen-" + kitchen,
+    });
+    if (window.LearnPlay) LearnPlay.stage(kitchen + 1, 3, {complete: kitchen >= 2, points: treats, label: "Kitchen " + (kitchen + 1), id: "kitchen-" + kitchen});
+    $("feedback").innerHTML =
+      `Kitchen done. Best bowl was <b>${NAMES[best]}</b> (p = ${oracle().toFixed(2)}). You got <b>${treats}</b> treats. Regret ≈ ${regret.toFixed(1)}.`;
+    if (kitchen < 2) $("nextBtn").disabled = false;
+    else finishCampaign();
+  }
+
+  function finishCampaign() {
+    const ok = campaign >= 30;
+    $("challenge").innerHTML = ok
+      ? `⭐ Challenge complete! ${campaign} treats — you balanced explore and exploit.`
+      : `${campaign} treats. Try exploring more in the first 6–8 pounces, then lock onto the leader.`;
+    $("challenge").className = "feedback " + (ok ? "good" : "bad");
+    lp.complete({ score: campaign });
+  }
+
+  function epsilonGreedy(eps) {
+    if (Math.random() < eps || counts.every(c => c === 0)) {
+      return Math.floor(Math.random() * 4);
+    }
+    let best = 0, bestA = -1;
+    for (let i = 0; i < 4; i++) {
+      const a = avg(i);
+      if (a > bestA) { bestA = a; best = i; }
+    }
+    return best;
+  }
+
+  function runAi(eps) {
+    if (left <= 0) return;
+    stopAi();
+    $("aiBtn").disabled = true;
+    $("greedyBtn").disabled = true;
+    $("stopBtn").disabled = false;
+    timer = setInterval(() => {
+      pounce(epsilonGreedy(eps), true);
+      if (left <= 0) {
+        stopAi();
+      }
+    }, 280);
+  }
+
+  function stopAi() {
+    clearInterval(timer); timer = null;
+    $("stopBtn").disabled = true;
+    $("aiBtn").disabled = left <= 0;
+    $("greedyBtn").disabled = left <= 0;
+    render(null);
+  }
+
+  $("aiBtn").onclick = () => runAi(0.2);
+  $("greedyBtn").onclick = () => runAi(0);
+  $("stopBtn").onclick = stopAi;
+  $("nextBtn").onclick = () => { kitchen++; startKitchen(); };
+  $("resetBtn").onclick = () => {
+    stopAi();
+    kitchen = 0; campaign = 0;
+    $("challenge").textContent = "";
+    $("challenge").className = "feedback";
+    startKitchen();
+  };
+
+  startKitchen();
+})();
+</script>
+</body>
+</html>

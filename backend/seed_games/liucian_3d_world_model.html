@@ -1,0 +1,644 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Liucian's 3D World Model — Predict Trajectories</title>
+<style>
+:root{--bg:#f7f7f8;--card:#fff;--text:#1f2937;--muted:#6b7280;--border:#d1d5db;--accent:#4b5563;--good:#237a4b;--bad:#b42318;--gold:#c27a1a}
+*{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,sans-serif;color:var(--text);background:#fff}
+main{max-width:1100px;margin:auto;padding:14px 16px 18px}h1{margin:0 0 6px;font-size:28px}h2{margin:0 0 8px;font-size:18px}
+.sub,.tiny{color:var(--muted)}.sub{margin-bottom:16px}.tiny{font-size:13px}
+.grid{display:grid;gap:14px}.metrics{grid-template-columns:repeat(4,1fr)}.two{grid-template-columns:1.2fr .8fr}
+.card,.metric{border:1px solid var(--border);border-radius:16px;padding:14px;background:var(--card)}
+.label{font-size:13px;color:var(--muted)}.value{font-size:23px;font-weight:700}
+button{padding:10px 14px;border:1px solid var(--border);border-radius:12px;background:#fff;font-size:15px;cursor:pointer;margin:4px 4px 0 0}
+button.primary{background:var(--accent);color:#fff}button:disabled{opacity:.45;cursor:not-allowed}
+button.active{outline:2px solid #111827}
+.box{padding:11px;border-radius:12px;background:var(--bg);border:1px solid var(--border);margin-top:12px}
+.math{font-family:ui-monospace,monospace;background:#fff;padding:8px;border-radius:9px;margin-top:8px;font-size:12px}
+canvas{display:block;width:100%;height:auto;border:1px solid var(--border);border-radius:14px;background:#eef2f6;cursor:grab;touch-action:none}
+.feedback{min-height:24px;margin-top:10px;font-weight:650}
+.good{color:var(--good)}.bad{color:var(--bad)}input[type=range]{width:100%}
+select{padding:6px 8px;border:1px solid var(--border);border-radius:8px;background:#fff}
+.legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;font-size:12px;color:var(--muted)}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+@media(max-width:800px){.metrics{grid-template-columns:repeat(2,1fr)}.two{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<main>
+  <h1>🐈 Liucian's 3D World Model</h1>
+  <div class="sub">Configure a <strong>world model</strong> of how people and the mouse will move. Imagine futures with that model, then commit. You succeed only if the model predicts their <strong>trajectories</strong> well enough to thread a 3D path to the mouse.</div>
+
+  <div class="grid metrics">
+    <div class="metric"><div class="label">Room</div><div id="mRoom" class="value">1 / 3</div></div>
+    <div class="metric"><div class="label">Moves left</div><div id="mMoves" class="value">14</div></div>
+    <div class="metric"><div class="label">Pred. error</div><div id="mErr" class="value">—</div></div>
+    <div class="metric"><div class="label">WM score</div><div id="mScore" class="value">0</div></div>
+  </div>
+
+  <div class="grid two" style="margin-top:15px">
+    <section class="card">
+      <h2>1. Imagine, then walk</h2>
+      <div class="tiny">Drag the room to look around. Yellow = your imagined path. Purple ghosts = people your world model expects. The real mouse and people only move when you commit.</div>
+      <canvas id="view" width="760" height="520" aria-label="3D room with Liucian, furniture, moving people, and a mouse"></canvas>
+      <div class="legend">
+        <span><span class="dot" style="background:#d8a66d"></span>Liucian</span>
+        <span><span class="dot" style="background:#d8dce7"></span>Mouse</span>
+        <span><span class="dot" style="background:#b997ff"></span>People</span>
+        <span><span class="dot" style="background:#6c96d1"></span>Sofa</span>
+        <span><span class="dot" style="background:#cf8b5d"></span>Chair</span>
+        <span><span class="dot" style="background:#87b487"></span>Table</span>
+        <span><span class="dot" style="background:#c27a1a"></span>Imagined path</span>
+        <span><span class="dot" style="background:#7c3aed"></span>Predicted next</span>
+        <span><span class="dot" style="background:#237a4b"></span>True next</span>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <button id="btnL" type="button">↖ Veer left</button>
+        <button id="btnF" type="button" class="primary">↑ Forward</button>
+        <button id="btnR" type="button">↗ Veer right</button>
+      </div>
+      <button id="imagineBtn" type="button">Imagine futures</button>
+      <button id="commitBtn" type="button" class="primary">Commit move</button>
+      <button id="watchBtn" type="button">Watch 3 true steps</button>
+      <button id="nextBtn" type="button" disabled>Next room</button>
+      <button id="resetBtn" type="button">Replay room</button>
+      <div id="feedback" class="feedback" aria-live="polite">Tune the world model, imagine, then commit a first step.</div>
+    </section>
+
+    <section class="card">
+      <h2>2. Your world model ẑ</h2>
+      <div class="tiny">This is <em>your</em> dynamics. Reality uses a hidden true model. Match it, or imagined gaps will close.</div>
+      <div class="box">
+        <label>Obstacle speed × <b id="obsOut">1.00</b></label>
+        <input id="obsSpeed" type="range" min="0.40" max="2.00" step="0.05" value="1.00">
+        <label style="display:block;margin-top:8px">Target speed × <b id="tgtOut">1.00</b></label>
+        <input id="tgtSpeed" type="range" min="0.40" max="2.00" step="0.05" value="1.00">
+        <label style="display:block;margin-top:8px">Target motion</label>
+        <select id="tgtMode">
+          <option value="still">Still (mouse waits)</option>
+          <option value="patrol">Patrol (bounce in a line)</option>
+          <option value="orbit">Orbit (circle the table)</option>
+        </select>
+        <label style="display:flex;gap:8px;align-items:center;margin-top:10px">
+          <input id="bounceOn" type="checkbox" checked>
+          People bounce off walls and furniture
+        </label>
+        <label style="display:block;margin-top:8px">Horizon H = <b id="hOut">6</b> steps</label>
+        <input id="horizon" type="range" min="3" max="8" step="1" value="6">
+      </div>
+      <div class="box">
+        <b>Pipeline</b>
+        <div class="math">oₜ → zₜ = enc(oₜ)</div>
+        <div class="math">ẑₜ₊₁ = fθ(zₜ, aₜ, Ôₜ) &nbsp; ← your fθ</div>
+        <div class="math">A* = argmax Σ [progress − λ risk]</div>
+        <div class="tiny" style="margin-top:8px">Furniture is known and static. Moving people and the mouse are what the world model must get right at every future step.</div>
+      </div>
+      <div class="box">
+        <b>Imagined first actions</b>
+        <div id="rollouts" class="tiny" style="margin-top:6px">Not simulated yet.</div>
+      </div>
+      <div class="box">
+        <b>🎯 Challenge</b>
+        <div class="tiny" style="margin-top:6px">Catch the mouse in all 3 rooms without a collision. A good world model keeps prediction error low and the gold path actually safe.</div>
+        <div>Rooms solved: <strong id="won">0 / 3</strong></div>
+        <div id="challenge" class="feedback"></div>
+      </div>
+    </section>
+  </div>
+</main>
+<script>
+(() => {
+  const lp = window.LearnPlay || {score(){},answer(){},taskStart(){},taskEnd(){},complete(){},stage(){}};
+  const $ = (id) => document.getElementById(id);
+  const canvas = $("view");
+  const ctx = canvas.getContext("2d");
+  const W = canvas.width, H = canvas.height;
+  const CAT_R = 0.34, MOUSE_R = 0.22, PERSON_R = 0.32;
+
+  const furniture = [
+    {kind:"box", name:"chair", x:-1.6, z:1.4, w:1.1, d:1.1, h:0.85, color:"#cf8b5d"},
+    {kind:"box", name:"sofa", x:0.4, z:-0.2, w:2.2, d:0.95, h:0.75, color:"#6c96d1"},
+    {kind:"cyl", name:"table", x:2.3, z:1.8, r:0.85, h:0.7, color:"#87b487"},
+  ];
+
+  const rooms = [
+    {
+      name: "one walker",
+      hint: "The mouse waits. One person cuts the corridor and bounces. Keep bounce on and obstacle speed near 1.0, then imagine before you walk.",
+      moves: 18,
+      true: {obsSpeed: 1.0, tgtSpeed: 1.0, tgtMode: "still", bounce: true},
+      people: [{x: -2.4, z: 2.4, vx: 0.58, vz: -0.2}],
+      mouse: {x: 3.7, z: -3.5, vx: 0, vz: 0},
+      cat: {x: -3.8, z: 3.6, yaw: -0.85},
+    },
+    {
+      name: "crossing paths",
+      hint: "The mouse patrols the far wall. Still / orbit will chase the last spot and miss. Set target motion to Patrol, obstacle speed a bit above 1, and use a longer horizon to intercept.",
+      moves: 16,
+      true: {obsSpeed: 1.2, tgtSpeed: 1.0, tgtMode: "patrol", bounce: true},
+      people: [{x: -3.5, z: 1.8, vx: 0.72, vz: -0.05}],
+      mouse: {x: 3.6, z: -3.4, vx: -0.62, vz: 0.05},
+      cat: {x: -3.8, z: 3.6, yaw: -0.7},
+    },
+    {
+      name: "orbit dinner",
+      hint: "The mouse circles the table. A still world model walks to where dinner used to be. Set target motion to Orbit and match target speed so the gold path leads the circle.",
+      moves: 16,
+      true: {obsSpeed: 0.85, tgtSpeed: 1.15, tgtMode: "orbit", bounce: true},
+      people: [{x: 3.2, z: 3.0, vx: -0.55, vz: -0.15}],
+      mouse: {x: 2.3, z: -0.6, vx: 0, vz: 0.5},
+      cat: {x: -3.8, z: 3.6, yaw: -0.7},
+    },
+  ];
+
+  let room = 0, wins = 0, score = 0, moves = 18, over = false;
+  let cat, people, mouse, selected = 0, rollouts = [], lastErr = null, lastGhost = null;
+  const cam = {yaw: 0.28, pitch: 0.98, dist: 11.2};
+
+  function wm() {
+    return {
+      obsSpeed: +$("obsSpeed").value,
+      tgtSpeed: +$("tgtSpeed").value,
+      tgtMode: $("tgtMode").value,
+      bounce: $("bounceOn").checked,
+      H: +$("horizon").value,
+    };
+  }
+
+  function clonePeople(src) { return src.map((p) => ({...p})); }
+
+  function hitFurniture(x, z, rad) {
+    for (const o of furniture) {
+      if (o.kind === "cyl") {
+        if (Math.hypot(x - o.x, z - o.z) < o.r + rad) return true;
+      } else if (Math.abs(x - o.x) < o.w / 2 + rad && Math.abs(z - o.z) < o.d / 2 + rad) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function bounceVel(p, scale, doBounce) {
+    let vx = p.vx * scale, vz = p.vz * scale;
+    let x = p.x + vx, z = p.z + vz;
+    if (doBounce) {
+      if (x < -4.4 || x > 4.4) { vx *= -1; x = Math.max(-4.4, Math.min(4.4, x)); }
+      if (z < -4.4 || z > 4.4) { vz *= -1; z = Math.max(-4.4, Math.min(4.4, z)); }
+      if (hitFurniture(x, z, PERSON_R)) {
+        if (Math.abs(vx) >= Math.abs(vz)) vx *= -1; else vz *= -1;
+        x = p.x + vx; z = p.z + vz;
+      }
+    } else {
+      x = Math.max(-4.6, Math.min(4.6, x));
+      z = Math.max(-4.6, Math.min(4.6, z));
+    }
+    return {x, z, vx: vx / scale, vz: vz / scale};
+  }
+
+  function stepMouse(m, cfg) {
+    if (cfg.tgtMode === "still") return {...m, vx: 0, vz: 0};
+    if (cfg.tgtMode === "orbit") {
+      const cx = 2.3, cz = 1.8;
+      const ang = Math.atan2(m.z - cz, m.x - cx) + 0.22 * cfg.tgtSpeed;
+      const rad = Math.hypot(m.x - cx, m.z - cz) || 1.35;
+      return {x: cx + Math.cos(ang) * rad, z: cz + Math.sin(ang) * rad, vx: m.vx, vz: m.vz};
+    }
+    const n = bounceVel({x: m.x, z: m.z, vx: m.vx, vz: m.vz}, cfg.tgtSpeed, true);
+    return {x: n.x, z: n.z, vx: n.vx, vz: n.vz};
+  }
+
+  function stepPeople(ps, cfg) {
+    return ps.map((p) => {
+      const n = bounceVel(p, cfg.obsSpeed, cfg.bounce);
+      return {x: n.x, z: n.z, vx: n.vx, vz: n.vz};
+    });
+  }
+
+  function stepCat(s, a) {
+    const yaw = s.yaw + a * 0.28;
+    const spd = 0.82;
+    return {x: s.x + Math.cos(yaw) * spd, z: s.z + Math.sin(yaw) * spd, yaw};
+  }
+
+  function collide(s, ps, m) {
+    if (s.x < -4.7 || s.x > 4.7 || s.z < -4.7 || s.z > 4.7) return "wall";
+    if (hitFurniture(s.x, s.z, CAT_R)) return "furniture";
+    if (ps.some((p) => Math.hypot(s.x - p.x, s.z - p.z) < CAT_R + PERSON_R)) return "person";
+    return null;
+  }
+
+  function caught(s, m) { return Math.hypot(s.x - m.x, s.z - m.z) < CAT_R + MOUSE_R + 0.26; }
+
+  function simulate(actions, model, startCat, startPeople, startMouse) {
+    let s = {...startCat};
+    let ps = clonePeople(startPeople);
+    let m = {...startMouse};
+    const path = [];
+    const peoplePath = ps.map(() => []);
+    const mousePath = [];
+    let risk = 0, hits = 0, progress = 0;
+    let prev = Math.hypot(s.x - m.x, s.z - m.z);
+    for (const a of actions) {
+      ps = stepPeople(ps, model);
+      m = stepMouse(m, model);
+      s = stepCat(s, a);
+      const hit = collide(s, ps, m);
+      if (hit) hits += 1;
+      const dPerson = Math.min(...ps.map((p) => Math.hypot(s.x - p.x, s.z - p.z) - PERSON_R - CAT_R), 9);
+      risk = Math.max(risk, Math.max(0, 1 - dPerson / 1.4));
+      const next = Math.hypot(s.x - m.x, s.z - m.z);
+      progress += prev - next;
+      prev = next;
+      path.push({...s});
+      ps.forEach((p, i) => peoplePath[i].push({...p}));
+      mousePath.push({...m});
+    }
+    const final = Math.hypot(s.x - m.x, s.z - m.z);
+    let sc = progress * 2.5 + (10 - final) * 2.2 - risk * 10 - hits * 28;
+    if (caught(s, m)) sc += 22;
+    return {actions, a: actions[0] || 0, path, peoplePath, mousePath, score: sc, hits, risk};
+  }
+
+  function plan(model) {
+    const H = model.H;
+    const acts = [-1, 0, 1];
+    let beam = [{actions: [], score: 0}];
+    for (let d = 0; d < H; d++) {
+      const exp = [];
+      for (const part of beam) {
+        for (const a of acts) exp.push(simulate([...part.actions, a], model, cat, people, mouse));
+      }
+      exp.sort((x, y) => y.score - x.score);
+      beam = exp.slice(0, 20);
+    }
+    return beam.sort((x, y) => y.score - x.score);
+  }
+
+  function startRoom() {
+    const R = rooms[room];
+    cat = {...R.cat};
+    people = clonePeople(R.people);
+    mouse = {...R.mouse};
+    moves = R.moves;
+    over = false;
+    rollouts = [];
+    lastErr = null;
+    lastGhost = null;
+    selected = 0;
+    $("mRoom").textContent = (room + 1) + " / 3";
+    $("mMoves").textContent = String(moves);
+    $("mErr").textContent = "—";
+    $("nextBtn").disabled = true;
+    $("feedback").className = "feedback";
+    $("feedback").textContent = R.hint;
+    markAction();
+    lp.taskStart("room-" + (room + 1));
+    draw();
+  }
+
+  function markAction() {
+    [["btnL", -1], ["btnF", 0], ["btnR", 1]].forEach(([id, a]) => {
+      $(id).classList.toggle("active", selected === a);
+    });
+  }
+
+  function imagine() {
+    if (over) return;
+    const model = wm();
+    const cands = plan(model);
+    const best = cands[0];
+    rollouts = [-1, 0, 1].map((first) => {
+      const hit = cands.find((r) => r.actions[0] === first);
+      return hit || simulate(Array.from({length: model.H}, (_, i) => (i === 0 ? first : 0)), model, cat, people, mouse);
+    });
+    $("rollouts").innerHTML = rollouts.map((r) => {
+      const name = {[-1]: "Left", [0]: "Forward", [1]: "Right"}[r.a];
+      const seq = r.actions.map((a) => ({[-1]: "L", [0]: "F", [1]: "R"}[a])).join("→");
+      const rec = r.a === best.a ? " · recommended by your WM" : "";
+      const hit = r.hits ? " · predicted collision" : "";
+      return `<div><b>${name}</b> ${seq}<br>score ${r.score.toFixed(1)} · risk ${(r.risk * 100).toFixed(0)}%${hit}${rec}</div>`;
+    }).join("<br>");
+    $("feedback").className = "feedback";
+    $("feedback").textContent = "Your world model recommends " + ({[-1]: "LEFT", [0]: "FORWARD", [1]: "RIGHT"}[best.a]) + ". Commit only if those purple ghosts look right.";
+    draw();
+  }
+
+  function predError(roll, nextPeople, nextMouse) {
+    if (!roll) return null;
+    const p0 = roll.peoplePath.map((track) => track[0]).filter(Boolean);
+    let e = 0, n = 0;
+    p0.forEach((p, i) => {
+      if (!nextPeople[i]) return;
+      e += Math.hypot(p.x - nextPeople[i].x, p.z - nextPeople[i].z);
+      n += 1;
+    });
+    if (roll.mousePath[0]) {
+      e += Math.hypot(roll.mousePath[0].x - nextMouse.x, roll.mousePath[0].z - nextMouse.z);
+      n += 1;
+    }
+    return n ? e / n : null;
+  }
+
+  function commit() {
+    if (over || moves <= 0) return;
+    if (!rollouts.length) imagine();
+    const chosen = rollouts.find((r) => r.a === selected) || rollouts[1];
+    const truth = rooms[room].true;
+    const before = Math.hypot(cat.x - mouse.x, cat.z - mouse.z);
+    const nextPeople = stepPeople(people, truth);
+    const nextMouse = stepMouse(mouse, truth);
+    const err = predError(chosen, nextPeople, nextMouse);
+    lastErr = err;
+    $("mErr").textContent = err == null ? "—" : err.toFixed(2);
+    lastGhost = {
+      people: (chosen.peoplePath || []).map((track) => track[0]).filter(Boolean),
+      mouse: chosen.mousePath && chosen.mousePath[0] ? chosen.mousePath[0] : null,
+      truePeople: nextPeople,
+      trueMouse: nextMouse,
+    };
+    people = nextPeople;
+    mouse = nextMouse;
+    cat = stepCat(cat, selected);
+    moves -= 1;
+    $("mMoves").textContent = String(moves);
+    const hit = collide(cat, people, mouse);
+    const after = Math.hypot(cat.x - mouse.x, cat.z - mouse.z);
+    let pts = Math.max(0, Math.round((before - after) * 6));
+    if (err != null) pts += err < 0.35 ? 4 : err < 0.7 ? 1 : 0;
+    if (hit) {
+      over = true;
+      $("feedback").className = "feedback bad";
+      $("feedback").textContent = "Collision with the " + hit + ". The imagined future used a world model that missed a trajectory.";
+      lp.answer({correct: false, taskId: "room-" + (room + 1), points: 0});
+      lp.taskEnd("room-" + (room + 1));
+    } else if (caught(cat, mouse)) {
+      over = true;
+      wins += 1;
+      const bonus = err != null && err < 0.35 ? 12 : 8;
+      score += 20 + bonus + pts;
+      $("won").textContent = wins + " / 3";
+      $("mScore").textContent = String(score);
+      $("feedback").className = "feedback good";
+      $("feedback").textContent = "Mouse caught. Your world model predicted the movers well enough to plan a safe path.";
+      $("nextBtn").disabled = room >= 2;
+      lp.answer({correct: true, taskId: "room-" + (room + 1), points: 20 + bonus});
+      lp.score(20 + bonus);
+      lp.taskEnd("room-" + (room + 1));
+      if (window.LearnPlay) LearnPlay.stage(wins, 3, {complete: wins >= 3, points: 20 + bonus, label: "Room " + (room + 1), id: "room-" + (room + 1)});
+      if (wins >= 3) {
+        $("challenge").className = "feedback good";
+        $("challenge").textContent = "All rooms solved. The configured dynamics matched the hidden world.";
+        lp.complete({score});
+      }
+    } else if (moves <= 0) {
+      over = true;
+      $("feedback").className = "feedback bad";
+      $("feedback").textContent = "Out of moves. Re-tune the world model — the mouse and people kept going where your ẑ did not.";
+      lp.answer({correct: false, taskId: "room-" + (room + 1), points: 0});
+      lp.taskEnd("room-" + (room + 1));
+    } else {
+      score += pts;
+      $("mScore").textContent = String(score);
+      if (pts) lp.score(pts);
+      $("feedback").className = "feedback";
+      $("feedback").textContent = err != null && err > 0.7
+        ? "Step taken, but prediction error is high. Your fθ is drifting from the true trajectories."
+        : "Step taken. Re-imagine from the new observation.";
+    }
+    rollouts = [];
+    $("rollouts").textContent = "Re-imagine from the new state.";
+    draw();
+  }
+
+  function watchTruth() {
+    if (over) return;
+    const truth = rooms[room].true;
+    for (let i = 0; i < 3; i++) {
+      people = stepPeople(people, truth);
+      mouse = stepMouse(mouse, truth);
+    }
+    $("feedback").className = "feedback";
+    $("feedback").textContent = "Watched 3 true steps. Use that evidence to set obstacle speed, bounce, and target motion.";
+    draw();
+  }
+
+  function project(x, y, z) {
+    const cy = Math.cos(cam.yaw), sy = Math.sin(cam.yaw);
+    const cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch);
+    let dx = x, dy = y - 0.1, dz = z;
+    let rx = dx * cy - dz * sy;
+    let rz = dx * sy + dz * cy;
+    let ry = dy * cp - rz * sp;
+    rz = dy * sp + rz * cp;
+    rz += cam.dist;
+    const f = 640 / Math.max(0.8, rz);
+    return {x: W * 0.52 + rx * f, y: H * 0.62 - ry * f, d: rz};
+  }
+
+  function strokePoly(pts, fill, stroke, width) {
+    if (pts.length < 2) return;
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+    ctx.closePath();
+    if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+    if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = width || 1; ctx.stroke(); }
+  }
+
+  function drawBox(o) {
+    const hx = o.w / 2, hz = o.d / 2;
+    const c = [
+      [o.x - hx, 0, o.z - hz], [o.x + hx, 0, o.z - hz], [o.x + hx, 0, o.z + hz], [o.x - hx, 0, o.z + hz],
+      [o.x - hx, o.h, o.z - hz], [o.x + hx, o.h, o.z - hz], [o.x + hx, o.h, o.z + hz], [o.x - hx, o.h, o.z + hz],
+    ].map((p) => project(p[0], p[1], p[2]));
+    const faces = [
+      [0, 1, 2, 3], [4, 5, 6, 7], [0, 1, 5, 4], [1, 2, 6, 5], [2, 3, 7, 6], [3, 0, 4, 7],
+    ];
+    const shaded = ["#0000", o.color, shade(o.color, 0.9), shade(o.color, 0.75), shade(o.color, 0.82), shade(o.color, 1.05)];
+    faces
+      .map((idx, i) => ({idx, i, d: idx.reduce((s, k) => s + c[k].d, 0)}))
+      .sort((a, b) => b.d - a.d)
+      .forEach((f) => strokePoly(f.idx.map((k) => c[k]), shaded[f.i] === "#0000" ? o.color : shaded[f.i], "#4b5563", 1));
+  }
+
+  function shade(hex, k) {
+    const n = parseInt(hex.slice(1), 16);
+    const r = Math.min(255, Math.round(((n >> 16) & 255) * k));
+    const g = Math.min(255, Math.round(((n >> 8) & 255) * k));
+    const b = Math.min(255, Math.round((n & 255) * k));
+    return `rgb(${r},${g},${b})`;
+  }
+
+  function drawCyl(x, z, r, h, color) {
+    const ring = [];
+    for (let i = 0; i < 10; i++) {
+      const a = (i / 10) * Math.PI * 2;
+      ring.push([x + Math.cos(a) * r, z + Math.sin(a) * r]);
+    }
+    const top = ring.map((p) => project(p[0], h, p[1]));
+    const bot = ring.map((p) => project(p[0], 0, p[1]));
+    strokePoly(bot, shade(color, 0.7), "#4b5563", 1);
+    for (let i = 0; i < 10; i++) {
+      const j = (i + 1) % 10;
+      strokePoly([bot[i], bot[j], top[j], top[i]], shade(color, 0.85 + 0.15 * Math.sin(i)), "#4b5563", 1);
+    }
+    strokePoly(top, color, "#4b5563", 1);
+  }
+
+  function drawFloor() {
+    const sky = ctx.createLinearGradient(0, 0, 0, H * 0.45);
+    sky.addColorStop(0, "#9eb4c9");
+    sky.addColorStop(1, "#cfd8e3");
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, W, H);
+    for (let xi = -5; xi < 5; xi += 1) {
+      for (let zi = -5; zi < 5; zi += 1) {
+        const tile = [
+          project(xi, 0, zi), project(xi + 1, 0, zi), project(xi + 1, 0, zi + 1), project(xi, 0, zi + 1),
+        ];
+        const light = ((xi + zi) & 1) === 0;
+        strokePoly(tile, light ? "#eef3f8" : "#b4c0ce", "#8b98a8", 0.7);
+      }
+    }
+    const back = [project(-5, 0, -5), project(5, 0, -5), project(5, 2.1, -5), project(-5, 2.1, -5)];
+    strokePoly(back, "rgba(150,166,184,.62)", "#6f7d8d", 1.2);
+  }
+
+  function drawShadow(x, z, r) {
+    const pts = [];
+    for (let i = 0; i < 10; i++) {
+      const a = (i / 10) * Math.PI * 2;
+      pts.push(project(x + Math.cos(a) * r, 0.02, z + Math.sin(a) * r));
+    }
+    strokePoly(pts, "rgba(31,41,55,.22)", null, 0);
+  }
+
+  function drawPath(pts, color, width, dash) {
+    if (!pts.length) return;
+    ctx.save();
+    ctx.strokeStyle = color; ctx.lineWidth = width; ctx.setLineDash(dash || []);
+    ctx.beginPath();
+    const p0 = project(cat.x, 0.04, cat.z);
+    ctx.moveTo(p0.x, p0.y);
+    pts.forEach((p) => { const q = project(p.x, 0.04, p.z); ctx.lineTo(q.x, q.y); });
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function draw() {
+    drawFloor();
+    const sprites = [];
+    furniture.forEach((o) => sprites.push({d: project(o.x, o.h / 2, o.z).d, draw: () => o.kind === "cyl" ? drawCyl(o.x, o.z, o.r, o.h, o.color) : drawBox(o)}));
+    people.forEach((p) => sprites.push({d: project(p.x, 0.7, p.z).d, draw: () => {
+      drawShadow(p.x, p.z, PERSON_R + 0.12);
+      drawCyl(p.x, p.z, PERSON_R, 1.15, "#b997ff");
+      const tip = project(p.x + p.vx * 1.4, 0.7, p.z + p.vz * 1.4);
+      const base = project(p.x, 0.7, p.z);
+      ctx.strokeStyle = "#5b21b6"; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(base.x, base.y); ctx.lineTo(tip.x, tip.y); ctx.stroke();
+    }}));
+    sprites.push({d: project(mouse.x, 0.2, mouse.z).d, draw: () => {
+      drawShadow(mouse.x, mouse.z, MOUSE_R + 0.1);
+      drawCyl(mouse.x, mouse.z, MOUSE_R, 0.28, "#f3f4f6");
+      const q = project(mouse.x, 0.55, mouse.z);
+      ctx.fillStyle = "#111827"; ctx.font = "12px Inter,system-ui,sans-serif";
+      ctx.fillText("mouse", q.x - 16, q.y);
+    }});
+    sprites.push({d: project(cat.x, 0.3, cat.z).d, draw: () => {
+      drawShadow(cat.x, cat.z, 0.42);
+      drawBox({x: cat.x, z: cat.z, w: 0.7, d: 0.42, h: 0.38, color: "#d8a66d"});
+      const hx = cat.x + Math.cos(cat.yaw) * 0.28;
+      const hz = cat.z + Math.sin(cat.yaw) * 0.28;
+      drawCyl(hx, hz, 0.2, 0.42, "#e0b27a");
+      const q = project(cat.x, 0.7, cat.z);
+      ctx.fillStyle = "#111827"; ctx.font = "12px Inter,system-ui,sans-serif";
+      ctx.fillText("Liucian", q.x - 18, q.y);
+    }});
+    const chosen = rollouts.find((r) => r.a === selected);
+    rollouts.forEach((r) => {
+      const rec = rollouts.reduce((b, x) => x.score > b.score ? x : b, rollouts[0]);
+      if (r.a === selected) drawPath(r.path, "#c27a1a", 3, []);
+      else if (r === rec) drawPath(r.path, "#237a4b", 2, [8, 5]);
+      else drawPath(r.path, "#9ca3af", 1.5, [4, 5]);
+    });
+    if (chosen) {
+      chosen.peoplePath.forEach((track) => track.forEach((p, i) => {
+        const q = project(p.x, 0.15, p.z);
+        ctx.globalAlpha = 0.18 + i * 0.08;
+        ctx.strokeStyle = "#7c3aed"; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.arc(q.x, q.y, 7, 0, Math.PI * 2); ctx.stroke();
+        ctx.globalAlpha = 1;
+      }));
+      chosen.mousePath.forEach((p, i) => {
+        const q = project(p.x, 0.12, p.z);
+        ctx.globalAlpha = 0.2 + i * 0.08;
+        ctx.strokeStyle = "#111827"; ctx.lineWidth = 1.2;
+        ctx.beginPath(); ctx.arc(q.x, q.y, 5, 0, Math.PI * 2); ctx.stroke();
+        ctx.globalAlpha = 1;
+      });
+    }
+    if (lastGhost) {
+      lastGhost.people.forEach((p) => {
+        const q = project(p.x, 0.16, p.z);
+        ctx.strokeStyle = "#7c3aed"; ctx.lineWidth = 2; ctx.setLineDash([3, 3]);
+        ctx.beginPath(); ctx.arc(q.x, q.y, 9, 0, Math.PI * 2); ctx.stroke();
+        ctx.setLineDash([]);
+      });
+      lastGhost.truePeople.forEach((p) => {
+        const q = project(p.x, 0.16, p.z);
+        ctx.strokeStyle = "#237a4b"; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(q.x, q.y, 11, 0, Math.PI * 2); ctx.stroke();
+      });
+      if (lastGhost.mouse) {
+        const q = project(lastGhost.mouse.x, 0.12, lastGhost.mouse.z);
+        ctx.strokeStyle = "#111827"; ctx.lineWidth = 1.6; ctx.setLineDash([3, 3]);
+        ctx.beginPath(); ctx.arc(q.x, q.y, 7, 0, Math.PI * 2); ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+    sprites.sort((a, b) => b.d - a.d).forEach((s) => s.draw());
+  }
+
+  function onWmChange() {
+    $("obsOut").textContent = (+$("obsSpeed").value).toFixed(2);
+    $("tgtOut").textContent = (+$("tgtSpeed").value).toFixed(2);
+    $("hOut").textContent = $("horizon").value;
+    lastGhost = null;
+    if (!over) imagine();
+  }
+  $("obsSpeed").oninput = onWmChange;
+  $("tgtSpeed").oninput = onWmChange;
+  $("horizon").oninput = onWmChange;
+  $("tgtMode").onchange = onWmChange;
+  $("bounceOn").onchange = onWmChange;
+  $("btnL").onclick = () => { selected = -1; markAction(); draw(); };
+  $("btnF").onclick = () => { selected = 0; markAction(); draw(); };
+  $("btnR").onclick = () => { selected = 1; markAction(); draw(); };
+  $("imagineBtn").onclick = imagine;
+  $("commitBtn").onclick = commit;
+  $("watchBtn").onclick = watchTruth;
+  $("resetBtn").onclick = startRoom;
+  $("nextBtn").onclick = () => { if (room < 2) { room += 1; startRoom(); } };
+
+  let drag = null;
+  canvas.addEventListener("pointerdown", (e) => {
+    drag = {x: e.clientX, y: e.clientY, yaw: cam.yaw, pitch: cam.pitch};
+    canvas.setPointerCapture(e.pointerId);
+    canvas.style.cursor = "grabbing";
+  });
+  canvas.addEventListener("pointermove", (e) => {
+    if (!drag) return;
+    cam.yaw = drag.yaw + (e.clientX - drag.x) * 0.008;
+    cam.pitch = Math.max(0.28, Math.min(1.15, drag.pitch + (e.clientY - drag.y) * 0.006));
+    draw();
+  });
+  canvas.addEventListener("pointerup", () => { drag = null; canvas.style.cursor = "grab"; });
+
+  startRoom();
+})();
+</script>
+</body>
+</html>

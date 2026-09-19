@@ -725,6 +725,43 @@ def create_edit_draft(
     return _draft_to_out(draft)
 
 
+@router.post("/{game_id}/files", response_model=GameOut)
+async def replace_game_files(
+    game_id: str,
+    file: UploadFile = File(...),
+    icon: UploadFile | None = File(default=None),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_game_author),
+) -> GameOut:
+    game = _owned_game(db, user, game_id)
+    raw = await file.read()
+    filename = file.filename or "game.html"
+    try:
+        if filename.lower().endswith(".zip"):
+            entry = save_uploaded_zip(game.id, raw)
+            game.html = None
+        else:
+            html = raw.decode("utf-8", errors="replace")
+            if not html.strip():
+                raise HTTPException(status_code=400, detail="HTML is required")
+            entry = save_uploaded_html(game.id, html, filename)
+            game.html = html
+        dest = game_dir(game.id)
+        if icon is not None and (icon.filename or "").strip():
+            raw_icon = await icon.read()
+            if raw_icon:
+                save_game_icon(dest, raw_icon)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    game.entry_path = entry
+    db.commit()
+    db.refresh(game)
+    write_game_preview(game)
+    return game_to_out(game)
+
+
 @router.post("/{game_id}/snapshot", response_model=GameOut)
 async def update_game_snapshot(
     game_id: str,

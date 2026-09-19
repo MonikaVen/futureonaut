@@ -210,6 +210,40 @@ class SnapshotEndpointTests(unittest.TestCase):
         out = asyncio.run(run())
         self.assertEqual(out.id, game_id)
 
+    def test_owner_can_replace_html_files(self) -> None:
+        import asyncio
+        from unittest.mock import AsyncMock, MagicMock
+        from uuid import uuid4
+
+        from app.models import UserRole
+        from app.routers.games import replace_game_files
+
+        game_id = uuid4()
+        user_id = uuid4()
+        game = SimpleNamespace(id=game_id, owner_id=user_id, title="Lab", html="old", entry_path="index.html")
+        user = SimpleNamespace(id=user_id, role=UserRole.creator)
+        upload = MagicMock()
+        upload.filename = "lab.html"
+        upload.read = AsyncMock(return_value=b"<html>new lab</html>")
+
+        async def run():
+            with (
+                patch("app.routers.games._owned_game", return_value=game),
+                patch("app.routers.games.save_uploaded_html", return_value="index.html") as save,
+                patch("app.routers.games.write_game_preview") as preview,
+                patch("app.routers.games.game_dir", return_value=Path("/tmp/game")),
+                patch("app.routers.games.game_to_out", return_value=SimpleNamespace(id=game_id, title="Lab")),
+            ):
+                db = MagicMock()
+                out = await replace_game_files(str(game_id), upload, None, db, user)
+            save.assert_called_once()
+            preview.assert_called_once_with(game)
+            self.assertEqual(game.html, "<html>new lab</html>")
+            return out
+
+        out = asyncio.run(run())
+        self.assertEqual(out.id, game_id)
+
 
 if __name__ == "__main__":
     unittest.main()
