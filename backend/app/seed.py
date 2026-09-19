@@ -24,3 +24,28 @@ def seed_admin() -> None:
         db.commit()
     finally:
         db.close()
+
+
+def seed_futureonaut() -> None:
+    """Platform creator who publishes the seeded HTML labs."""
+    settings = get_settings()
+    db = SessionLocal()
+    try:
+        existing = db.query(User).filter(User.email == settings.creator_email.lower()).first()
+        if existing:
+            existing.display_name = settings.creator_name
+            if existing.role == UserRole.learner:
+                existing.role = UserRole.creator
+            db.commit()
+            return
+        db.add(
+            User(
+                email=settings.creator_email.lower(),
+                password_hash=hash_password(settings.creator_password),
+                display_name=settings.creator_name,
+                role=UserRole.creator,
+            )
+        )
+        db.commit()
+    finally:
+        db.close()

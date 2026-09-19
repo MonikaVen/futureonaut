@@ -4,7 +4,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from fastapi.responses import FileResponse, HTMLResponse
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.auth import get_current_user, require_roles
 from app.database import get_db
@@ -43,7 +43,7 @@ def list_languages() -> dict:
 
 @router.get("", response_model=list[GameOut])
 def list_games(db: Session = Depends(get_db)) -> list[GameOut]:
-    games = db.query(Game).order_by(Game.created_at.desc()).all()
+    games = db.query(Game).options(joinedload(Game.owner)).order_by(Game.created_at.desc()).all()
     return [game_to_out(g) for g in games]
 
 
@@ -52,7 +52,7 @@ def my_games(
     db: Session = Depends(get_db),
     user: User = Depends(require_roles(UserRole.creator, UserRole.admin)),
 ) -> list[GameOut]:
-    q = db.query(Game)
+    q = db.query(Game).options(joinedload(Game.owner))
     if user.role != UserRole.admin:
         q = q.filter(Game.owner_id == user.id)
     return [game_to_out(g) for g in q.order_by(Game.created_at.desc()).all()]

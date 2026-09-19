@@ -139,7 +139,7 @@ button:disabled{opacity:.4;cursor:not-allowed}
   }
   function startKitchen(){
     pulls=shuffle(kitchens[kitchen]); counts=[0,0,0,0]; sums=[0,0,0,0];
-    left=BUDGET; treats=0; finished=false; streak=0; catX=140;
+    left=BUDGET; treats=0; finished=false; streak=0; catX=200;
     $("nextBtn").disabled=true; $("aiBtn").disabled=false; $("greedyBtn").disabled=false;
     $("feedback").textContent=`Kitchen ${kitchen+1}: bowls shuffled. Explore first, then exploit.`;
     $("feedback").className="fb";

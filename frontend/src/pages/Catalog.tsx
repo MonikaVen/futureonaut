@@ -115,6 +115,7 @@ export function CatalogPage() {
           <article key={g.id} className="game-tile">
             <h3>{g.title}</h3>
             <p className="meta">{g.description || "No description"}</p>
+            {g.owner_name && <p className="meta">by {g.owner_name}</p>}
             <div className="tags">
               <span className="tag">{primaryTopic(g)}</span>
               <span className="tag">Lv {g.difficulty}</span>

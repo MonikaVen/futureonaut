@@ -47,6 +47,7 @@ class GameOut(BaseModel):
     title: str
     description: str
     owner_id: uuid.UUID
+    owner_name: str | None = None
     source: GameSource
     topic_tags: list[str]
     difficulty: int

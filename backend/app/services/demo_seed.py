@@ -72,12 +72,24 @@ def _seed_dir() -> Path:
     return Path(__file__).resolve().parents[2] / "seed_games"
 
 
+def _futureonaut(db) -> User | None:
+    from app.config import get_settings
+
+    settings = get_settings()
+    return (
+        db.query(User)
+        .filter(User.email == settings.creator_email.lower())
+        .first()
+    )
+
+
 def seed_demo_games() -> None:
     db = SessionLocal()
     try:
         admin = db.query(User).filter(User.role == UserRole.admin).first()
         if admin is None:
             return
+        publisher = _futureonaut(db) or admin
 
         if db.query(Game).count() == 0:
             for template_type, content, source in (
@@ -91,7 +103,7 @@ def seed_demo_games() -> None:
                         id=game_id,
                         title=content["title"],
                         description=content["description"],
-                        owner_id=admin.id,
+                        owner_id=publisher.id,
                         source=source,
                         topic_tags=content["topic_tags"],
                         difficulty=content["difficulty"],
@@ -104,13 +116,32 @@ def seed_demo_games() -> None:
                 )
             db.commit()
 
-        seed_html_pack(db, admin.id)
+        seed_html_pack(db, publisher.id)
+        assign_seed_pack_owner(db, publisher.id)
         refresh_seed_game_files(db)
         normalize_game_topics(db)
         detect_missing_languages(db)
         restore_missing_game_files(db)
     finally:
         db.close()
+
+
+def assign_seed_pack_owner(db, owner_id) -> None:
+    """Point seeded HTML labs at the Futureonaut creator account."""
+    manifest_path = _seed_dir() / "manifest.json"
+    if not manifest_path.exists():
+        return
+    titles = {
+        item.get("title") or item["file"]
+        for item in json.loads(manifest_path.read_text(encoding="utf-8"))
+    }
+    changed = False
+    for game in db.query(Game).filter(Game.title.in_(titles)).all():
+        if game.owner_id != owner_id:
+            game.owner_id = owner_id
+            changed = True
+    if changed:
+        db.commit()
 
 
 def refresh_seed_game_files(db) -> None:
