@@ -31,6 +31,7 @@ New playable AI labs (seeded automatically):
 - **Liucian's Overfit Orchard** — train loss vs test loss
 - **Liucian's Precision Pounce** — thresholds, precision, and recall
 - **Liucian's Gradient Valley** — learning rate on a loss landscape
+- **Liucian's 3D World Model** — configure dynamics so predicted obstacle and target trajectories stay true
 
 
 ### Local development (without rebuilding frontend)

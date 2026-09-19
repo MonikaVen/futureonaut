@@ -239,6 +239,17 @@
     "difficulty": 3
   },
   {
+    "file": "liucian_3d_world_model.html",
+    "title": "Liucian 3D World Model",
+    "description": "Configure a 3D world model of moving people and the mouse. You catch dinner only if those predicted trajectories match reality.",
+    "topic_tags": [
+      "Physics",
+      "world-models",
+      "planning"
+    ],
+    "difficulty": 3
+  },
+  {
     "file": "lucian_world_model_obstacle_aware_future_planning.html",
     "title": "Lucian World Model Obstacle Aware Future Planning",
     "description": "Interactive Liucian learning game: Lucian World Model Obstacle Aware Future Planning.",
