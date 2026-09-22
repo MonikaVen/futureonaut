@@ -11,6 +11,9 @@ MAX_DURATION_MS = 24 * 60 * 60 * 1000
 MAX_TASK_ID_LEN = 64
 MAX_INT_DIGITS = 10
 
+# Match Luna / platform prompt input size for game-generation queries.
+MAX_LUNA_QUERY_CHARS = 12_000
+
 _LEVEL_KEYS = ("level", "totalLevels", "total_levels", "levelsCompleted", "levels_completed")
 _DURATION_KEYS = ("durationMs", "duration_ms")
 _DELTA_KEYS = ("delta",)

@@ -11,6 +11,7 @@ from cryptography.fernet import Fernet, InvalidToken
 from fastapi import HTTPException, status
 
 from app.config import get_settings
+from app.limits import MAX_LUNA_QUERY_CHARS
 
 LlmProvider = Literal["openai", "claude", "grok"]
 
@@ -276,7 +277,7 @@ def _chat_messages(user: str, history: list[dict[str, str]] | None) -> list[dict
         role = (item.get("role") or "").strip()
         content = (item.get("content") or "").strip()
         if role in {"user", "assistant"} and content:
-            messages.append({"role": role, "content": content[:8000]})
+            messages.append({"role": role, "content": content[:MAX_LUNA_QUERY_CHARS]})
     messages.append({"role": "user", "content": user})
     return messages[-12:]
 

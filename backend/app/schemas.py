@@ -9,6 +9,7 @@ from app.limits import (
     MAX_EVENT_PAYLOAD_BYTES,
     MAX_EVENT_PAYLOAD_KEY_LEN,
     MAX_EVENT_PAYLOAD_KEYS,
+    MAX_LUNA_QUERY_CHARS,
     cap_event_payload,
 )
 from app.models import EventType, GameSource, UserRole
@@ -203,7 +204,7 @@ class AIGenerateRequest(BaseModel):
 
 class HtmlGenerateRequest(BaseModel):
     topic: str = Field(min_length=2, max_length=200)
-    levels_brief: str = Field(min_length=8, max_length=8000)
+    levels_brief: str = Field(min_length=8, max_length=MAX_LUNA_QUERY_CHARS)
     title: str = Field(default="", max_length=200)
     difficulty: int = Field(default=2, ge=1, le=5)
     level_count: int = Field(default=4, ge=2, le=12)
@@ -250,7 +251,7 @@ class GameDraftOut(BaseModel):
 
 
 class DraftChatRequest(BaseModel):
-    message: str = Field(min_length=2, max_length=8000)
+    message: str = Field(min_length=2, max_length=MAX_LUNA_QUERY_CHARS)
     provider: str = Field(default="openai", max_length=16)
     api_key: str | None = Field(default=None, max_length=256)
     model: str | None = Field(default=None, max_length=80)
@@ -268,7 +269,7 @@ class DraftChatRequest(BaseModel):
 
 
 class DraftReviseRequest(BaseModel):
-    message: str = Field(min_length=2, max_length=8000)
+    message: str = Field(min_length=2, max_length=MAX_LUNA_QUERY_CHARS)
     provider: str = Field(default="openai", max_length=16)
     api_key: str | None = Field(default=None, max_length=256)
     model: str | None = Field(default=None, max_length=80)
@@ -324,9 +325,9 @@ class PlatformPromptsOut(BaseModel):
 
 
 class PlatformPromptsUpdate(BaseModel):
-    style_guidelines: str = Field(min_length=8, max_length=12000)
-    generation_system_prompt: str = Field(min_length=8, max_length=12000)
-    revise_system_prompt: str = Field(min_length=8, max_length=12000)
+    style_guidelines: str = Field(min_length=8, max_length=MAX_LUNA_QUERY_CHARS)
+    generation_system_prompt: str = Field(min_length=8, max_length=MAX_LUNA_QUERY_CHARS)
+    revise_system_prompt: str = Field(min_length=8, max_length=MAX_LUNA_QUERY_CHARS)
 
 
 class CreatorStyleOut(BaseModel):
@@ -338,7 +339,7 @@ class CreatorStyleOut(BaseModel):
 
 class CreatorStyleUpdate(BaseModel):
     source: str = Field(default="futureonaut", max_length=16)
-    custom_guidelines: str = Field(default="", max_length=8000)
+    custom_guidelines: str = Field(default="", max_length=MAX_LUNA_QUERY_CHARS)
 
 
 class SessionCreate(BaseModel):

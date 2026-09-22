@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.auth import create_draft_file_token, decode_draft_file_token, get_optional_user, require_game_author
 from app.database import get_db
+from app.limits import MAX_LUNA_QUERY_CHARS
 from app.models import (
     Classroom,
     ClassroomAssignment,
@@ -376,7 +377,7 @@ async def generate_html_game_endpoint(
     draft = GameDraft(
         title=title[:200],
         topic=body.topic[:200],
-        description=body.levels_brief[:8000],
+        description=body.levels_brief[:MAX_LUNA_QUERY_CHARS],
         owner_id=user.id,
         difficulty=body.difficulty,
         level_count=body.level_count,
@@ -471,7 +472,7 @@ async def chat_draft(
     draft = GameDraft(
         title=title[:200],
         topic=title[:200],
-        description=note[:8000],
+        description=note[:MAX_LUNA_QUERY_CHARS],
         owner_id=user.id,
         difficulty=2,
         level_count=level_count,
@@ -693,7 +694,7 @@ def create_edit_draft(
     draft = GameDraft(
         title=game.title[:200],
         topic=(game.topic_tags[0] if game.topic_tags else game.title)[:200],
-        description=(game.description or "")[:8000],
+        description=(game.description or "")[:MAX_LUNA_QUERY_CHARS],
         owner_id=user.id,
         difficulty=game.difficulty or 2,
         level_count=4,
