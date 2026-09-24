@@ -1,11 +1,18 @@
 from datetime import datetime, timedelta, timezone
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Query, UploadFile, status
 from fastapi.responses import FileResponse
+from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 
-from app.auth import create_draft_file_token, decode_draft_file_token, get_optional_user, require_game_author
+from app.auth import (
+    create_draft_file_token,
+    decode_draft_file_token,
+    decode_token,
+    get_optional_user,
+    require_game_author,
+)
 from app.database import get_db
 from app.limits import MAX_LUNA_QUERY_CHARS
 from app.models import (
@@ -57,6 +64,7 @@ from app.services.demo_seed import restore_game_html_files
 from app.services.prompts import generation_context
 from app.services.handles import allocate_handle, resolve_game, user_slug_for_game
 from app.services.topics import ensure_topic_tag
+from app.services.visibility import can_view_game
 
 # Document CSP sandbox (no allow-same-origin) makes game HTML a unique origin even
 # if opened top-level or framed without the Play UI sandbox, so it cannot read SPA
@@ -97,7 +105,13 @@ def list_games(
     db: Session = Depends(get_db),
     user: User | None = Depends(get_optional_user),
 ) -> list[GameOut]:
-    games = db.query(Game).options(joinedload(Game.owner)).order_by(Game.created_at.desc()).all()
+    query = db.query(Game).options(joinedload(Game.owner))
+    if user is None or user.role != UserRole.admin:
+        if user is None:
+            query = query.filter(Game.is_public.is_(True))
+        else:
+            query = query.filter(or_(Game.is_public.is_(True), Game.owner_id == user.id))
+    games = query.order_by(Game.created_at.desc()).all()
     return enrich_games(db, games, user.id if user else None)
 
 
@@ -308,6 +322,28 @@ def _draft_to_out(draft: GameDraft) -> GameDraftOut:
 def _game_or_404(db: Session, ref: str) -> Game:
     game = resolve_game(db, ref)
     if game is None:
+        raise HTTPException(status_code=404, detail="Game not found")
+    return game
+
+
+def _user_from_access_token(db: Session, token: str | None) -> User | None:
+    if not token:
+        return None
+    try:
+        payload = decode_token(token)
+    except HTTPException:
+        return None
+    if payload.get("type") != "access":
+        return None
+    user_id = payload.get("sub")
+    try:
+        return db.get(User, UUID(user_id)) if user_id else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _visible_or_404(db: Session, game: Game, user: User | None) -> Game:
+    if not can_view_game(db, game, user):
         raise HTTPException(status_code=404, detail="Game not found")
     return game
 
@@ -753,6 +789,7 @@ def get_game_by_handle(
     game = resolve_game(db, f"{owner_slug}/{game_slug}")
     if game is None:
         raise HTTPException(status_code=404, detail="Game not found")
+    _visible_or_404(db, game, user)
     return enrich_games(db, [game], user.id if user else None)[0]
 
 
@@ -762,7 +799,7 @@ def get_game(
     db: Session = Depends(get_db),
     user: User | None = Depends(get_optional_user),
 ) -> GameOut:
-    game = _game_or_404(db, game_id)
+    game = _visible_or_404(db, _game_or_404(db, game_id), user)
     return enrich_games(db, [game], user.id if user else None)[0]
 
 
@@ -773,7 +810,7 @@ def record_game_view(
     user: User | None = Depends(get_optional_user),
     x_visitor_id: str | None = Header(default=None, alias="X-Visitor-Id"),
 ) -> None:
-    game = _game_or_404(db, game_id)
+    game = _visible_or_404(db, _game_or_404(db, game_id), user)
     visitor = (x_visitor_id or "").strip()[:64] or None
     if user is None and not visitor:
         return
@@ -815,6 +852,8 @@ def update_game(
     game = _owned_game(db, user, game_id)
     data = body.model_dump(exclude_unset=True)
     html = data.pop("html", None)
+    if "is_public" in data and user.role not in (UserRole.admin, UserRole.creator):
+        raise HTTPException(status_code=403, detail="Only admins and creators can change game privacy")
     if "title" in data:
         data["title"] = (data["title"] or "").strip()
         if not data["title"]:
@@ -870,10 +909,13 @@ def serve_game_file(
     game_id: UUID,
     file_path: str,
     db: Session = Depends(get_db),
+    user: User | None = Depends(get_optional_user),
+    access_token: str | None = Query(default=None),
 ):
     game = db.get(Game, game_id)
     if game is None:
         raise HTTPException(status_code=404, detail="Game not found")
+    _visible_or_404(db, game, user or _user_from_access_token(db, access_token))
     base = game_dir(game_id).resolve()
     target = (base / file_path).resolve()
     if not target.is_file() or not target.is_relative_to(base):

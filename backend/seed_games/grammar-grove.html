@@ -23,7 +23,7 @@
   }
   body { display:grid; place-items:center; }
   #shell {
-    position:relative; width:100vw; height:100vh; overflow:hidden;
+    position:relative; width:100%; height:100%; overflow:hidden;
     background:radial-gradient(circle at 70% 10%, #243d4a 0, #0a1c21 48%, #061317 100%);
   }
   canvas { width:100%; height:100%; display:block; touch-action:none; }
@@ -296,7 +296,17 @@
 (() => {
   "use strict";
   const canvas = document.getElementById("game");
+  const shell = document.getElementById("shell");
   const ctx = canvas.getContext("2d");
+  function readStore(key){
+    try { return localStorage.getItem(key); } catch(e) { return null; }
+  }
+  function writeStore(key, value){
+    try { localStorage.setItem(key, value); } catch(e) {}
+  }
+  function clearStore(key){
+    try { localStorage.removeItem(key); } catch(e) {}
+  }
   const levelNameEl = document.getElementById("levelName");
   const levelHintEl = document.getElementById("levelHint");
   const crystalCountEl = document.getElementById("crystalCount");
@@ -337,7 +347,9 @@
   const DPR = Math.min(2, window.devicePixelRatio || 1);
   let W = innerWidth, H = innerHeight;
   function resize() {
-    W = innerWidth; H = innerHeight;
+    const box = shell ? shell.getBoundingClientRect() : null;
+    W = Math.max(1, Math.floor((box && box.width) || innerWidth || 1));
+    H = Math.max(1, Math.floor((box && box.height) || innerHeight || 1));
     canvas.width = Math.floor(W * DPR);
     canvas.height = Math.floor(H * DPR);
     canvas.style.width = W + "px";
@@ -411,7 +423,7 @@
   const clamp = (v,a,b) => Math.max(a, Math.min(b,v));
   function setPlayerGender(g){
     playerGender = g === "boy" ? "boy" : "girl";
-    localStorage.setItem("grammarGroveGender", playerGender);
+    writeStore("grammarGroveGender", playerGender);
     girlChoice.classList.toggle("selected", playerGender === "girl");
     boyChoice.classList.toggle("selected", playerGender === "boy");
   }
@@ -824,7 +836,7 @@
     const config = readTeacherForm();
     const error = validateTeacherConfig(config);
     if(error){ teacherStatusEl.textContent = error; return; }
-    localStorage.setItem("grammarGroveTeacher", JSON.stringify(config));
+    writeStore("grammarGroveTeacher", JSON.stringify(config));
     applyTeacherConfig(config);
     teacherStatusEl.textContent = "Saved in this browser.";
     if(play){
@@ -842,7 +854,7 @@
     const config=readTeacherForm();
     const error=validateTeacherConfig(config);
     if(error){ teacherStatusEl.textContent=error; return; }
-    localStorage.setItem("grammarGroveTeacher",JSON.stringify(config));
+    writeStore("grammarGroveTeacher", JSON.stringify(config));
     applyTeacherConfig(config);
     teacherPreview.active=true;
     teacherPreview.selectedLevel=teacherEditLevel;
@@ -895,7 +907,7 @@
   }
 
   function resetTeacherConfig(){
-    localStorage.removeItem("grammarGroveTeacher");
+    clearStore("grammarGroveTeacher");
     applyTeacherConfig(null);
     renderTeacherFields();
     teacherStatusEl.textContent = "Built-in word lists restored.";
@@ -942,10 +954,10 @@
       return;
     }
     try {
-      const saved = JSON.parse(localStorage.getItem("grammarGroveTeacher") || "null");
+      const saved = JSON.parse(readStore("grammarGroveTeacher") || "null");
       if(saved) applyTeacherConfig(saved);
     } catch(err) {
-      localStorage.removeItem("grammarGroveTeacher");
+      clearStore("grammarGroveTeacher");
     }
   }
 
@@ -966,9 +978,13 @@
   let xp = 0;
   let playerLevel = 1;
   const PEN_UNLOCK_XP = 12;
-  let playerGender = localStorage.getItem("grammarGroveGender") || "girl";
+  let playerGender = readStore("grammarGroveGender") || "girl";
   let particles=[];
   let camera={x:0,y:0};
+  function frameWorld(){
+    if(!level) return;
+    camera.y = Math.max(0, level.groundY + 88 - H);
+  }
   let running=false, won=false;
   let totalHidden=0, collectedHidden=0;
   let trashedWrong=0;
@@ -1016,7 +1032,8 @@
     player.x=level.spawn.x; player.y=level.spawn.y;
     player.vx=0; player.vy=0; player.grounded=false; player.coyote=0; player.jumpBuffer=0;
     player.hearts=3; player.invuln=0; player.riding=null; player.collected=0; player.carriedWord=null;
-    camera.x=0; camera.y=0; particles=[]; nets=[]; wordLadders=[]; wordInventory=[]; screenShake=0; flash=0; levelTransition.active=false; player.netCooldown=0;
+    camera.x=0; particles=[]; nets=[]; wordLadders=[]; wordInventory=[]; screenShake=0; flash=0; levelTransition.active=false; player.netCooldown=0;
+    frameWorld();
     teacherPreview.selectedLevel=levelIndex; player.penCooldown=0; player.parachute=false; player.fallProtected=false; player.climbing=false; player.netAngle=-0.73;
     levelNameEl.textContent = level.name;
     levelHintEl.textContent = teacherPreview.active ? `Teacher Preview · ${level.hint}` : level.hint;
@@ -1525,7 +1542,7 @@
       }
     }
     player.x=clamp(player.x,0,level.width-player.w);
-    if(player.y>H+500){
+    if(player.y>level.groundY+420){
       if(player.fallProtected){
         player.x=level.spawn.x; player.y=level.spawn.y; player.vx=0; player.vy=0;
         player.parachute=false; player.fallProtected=false; player.invuln=.35;
@@ -1624,6 +1641,7 @@
     }
     const targetX=clamp(player.x-W*.38,0,Math.max(0,level.width-W));
     camera.x=lerp(camera.x,targetX,1-Math.pow(.0008,dt));
+    frameWorld();
   }
   function roundedRect(x,y,w,h,r){
     r=Math.min(r,w/2,h/2);

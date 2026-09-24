@@ -218,6 +218,12 @@ def ensure_schema() -> None:
         )
         conn.execute(
             text(
+                "ALTER TABLE games ADD COLUMN IF NOT EXISTS is_public "
+                "BOOLEAN NOT NULL DEFAULT TRUE"
+            )
+        )
+        conn.execute(
+            text(
                 """
                 CREATE TABLE IF NOT EXISTS user_llm_keys (
                     id UUID PRIMARY KEY,

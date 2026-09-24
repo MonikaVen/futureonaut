@@ -19,6 +19,7 @@ from app.services.guest_merge import apply_session_event
 from app.services.progress import best_sessions_by_game, progress_from_session
 from app.services.recommendations import game_is_new
 from app.services.snapshot import has_game_screenshot
+from app.services.visibility import can_view_game
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
 
@@ -81,7 +82,7 @@ def start_session(
     user: User = Depends(get_current_user),
 ) -> SessionOut:
     game = db.get(Game, body.game_id)
-    if game is None:
+    if game is None or not can_view_game(db, game, user):
         raise HTTPException(status_code=404, detail="Game not found")
     return _session_out(_resume_or_create(db, game, user_id=user.id))
 
@@ -89,7 +90,7 @@ def start_session(
 @router.post("/guest", response_model=SessionOut, status_code=201)
 def start_guest_session(body: GuestSessionCreate, db: Session = Depends(get_db)) -> SessionOut:
     game = db.get(Game, body.game_id)
-    if game is None:
+    if game is None or not can_view_game(db, game, None):
         raise HTTPException(status_code=404, detail="Game not found")
     if not body.visitor_id or len(body.visitor_id) > 64:
         raise HTTPException(status_code=400, detail="visitor_id required")
@@ -117,7 +118,7 @@ def continue_sessions(
         incomplete = s.ended_at is None or (
             s.total_levels is not None and s.levels_completed < s.total_levels
         )
-        if not incomplete:
+        if not incomplete or s.game is None or not can_view_game(db, s.game, user):
             continue
         seen_games.add(s.game_id)
         out.append(

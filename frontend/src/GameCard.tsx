@@ -54,8 +54,9 @@ export function GameCard({ game, topic, focusLabels, onUpdate }: Props) {
             {game.owner_name || game.owner_slug}
           </Link>
         ) : null}
-        {focusLabels.length > 0 ? (
+        {focusLabels.length > 0 || game.is_public === false ? (
           <div className="tags">
+            {game.is_public === false ? <span className="tag private">{t("privateGame")}</span> : null}
             {focusLabels.map((label) => (
               <span key={label} className="tag focus">
                 {label}

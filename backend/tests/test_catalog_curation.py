@@ -53,6 +53,7 @@ class CatalogCurationTests(unittest.TestCase):
             patch("app.services.demo_seed.backfill_game_handles"),
             patch("app.services.demo_seed.assign_catalog_to_owner"),
             patch("app.services.demo_seed.ensure_flagged_seed_games") as ensure,
+            patch("app.services.demo_seed.refresh_ensured_seed_html"),
         ):
             seed_demo_games()
         pack.assert_not_called()

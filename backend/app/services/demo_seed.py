@@ -178,6 +178,7 @@ def seed_demo_games() -> None:
             seed_html_pack(db, owner.id)
 
         ensure_flagged_seed_games(db, owner.id)
+        refresh_ensured_seed_html(db)
         backfill_seed_files(db)
         normalize_game_topics(db)
         restore_published_html(db)
@@ -362,6 +363,37 @@ def ensure_flagged_seed_games(db, owner_id) -> None:
         existing_titles.add(title)
         added += 1
     if added:
+        db.commit()
+
+
+def refresh_ensured_seed_html(db) -> None:
+    """Replace HTML for ensure=true seed games so a fixed seed file reaches the live catalog."""
+    manifest_path = _seed_dir() / "manifest.json"
+    if not manifest_path.exists():
+        return
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    changed = False
+    for item in manifest:
+        if not item.get("ensure"):
+            continue
+        seed_file = item.get("file")
+        if not seed_file:
+            continue
+        src = _seed_dir() / seed_file
+        if not src.is_file():
+            continue
+        html = src.read_text(encoding="utf-8", errors="replace")
+        game = db.query(Game).filter(Game.seed_file == seed_file).first()
+        if game is None and item.get("title"):
+            game = db.query(Game).filter(Game.title == item["title"]).first()
+        if game is None or game.html == html:
+            continue
+        entry = save_uploaded_html(game.id, html, "index.html")
+        game.html = html
+        game.entry_path = entry
+        game.seed_file = seed_file
+        changed = True
+    if changed:
         db.commit()
 
 

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { api, type ClassroomDetail, type Game, type Session } from "../api";
+import { api, getAccessToken, type ClassroomDetail, type Game, type Session } from "../api";
 import { useAuth } from "../auth";
 import { GameShare } from "../GameShare";
 import { GameSocial } from "../GameSocial";
@@ -267,6 +267,8 @@ export function PlayPage() {
     }
     const params = new URLSearchParams({ theme: gameTheme, lang });
     if (classConfig) params.set("lp_config", classConfig);
+    const token = getAccessToken();
+    if (token) params.set("access_token", token);
     const next = `/api/games/${game.id}/files/${game.entry_path}?${params.toString()}`;
     iframeGameIdRef.current = game.id;
     iframeSrcRef.current = next;

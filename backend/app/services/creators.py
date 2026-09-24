@@ -60,7 +60,7 @@ def backfill_profile_slugs() -> None:
 def _game_counts(db: Session) -> dict:
     return dict(
         db.query(Game.owner_id, func.count(Game.id))
-        .filter(Game.owner_id.isnot(None))
+        .filter(Game.owner_id.isnot(None), Game.is_public.is_(True))
         .group_by(Game.owner_id)
         .all()
     )
@@ -106,6 +106,9 @@ def creator_profile(db: Session, slug: str, viewer_id=None) -> CreatorProfileOut
         .order_by(Game.created_at.desc())
         .all()
     )
+    viewer = db.get(User, viewer_id) if viewer_id else None
+    if viewer is None or (viewer.role != UserRole.admin and viewer.id != user.id):
+        games = [game for game in games if getattr(game, "is_public", True) is not False]
     enriched: list[GameOut] = enrich_games(db, games, viewer_id)
     return CreatorProfileOut(
         **public_creator_out(user, len(games)).model_dump(),

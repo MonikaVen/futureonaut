@@ -3,12 +3,13 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, joinedload
 
-from app.auth import get_current_user, require_roles
+from app.auth import get_current_user, get_optional_user, require_roles
 from app.database import get_db
 from app.models import Game, GameComment, GameLike, User, UserRole
 from app.schemas import CommentCreate, CommentOut, LikeToggleOut
 from app.services.avatars import has_user_avatar
 from app.services.handles import profile_slug_for
+from app.services.visibility import can_view_game
 
 router = APIRouter(prefix="/games", tags=["social"])
 
@@ -28,9 +29,13 @@ def _comment_out(comment: GameComment) -> CommentOut:
 
 
 @router.get("/{game_id}/comments", response_model=list[CommentOut])
-def list_comments(game_id: UUID, db: Session = Depends(get_db)) -> list[CommentOut]:
+def list_comments(
+    game_id: UUID,
+    db: Session = Depends(get_db),
+    user: User | None = Depends(get_optional_user),
+) -> list[CommentOut]:
     game = db.get(Game, game_id)
-    if game is None:
+    if game is None or not can_view_game(db, game, user):
         raise HTTPException(status_code=404, detail="Game not found")
     comments = (
         db.query(GameComment)
@@ -51,7 +56,7 @@ def add_comment(
     user: User = Depends(get_current_user),
 ) -> CommentOut:
     game = db.get(Game, game_id)
-    if game is None:
+    if game is None or not can_view_game(db, game, user):
         raise HTTPException(status_code=404, detail="Game not found")
     text = body.body.strip()
     if not text:
@@ -71,7 +76,7 @@ def toggle_like(
     user: User = Depends(get_current_user),
 ) -> LikeToggleOut:
     game = db.get(Game, game_id)
-    if game is None:
+    if game is None or not can_view_game(db, game, user):
         raise HTTPException(status_code=404, detail="Game not found")
     existing = (
         db.query(GameLike)

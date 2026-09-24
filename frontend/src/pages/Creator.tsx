@@ -214,6 +214,24 @@ export function CreatorPage() {
     setEditTitle(game.title);
   }
 
+  async function setPublic(game: Game, isPublic: boolean) {
+    setBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      await api(`/api/games/${game.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ is_public: isPublic }),
+      });
+      setMessage(isPublic ? t("gameNowPublic") : t("gameNowPrivate"));
+      await reload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("makePrivate"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function saveTitle(game: Game) {
     const title = editTitle.trim();
     if (!title) {
@@ -549,6 +567,7 @@ export function CreatorPage() {
                   ) : (
                     <div className="creator-title-cell">
                       <span>{g.title}</span>
+                      {g.is_public === false ? <span className="tag private">{t("privateGame")}</span> : null}
                       <button className="btn secondary btn-sm" type="button" disabled={busy} onClick={() => startRename(g)}>
                         {t("renameGame")}
                       </button>
@@ -592,6 +611,16 @@ export function CreatorPage() {
                   <button className="btn secondary" type="button" disabled={busy} onClick={() => startEdit(g.id)}>
                     {t("editGame")}
                   </button>
+                  {user?.role === "admin" || user?.role === "creator" ? (
+                    <button
+                      className="btn secondary"
+                      type="button"
+                      disabled={busy}
+                      onClick={() => void setPublic(g, g.is_public === false)}
+                    >
+                      {g.is_public === false ? t("makePublic") : t("makePrivate")}
+                    </button>
+                  ) : null}
                   <button className="btn danger" type="button" onClick={() => remove(g.id)}>
                     Delete
                   </button>

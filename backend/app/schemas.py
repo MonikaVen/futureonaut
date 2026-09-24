@@ -93,6 +93,7 @@ class GameOut(BaseModel):
     owner_slug: str | None = None
     owner_name: str | None = None
     owner_has_avatar: bool = False
+    is_public: bool = True
 
     model_config = {"from_attributes": True}
 
@@ -125,6 +126,7 @@ class GameUpdate(BaseModel):
     topic_tags: list[str] | None = None
     difficulty: int | None = Field(default=None, ge=1, le=5)
     html: str | None = Field(default=None, max_length=400_000)
+    is_public: bool | None = None
 
 
 class QuizOption(BaseModel):

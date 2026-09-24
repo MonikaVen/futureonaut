@@ -57,6 +57,7 @@ export interface Game {
   owner_slug?: string | null;
   owner_name?: string | null;
   owner_has_avatar?: boolean;
+  is_public?: boolean;
 }
 
 export interface DraftMessage {

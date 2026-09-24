@@ -53,6 +53,7 @@ def game_to_out(game: Game) -> GameOut:
         owner_slug=owner_slug,
         owner_name=owner_name,
         owner_has_avatar=has_user_avatar(owner_id) if owner_id else False,
+        is_public=getattr(game, "is_public", True) is not False,
     )
 
 
@@ -107,6 +108,8 @@ def recommend_games(db: Session, user_id: UUID, limit: int = 8) -> list[Recommen
     scored: list[RecommendationOut] = []
 
     for game in all_games:
+        if getattr(game, "is_public", True) is False:
+            continue
         reason_parts: list[str] = []
         score = 0.0
         game_topic = _canonical_topic(game.topic_tags)
