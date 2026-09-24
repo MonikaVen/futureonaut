@@ -144,6 +144,8 @@ export interface ClassroomAssignment {
   id: string;
   game_id: string;
   game_title: string;
+  config?: string;
+  published?: boolean;
   created_at: string;
   completed?: boolean;
   points?: number;
@@ -173,6 +175,36 @@ export interface StudentProgress {
   progress_pct?: number | null;
 }
 
+export interface ClassGroup {
+  id: string;
+  name: string;
+  member_count: number;
+}
+
+export interface ClassMember {
+  user_id: string;
+  display_name: string;
+  email: string;
+  group_id: string | null;
+  group_name: string;
+}
+
+export interface IssuedLogin {
+  user_id: string;
+  email: string;
+  display_name: string;
+  password: string;
+}
+
+export interface ClassIssued {
+  classroom_id: string;
+  classroom_name: string;
+  assignment_id: string;
+  game_id: string;
+  game_title: string;
+  config: string;
+}
+
 export interface ClassroomDetail {
   id: string;
   name: string;
@@ -182,6 +214,8 @@ export interface ClassroomDetail {
   member_count: number;
   assignments: ClassroomAssignment[];
   progress: StudentProgress[];
+  groups?: ClassGroup[];
+  members?: ClassMember[];
   solved_assignments?: number;
   total_assignments?: number;
   students_solved_all?: number;

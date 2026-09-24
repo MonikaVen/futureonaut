@@ -1720,6 +1720,37 @@ body.play-focus {
   gap: 0.75rem;
   align-items: flex-start;
 }
+.form input[type="checkbox"] {
+  width: auto;
+  padding: 0;
+  justify-self: start;
+}
+.class-issue-note,
+.class-issue {
+  white-space: pre-wrap;
+}
+.class-issue-note {
+  flex-basis: 100%;
+  margin: 0.25rem 0 0;
+}
+.grove-config {
+  display: grid;
+  gap: 0.75rem;
+}
+.grove-nav {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.5rem;
+  align-items: center;
+}
+.grove-nav strong {
+  display: block;
+  text-align: center;
+}
+.grove-nav .meta {
+  display: block;
+  text-align: center;
+}
 .assignment-main {
   display: flex;
   flex-wrap: wrap;

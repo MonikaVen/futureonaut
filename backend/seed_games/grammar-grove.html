@@ -1,0 +1,1888 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>Grammar Grove — Magical Forest Platformer</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --ink:#f7fbff;
+    --muted:#c4d7d6;
+    --panel:rgba(8,21,27,.74);
+    --panel2:rgba(21,46,49,.72);
+    --accent:#8df5d6;
+    --accent2:#cda8ff;
+    --gold:#ffe48b;
+    --danger:#ff98a8;
+  }
+  * { box-sizing:border-box; }
+  html, body {
+    margin:0; width:100%; height:100%; overflow:hidden; background:#07161a;
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  }
+  body { display:grid; place-items:center; }
+  #shell {
+    position:relative; width:100vw; height:100vh; overflow:hidden;
+    background:radial-gradient(circle at 70% 10%, #243d4a 0, #0a1c21 48%, #061317 100%);
+  }
+  canvas { width:100%; height:100%; display:block; touch-action:none; }
+
+  #hud {
+    position:absolute; inset:0; pointer-events:none; color:var(--ink);
+  }
+  .topbar {
+    position:absolute; left:18px; right:18px; top:16px; display:flex; justify-content:space-between; gap:12px; align-items:flex-start;
+  }
+  .card {
+    border:1px solid rgba(204,255,241,.16);
+    background:linear-gradient(180deg, rgba(10,28,34,.80), rgba(6,20,25,.64));
+    box-shadow:0 12px 40px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.04);
+    backdrop-filter: blur(12px);
+    border-radius:16px; padding:10px 14px;
+  }
+  .brand { font-weight:900; letter-spacing:.08em; font-size:12px; text-transform:uppercase; color:#dffcf3; }
+  .levelLine { font-size:18px; font-weight:850; margin-top:2px; }
+  .sub { color:var(--muted); font-size:12px; margin-top:2px; }
+  .stats { display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+  .pill {
+    border-radius:999px; padding:8px 11px; background:rgba(9,28,32,.72); border:1px solid rgba(255,255,255,.10);
+    font-size:12px; font-weight:750; white-space:nowrap;
+  }
+  .legend {
+    position:absolute; left:18px; bottom:18px; max-width:min(600px, calc(100vw - 36px));
+    font-size:12px; color:#d7e8e5;
+  }
+  .legend b { color:#fff; }
+  #toast {
+    position:absolute; left:50%; top:92px; transform:translateX(-50%) translateY(-12px);
+    min-width:220px; max-width:min(620px, calc(100vw - 30px)); text-align:center;
+    padding:10px 16px; border-radius:999px; background:rgba(6,20,25,.80);
+    border:1px solid rgba(186,255,238,.20); color:#eefef9; font-weight:800; font-size:13px;
+    opacity:0; transition:.22s ease; box-shadow:0 10px 30px rgba(0,0,0,.25);
+  }
+  #toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+
+  #overlay, #teacherOverlay {
+    position:absolute; inset:0; display:grid; place-items:center;
+    background:radial-gradient(circle at 50% 40%, rgba(26,58,60,.45), rgba(2,10,13,.88));
+    color:white; padding:24px; z-index:5;
+  }
+  #teacherOverlay { z-index:8; overflow:auto; }
+  #overlay.hidden, #teacherOverlay.hidden { display:none; }
+  .modal {
+    width:min(720px, 94vw); border-radius:28px; padding:30px;
+    background:linear-gradient(180deg, rgba(10,31,36,.94), rgba(5,18,23,.96));
+    border:1px solid rgba(171,255,230,.18); box-shadow:0 28px 90px rgba(0,0,0,.45);
+  }
+  .eyebrow { color:var(--accent); font-size:12px; letter-spacing:.16em; text-transform:uppercase; font-weight:900; }
+  h1 { margin:6px 0 8px; font-size:clamp(34px, 7vw, 68px); line-height:.95; letter-spacing:-.05em; }
+  .lead { margin:0; color:#cfe3df; font-size:15px; line-height:1.55; }
+  .featureGrid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin:20px 0; }
+  .feature {
+    padding:13px; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); border-radius:16px;
+    min-height:90px;
+  }
+  .feature strong { display:block; margin-bottom:5px; color:#fff; }
+  .feature span { font-size:12px; color:#bed0cd; line-height:1.4; }
+  button {
+    border:0; border-radius:999px; padding:12px 18px; font-weight:900; cursor:pointer;
+    background:linear-gradient(135deg, #8df5d6, #b8ffd9); color:#06241d; box-shadow:0 8px 24px rgba(84,255,203,.18);
+  }
+  button.secondary { background:rgba(255,255,255,.08); color:white; box-shadow:none; margin-left:8px; }
+  .controlsLine { margin-top:13px; color:#9fb6b2; font-size:12px; }
+  .playerChoice {
+    display:flex; gap:8px; align-items:center; margin:16px 0 2px; flex-wrap:wrap;
+  }
+  .playerChoice span { color:#bcd0cc; font-size:12px; font-weight:800; margin-right:4px; }
+  .avatarChoice {
+    background:rgba(255,255,255,.06); color:white; box-shadow:none;
+    border:1px solid rgba(255,255,255,.10); padding:9px 14px;
+  }
+  .avatarChoice.selected {
+    background:rgba(141,245,214,.16); border-color:rgba(141,245,214,.55); color:#eafff8;
+  }
+  .teacherBtn {
+    pointer-events:auto; background:rgba(141,245,214,.10); color:#eafff8;
+    border:1px solid rgba(141,245,214,.24); box-shadow:none; padding:8px 12px; font-size:12px;
+  }
+  .teacherModal { width:min(980px, 96vw); max-height:92vh; overflow:auto; }
+  .teacherTop { display:flex; align-items:flex-start; justify-content:space-between; gap:18px; }
+  .teacherTop h2 { margin:4px 0 5px; font-size:30px; }
+  .teacherTop p { margin:0; color:#bdd1cd; font-size:13px; line-height:1.5; max-width:650px; }
+  .teacherLessonRow { margin:18px 0 12px; display:grid; grid-template-columns:1fr auto; gap:10px; align-items:end; }
+  .teacherLessonRow label, .teacherLevel label { display:block; color:#cfe1de; font-size:12px; font-weight:800; margin-bottom:6px; }
+  .teacherLessonRow input, .teacherLevel textarea {
+    width:100%; border-radius:12px; border:1px solid rgba(255,255,255,.12);
+    background:rgba(1,10,13,.55); color:white; padding:11px 12px; font:inherit; outline:none;
+  }
+  .teacherLessonRow input:focus, .teacherLevel textarea:focus { border-color:rgba(141,245,214,.56); }
+  .teacherLevels { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+  .teacherLevelNav {
+    display:grid; grid-template-columns:auto 1fr auto; gap:10px; align-items:center;
+    margin:16px 0 10px;
+  }
+  .teacherLevelTitle {
+    min-height:46px; border-radius:14px; background:rgba(255,255,255,.035);
+    border:1px solid rgba(255,255,255,.08); display:flex; align-items:center;
+    justify-content:center; gap:10px; padding:8px 14px;
+  }
+  .teacherLevelTitle strong { font-size:15px; }
+  .teacherLevelTitle span { color:#93aaa6; font-size:12px; }
+  .navArrow { min-width:52px; font-size:20px; padding:9px 15px; margin:0; }
+  #teacherPreviewBar {
+    position:absolute; z-index:7; left:50%; bottom:18px; transform:translateX(-50%);
+    display:none; align-items:center; gap:8px; padding:8px 10px;
+    border-radius:999px; background:rgba(5,20,24,.88);
+    border:1px solid rgba(141,245,214,.28); backdrop-filter:blur(10px);
+    color:#e9fff8; box-shadow:0 12px 32px rgba(0,0,0,.28);
+  }
+  #teacherPreviewBar.show { display:flex; }
+  #teacherPreviewBar button { padding:8px 13px; min-width:42px; }
+  #teacherPreviewBar .previewText { min-width:190px; text-align:center; }
+  #teacherPreviewBar strong { display:block; font-size:11px; letter-spacing:.08em; }
+  #teacherPreviewBar span { display:block; font-size:10px; color:#a9c4be; margin-top:1px; }
+  .teacherLevel {
+    padding:14px; border-radius:18px; background:rgba(255,255,255,.035);
+    border:1px solid rgba(255,255,255,.08);
+  }
+  .teacherLevel h3 { margin:0 0 3px; font-size:15px; }
+  .teacherLevel .capacity { color:#8fa9a5; font-size:11px; margin-bottom:12px; }
+  .teacherLevel textarea { min-height:126px; resize:vertical; margin-bottom:10px; line-height:1.45; }
+  .teacherActions { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:15px; }
+  #teacherStatus { color:#a9c6c0; font-size:12px; margin-left:auto; }
+  .toggleWrap {
+    display:flex; gap:8px; align-items:center; white-space:nowrap; padding:11px 12px;
+    border:1px solid rgba(255,255,255,.10); border-radius:12px; background:rgba(255,255,255,.035);
+    color:#d9ece8; font-size:12px; font-weight:750;
+  }
+  .toggleWrap input { accent-color:#8df5d6; }
+
+  #touch {
+    display:none; position:absolute; inset:0; pointer-events:none; z-index:4;
+  }
+  .touchGroup { position:absolute; bottom:18px; display:flex; gap:10px; pointer-events:auto; }
+  .touchGroup.left { left:16px; }
+  .touchGroup.right { right:16px; }
+  .touchBtn {
+    width:58px; height:58px; border-radius:18px; display:grid; place-items:center;
+    background:rgba(6,20,25,.62); border:1px solid rgba(255,255,255,.14); color:white; font-weight:950;
+    backdrop-filter:blur(8px); user-select:none; -webkit-user-select:none; touch-action:none;
+  }
+  .touchBtn.jump { width:78px; border-radius:28px; color:#0a251e; background:rgba(141,245,214,.85); }
+  .touchBtn.action { width:68px; border-radius:24px; color:#fff6cf; background:rgba(115,77,143,.82); }
+  @media (max-width: 760px), (pointer:coarse) {
+    #touch { display:block; }
+    .legend { display:none; }
+    .featureGrid { grid-template-columns:1fr; }
+    .teacherLevels { grid-template-columns:1fr; }
+    .teacherLessonRow { grid-template-columns:1fr; }
+    .modal { padding:22px; }
+    .stats .pill:nth-child(4) { display:none; }
+    .touchGroup.right { gap:6px; max-width:230px; flex-wrap:wrap; justify-content:flex-end; }
+    .touchBtn { width:52px; height:52px; font-size:11px; }
+    .touchBtn.jump { width:68px; }
+  }
+</style>
+</head>
+<body>
+<div id="shell">
+  <canvas id="game"></canvas>
+  <div id="hud">
+    <div class="topbar">
+      <div class="card">
+        <div class="brand">Grammar Grove</div>
+        <div class="levelLine" id="levelName">Level 1</div>
+        <div class="sub" id="levelHint">Collect every correct word crystal.</div>
+      </div>
+      <div class="stats">
+        <div class="pill">💎 <span id="crystalCount">0 / 0</span></div>
+        <div class="pill">🪜 <span id="ladderCount">0</span></div>
+        <div class="pill">🗑 <span id="trashCount">0 / 0</span></div>
+        <div class="pill">★ <span id="rewardCount">0 / 0</span></div>
+        <div class="pill">LV <span id="playerLevel">1</span> · <span id="xpCount">0/12 XP</span></div>
+        <div class="pill">✎ <span id="penStatus">LOCKED</span></div>
+        <div class="pill">❤ <span id="heartCount">3</span></div>
+        <button class="teacherBtn" id="teacherBtn">Teacher Mode</button>
+      </div>
+    </div>
+    <div id="toast"></div>
+    <div class="legend card"><b>Move:</b> A/D or ←/→ &nbsp; <b>Jump/Climb:</b> W, ↑ or Space &nbsp; <b>Down:</b> S/↓ &nbsp; <b>Parachute:</b> hold Jump falling &nbsp; <b>Net:</b> Q/F &nbsp; <b>Word ladder:</b> L/C &nbsp; <b>Red pen:</b> P &nbsp; <b>Bag:</b> E</div>
+  </div>
+  <div id="touch">
+    <div class="touchGroup left">
+      <div class="touchBtn" data-key="left">◀</div>
+      <div class="touchBtn" data-key="right">▶</div>
+      <div class="touchBtn" data-key="down">▼</div>
+    </div>
+    <div class="touchGroup right">
+      <div class="touchBtn action" data-key="aimDown">AIM−</div>
+      <div class="touchBtn action" data-key="aimUp">AIM+</div>
+      <div class="touchBtn action" data-key="net">NET</div>
+      <div class="touchBtn action" data-key="ladder">LADDER</div>
+      <div class="touchBtn action" data-key="pen">PEN</div>
+      <div class="touchBtn action" data-key="action">BAG</div>
+      <div class="touchBtn jump" data-key="jump">JUMP</div>
+    </div>
+  </div>
+  <div id="overlay">
+    <div class="modal" id="modal">
+      <div class="eyebrow">Magical grammar platformer</div>
+      <h1>Grammar Grove</h1>
+      <p class="lead">Run through an eight-level magical forest where every word looks like the same glowing crystal. Build ladders from correct words, hunt high stars, control mistakes with nets or the red pen, and cross each glowing finish line.</p>
+      <div class="featureGrid">
+        <div class="feature"><strong>💎 Identical word crystals</strong><span>Correct and incorrect forms look exactly the same until you choose one.</span></div>
+        <div class="feature"><strong>👾 Surprise monsters</strong><span>Touch a wrong form and its crystal bursts into a creature that chases you.</span></div>
+        <div class="feature"><strong>🕸 Trap mistakes</strong><span>Throw a net along the predicted arc. Trapped wrong words may still transform, but they cannot hurt you.</span></div>
+        <div class="feature"><strong>🪜 Build with words</strong><span>Collected correct words become ladders for climbing to hidden stars, and ladders can now stack on top of one another.</span></div>
+        <div class="feature"><strong>✎ Level up</strong><span>Earn XP and unlock a red correction pen that erases nearby wrong words.</span></div>
+      </div>
+      <div class="playerChoice">
+        <span>Choose explorer:</span>
+        <button class="avatarChoice selected" id="girlChoice">Girl</button>
+        <button class="avatarChoice" id="boyChoice">Boy</button>
+      </div>
+      <button id="startBtn">Enter the forest</button>
+      <button class="secondary" id="teacherStartBtn">Teacher Mode</button>
+      <div class="controlsLine">Correct words become ladder pieces: press L/C to place one, stack ladders upward, and climb toward stars. Earn 12 XP to unlock the red pen, then press P near a wrong word.</div>
+    </div>
+  </div>
+  <div id="teacherPreviewBar">
+    <button class="secondary" id="previewPrevBtn">←</button>
+    <div class="previewText">
+      <strong>TEACHER PREVIEW</strong>
+      <span id="previewLevelLabel">Level 1</span>
+    </div>
+    <button class="secondary" id="previewNextBtn">→</button>
+    <button class="secondary" id="previewExitBtn">Exit</button>
+  </div>
+  <div id="teacherOverlay" class="hidden">
+    <div class="modal teacherModal">
+      <div class="teacherTop">
+        <div>
+          <div class="eyebrow">Classroom setup</div>
+          <h2>Teacher Mode</h2>
+          <p>Replace the built-in grammar with your own word sets for all eight levels. Use the <b>← / → arrows</b> to oversee one level at a time, edit its words, and preview that level directly before students play.</p>
+        </div>
+        <button class="secondary" id="teacherCloseBtn">Close</button>
+      </div>
+      <div class="teacherLessonRow">
+        <div>
+          <label for="lessonNameInput">Lesson name</label>
+          <input id="lessonNameInput" maxlength="70" placeholder="e.g. Past tense practice" />
+        </div>
+        <label class="toggleWrap"><input type="checkbox" id="requireTrashInput" checked /> Require wrong words in trash to open portal</label>
+      </div>
+      <div class="teacherLevelNav">
+        <button class="secondary navArrow" id="teacherPrevLevel">←</button>
+        <div class="teacherLevelTitle">
+          <strong id="teacherLevelTitle">Level 1</strong>
+          <span id="teacherLevelCounter">1 / 8</span>
+        </div>
+        <button class="secondary navArrow" id="teacherNextLevel">→</button>
+      </div>
+      <div class="teacherLevels" id="teacherLevels"></div>
+      <div class="teacherActions">
+        <button id="teacherPlayBtn">Save & play lesson</button>
+        <button class="secondary" id="teacherPreviewBtn">Preview this level</button>
+        <button class="secondary" id="teacherSaveBtn">Save lists</button>
+        <button class="secondary" id="teacherResetBtn">Restore built-in words</button>
+        <span id="teacherStatus"></span>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+(() => {
+  "use strict";
+  const canvas = document.getElementById("game");
+  const ctx = canvas.getContext("2d");
+  const levelNameEl = document.getElementById("levelName");
+  const levelHintEl = document.getElementById("levelHint");
+  const crystalCountEl = document.getElementById("crystalCount");
+  const rewardCountEl = document.getElementById("rewardCount");
+  const ladderCountEl = document.getElementById("ladderCount");
+  const trashCountEl = document.getElementById("trashCount");
+  const playerLevelEl = document.getElementById("playerLevel");
+  const xpCountEl = document.getElementById("xpCount");
+  const penStatusEl = document.getElementById("penStatus");
+  const heartCountEl = document.getElementById("heartCount");
+  const toastEl = document.getElementById("toast");
+  const overlay = document.getElementById("overlay");
+  const modal = document.getElementById("modal");
+  const startBtn = document.getElementById("startBtn");
+  const teacherBtn = document.getElementById("teacherBtn");
+  const teacherStartBtn = document.getElementById("teacherStartBtn");
+  const teacherOverlay = document.getElementById("teacherOverlay");
+  const teacherCloseBtn = document.getElementById("teacherCloseBtn");
+  const teacherPlayBtn = document.getElementById("teacherPlayBtn");
+  const teacherSaveBtn = document.getElementById("teacherSaveBtn");
+  const teacherPreviewBtn = document.getElementById("teacherPreviewBtn");
+  const teacherResetBtn = document.getElementById("teacherResetBtn");
+  const teacherPrevLevel = document.getElementById("teacherPrevLevel");
+  const teacherNextLevel = document.getElementById("teacherNextLevel");
+  const teacherLevelTitleEl = document.getElementById("teacherLevelTitle");
+  const teacherLevelCounterEl = document.getElementById("teacherLevelCounter");
+  const teacherPreviewBar = document.getElementById("teacherPreviewBar");
+  const previewPrevBtn = document.getElementById("previewPrevBtn");
+  const previewNextBtn = document.getElementById("previewNextBtn");
+  const previewExitBtn = document.getElementById("previewExitBtn");
+  const previewLevelLabel = document.getElementById("previewLevelLabel");
+  const teacherLevelsEl = document.getElementById("teacherLevels");
+  const teacherStatusEl = document.getElementById("teacherStatus");
+  const lessonNameInput = document.getElementById("lessonNameInput");
+  const requireTrashInput = document.getElementById("requireTrashInput");
+  const girlChoice = document.getElementById("girlChoice");
+  const boyChoice = document.getElementById("boyChoice");
+  const DPR = Math.min(2, window.devicePixelRatio || 1);
+  let W = innerWidth, H = innerHeight;
+  function resize() {
+    W = innerWidth; H = innerHeight;
+    canvas.width = Math.floor(W * DPR);
+    canvas.height = Math.floor(H * DPR);
+    canvas.style.width = W + "px";
+    canvas.style.height = H + "px";
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+  addEventListener("resize", resize);
+  resize();
+  const keys = { left:false, right:false, down:false, jump:false, aimUp:false, aimDown:false };
+  let jumpPressed = false;
+  let actionPressed = false;
+  let netPressed = false;
+  let ladderPressed = false;
+  let penPressed = false;
+  let pointerAim = { active:false, x:0, y:0 };
+  addEventListener("keydown", (e) => {
+    if (["ArrowLeft","ArrowRight","ArrowUp","Space"].includes(e.code)) e.preventDefault();
+    if (e.code === "ArrowLeft" || e.code === "KeyA") keys.left = true;
+    if (e.code === "ArrowRight" || e.code === "KeyD") keys.right = true;
+    if (e.code === "ArrowDown" || e.code === "KeyS") keys.down = true;
+    if (e.code === "ArrowUp" || e.code === "KeyW" || e.code === "Space") {
+      if (!keys.jump) jumpPressed = true;
+      keys.jump = true;
+    }
+    if (e.code === "KeyE" || e.code === "Enter") actionPressed = true;
+    if (e.code === "KeyQ" || e.code === "KeyF") netPressed = true;
+    if (e.code === "KeyL" || e.code === "KeyC") ladderPressed = true;
+    if (e.code === "KeyP") penPressed = true;
+    if (e.code === "KeyZ") keys.aimDown = true;
+    if (e.code === "KeyX") keys.aimUp = true;
+    if (e.code === "KeyR" && running) loadLevel(levelIndex);
+  });
+  addEventListener("keyup", (e) => {
+    if (e.code === "ArrowLeft" || e.code === "KeyA") keys.left = false;
+    if (e.code === "ArrowRight" || e.code === "KeyD") keys.right = false;
+    if (e.code === "ArrowDown" || e.code === "KeyS") keys.down = false;
+    if (e.code === "ArrowUp" || e.code === "KeyW" || e.code === "Space") keys.jump = false;
+    if (e.code === "KeyZ") keys.aimDown = false;
+    if (e.code === "KeyX") keys.aimUp = false;
+  });
+  document.querySelectorAll(".touchBtn").forEach(btn => {
+    const key = btn.dataset.key;
+    const down = (e) => {
+      e.preventDefault();
+      if (key === "jump") { if (!keys.jump) jumpPressed = true; keys.jump = true; }
+      else if (key === "action") actionPressed = true;
+      else if (key === "net") netPressed = true;
+      else if (key === "ladder") ladderPressed = true;
+      else if (key === "pen") penPressed = true;
+      else if (key === "aimUp" || key === "aimDown") keys[key] = true;
+      else keys[key] = true;
+    };
+    const up = (e) => {
+      e.preventDefault();
+      if (key === "jump") keys.jump = false;
+      else if (key === "aimUp" || key === "aimDown") keys[key] = false;
+      else if (!["action","net","ladder","pen"].includes(key)) keys[key] = false;
+    };
+    btn.addEventListener("pointerdown", down);
+    btn.addEventListener("pointerup", up);
+    btn.addEventListener("pointercancel", up);
+    btn.addEventListener("pointerleave", up);
+  });
+  canvas.addEventListener("pointermove",(e)=>{
+    const rect=canvas.getBoundingClientRect();
+    pointerAim.x=(e.clientX-rect.left)*(W/rect.width)+camera.x;
+    pointerAim.y=(e.clientY-rect.top)*(H/rect.height)+camera.y;
+    pointerAim.active=true;
+  });
+  canvas.addEventListener("pointerleave",()=>{ pointerAim.active=false; });
+  const clamp = (v,a,b) => Math.max(a, Math.min(b,v));
+  function setPlayerGender(g){
+    playerGender = g === "boy" ? "boy" : "girl";
+    localStorage.setItem("grammarGroveGender", playerGender);
+    girlChoice.classList.toggle("selected", playerGender === "girl");
+    boyChoice.classList.toggle("selected", playerGender === "boy");
+  }
+  const lerp = (a,b,t) => a + (b-a)*t;
+  const rnd = (a,b) => a + Math.random()*(b-a);
+  const ease = (t) => t*t*(3-2*t);
+  const palette = [
+    {name:"Roots", sky1:"#133447", sky2:"#08161a", fog:"#72c2ac", leaf:"#173f35", leaf2:"#2a604f", glow:"#8df5d6", mushroom:"#ffb7cb",
+     soilTop1:"#88d2a5", soilTop2:"#43795f", soilBody:"#243c39", soilAccent:"#315850", spore:"#dce7ff", particleMode:"spores", celestial:"moon"},
+    {name:"Canopy", sky1:"#1e2b58", sky2:"#0b1224", fog:"#8ba1d8", leaf:"#223056", leaf2:"#42558b", glow:"#c8b4ff", mushroom:"#ffd6a3",
+     soilTop1:"#adc4ff", soilTop2:"#536a98", soilBody:"#25324f", soilAccent:"#33456b", spore:"#eef2ff", particleMode:"mist", celestial:"moon"},
+    {name:"Hollow", sky1:"#291f4f", sky2:"#0d1122", fog:"#9985ca", leaf:"#32275b", leaf2:"#544180", glow:"#a5ffe0", mushroom:"#ff9fca",
+     soilTop1:"#abf7de", soilTop2:"#4d8b7a", soilBody:"#2c2846", soilAccent:"#463b69", spore:"#fff2c0", particleMode:"embers", celestial:"moon"},
+    {name:"Library", sky1:"#18363a", sky2:"#081518", fog:"#89d0b6", leaf:"#18453c", leaf2:"#29695b", glow:"#ffd88b", mushroom:"#ffe6aa",
+     soilTop1:"#dbc58e", soilTop2:"#7a6641", soilBody:"#3a3225", soilAccent:"#5a4f37", spore:"#ffe8b6", particleMode:"fireflies", celestial:"moon"},
+    {name:"Aurora", sky1:"#0e2948", sky2:"#060d17", fog:"#88f0df", leaf:"#153651", leaf2:"#27627b", glow:"#9ff7ff", mushroom:"#ffb2ef",
+     soilTop1:"#6ce7ff", soilTop2:"#31728a", soilBody:"#1f3449", soilAccent:"#2d516a", spore:"#ddf9ff", particleMode:"aurora", celestial:"moon"},
+    {name:"Ruins", sky1:"#42506c", sky2:"#111827", fog:"#c2d2ef", leaf:"#42566d", leaf2:"#7288a5", glow:"#e4f0ff", mushroom:"#ffd6aa",
+     soilTop1:"#d5e1ef", soilTop2:"#788596", soilBody:"#485564", soilAccent:"#607282", spore:"#f5faff", particleMode:"snow", celestial:"moon"},
+    {name:"Observatory", sky1:"#141b34", sky2:"#050913", fog:"#7ec4ff", leaf:"#1a2751", leaf2:"#334b7b", glow:"#7fd4ff", mushroom:"#d4b6ff",
+     soilTop1:"#8fe8ff", soilTop2:"#396e9e", soilBody:"#1e2644", soilAccent:"#33476c", spore:"#bfeaff", particleMode:"crystals", celestial:"moon"},
+    {name:"Heart", sky1:"#261847", sky2:"#060913", fog:"#ffbeef", leaf:"#3f2365", leaf2:"#6f46a4", glow:"#ffe88f", mushroom:"#ff9ec8",
+     soilTop1:"#ffd98c", soilTop2:"#9b6a2c", soilBody:"#332144", soilAccent:"#513768", spore:"#fff1c4", particleMode:"aurora", celestial:"sun"}
+  ];
+
+  const levels = [
+    {
+      name:"Level 1 · Whispering Roots",
+      hint:"Irregular forms: collect the correct words. Early ladder route introduces vertical rewards.",
+      width:2600, groundY:610,
+      spawn:{x:110,y:500}, portal:{x:2450,y:470,w:90,h:140}, trash:{x:2386,y:536,w:56,h:74},
+      platforms:[
+        {x:0,y:610,w:470,h:100},{x:560,y:555,w:280,h:35},{x:920,y:495,w:240,h:34},
+        {x:1240,y:575,w:340,h:35},{x:1670,y:505,w:260,h:34},{x:2020,y:570,w:290,h:40},{x:2380,y:610,w:220,h:100},
+        {x:780,y:390,w:130,h:26},{x:1540,y:355,w:150,h:26, secret:true},
+        {x:1880,y:385,w:150,h:26, moving:true, axis:"x", range:180, speed:1.2}
+      ],
+      crystals:[
+        {x:330,y:540,word:"went"},{x:690,y:485,word:"children"},{x:1035,y:425,word:"better"},
+        {x:1410,y:505,word:"brought"},{x:2170,y:500,word:"were"}
+      ],
+      monsters:[
+        {x:610,y:507,word:"goed",minX:575,maxX:805},{x:1295,y:527,word:"childs",minX:1260,maxX:1545},
+        {x:1730,y:457,word:"gooder",minX:1685,maxX:1905},{x:2050,y:522,word:"bringed",minX:2040,maxX:2280}
+      ],
+      rewards:[{x:1600,y:180,label:"Forest Star"},{x:835,y:300,label:"Root Star"},{x:2005,y:285,label:"Moss Star"}],
+      decorations:[{x:860,y:575,type:"sign",text:"Roots remember good grammar."}],
+      ladderSites:[{x:990,y:470,h:130,label:"ROOT CLIMB"},{x:1510,y:500,h:145,label:"STAR PATH"},{x:1985,y:485,h:150,label:"MOSS STAR"}]
+    },
+    {
+      name:"Level 2 · Mooncap Canopy",
+      hint:"Agreement and comparison: choose standard forms. Two ladder routes and more hidden stars.",
+      width:3100, groundY:630,
+      spawn:{x:100,y:510}, portal:{x:2920,y:430,w:95,h:150}, trash:{x:2820,y:516,w:58,h:74},
+      platforms:[
+        {x:0,y:630,w:380,h:100},{x:480,y:560,w:230,h:32},{x:800,y:490,w:250,h:32},
+        {x:1140,y:560,w:180,h:32},{x:1420,y:470,w:260,h:32},{x:1770,y:570,w:230,h:32},
+        {x:2090,y:500,w:300,h:32},{x:2480,y:560,w:220,h:32},{x:2790,y:590,w:310,h:100},
+        {x:500,y:380,w:130,h:25, moving:true, axis:"y", range:120, speed:1.35},
+        {x:1260,y:330,w:140,h:25, secret:true},{x:1940,y:365,w:150,h:25, moving:true, axis:"x", range:210, speed:1.1},
+        {x:2580,y:350,w:130,h:25, secret:true}
+      ],
+      crystals:[
+        {x:245,y:558,word:"does"},{x:900,y:420,word:"mice"},{x:1505,y:400,word:"fewer"},
+        {x:2205,y:430,word:"has"},{x:2585,y:490,word:"best"}
+      ],
+      monsters:[
+        {x:500,y:512,word:"do",minX:490,maxX:685},{x:830,y:442,word:"mouses",minX:810,maxX:1020},
+        {x:1465,y:422,word:"lesser",minX:1430,maxX:1650},{x:2125,y:452,word:"have",minX:2100,maxX:2360},
+        {x:2515,y:512,word:"bestest",minX:2490,maxX:2680}
+      ],
+      rewards:[{x:1305,y:160,label:"Forest Star"},{x:2625,y:175,label:"Silver Star"},{x:2015,y:270,label:"Canopy Star"},{x:870,y:255,label:"Mooncap Star"}],
+      decorations:[{x:1825,y:520,type:"sign",text:"The canopy hides a second path."}],
+      ladderSites:[{x:840,y:485,h:150,label:"MOONCAP STAR"},{x:1210,y:490,h:160,label:"BUILD TO STAR"},{x:2140,y:480,h:170,label:"CANOPY ROUTE"},{x:2520,y:500,h:150,label:"SECRET STAR"}]
+    },
+    {
+      name:"Level 3 · Starlit Hollow",
+      hint:"Tricky forms: precision opens the final portal.",
+      width:3550, groundY:640,
+      spawn:{x:100,y:520}, portal:{x:3360,y:390,w:105,h:165}, trash:{x:3280,y:536,w:58,h:74},
+      platforms:[
+        {x:0,y:640,w:340,h:100},{x:430,y:570,w:210,h:30},{x:760,y:500,w:180,h:30},
+        {x:1040,y:585,w:200,h:30},{x:1350,y:500,w:230,h:30},{x:1690,y:590,w:230,h:30},
+        {x:2010,y:490,w:220,h:30},{x:2340,y:565,w:240,h:30},{x:2680,y:475,w:220,h:30},
+        {x:3000,y:570,w:200,h:30},{x:3270,y:610,w:280,h:100},
+        {x:600,y:370,w:130,h:24, moving:true, axis:"x", range:210, speed:1.1},
+        {x:1180,y:350,w:130,h:24, moving:true, axis:"y", range:140, speed:1.25},
+        {x:1860,y:350,w:150,h:24, secret:true},
+        {x:2460,y:330,w:140,h:24, moving:true, axis:"x", range:220, speed:1.45},
+        {x:3060,y:340,w:145,h:24, secret:true}
+      ],
+      crystals:[
+        {x:270,y:566,word:"their"},{x:830,y:430,word:"could've"},{x:1455,y:430,word:"than"},
+        {x:2100,y:420,word:"its"},{x:2780,y:405,word:"lying"},{x:3110,y:500,word:"who"}
+      ],
+      monsters:[
+        {x:470,y:522,word:"there",minX:440,maxX:615},{x:785,y:452,word:"could of",minX:770,maxX:920},
+        {x:1380,y:452,word:"then",minX:1360,maxX:1555},{x:2040,y:442,word:"it's",minX:2020,maxX:2200},
+        {x:2710,y:427,word:"laying",minX:2690,maxX:2880},{x:3018,y:522,word:"whom",minX:3010,maxX:3175}
+      ],
+      rewards:[{x:1915,y:175,label:"Forest Star"},{x:3110,y:160,label:"Starlight Star"},{x:1230,y:250,label:"Hollow Star"},{x:2860,y:245,label:"Glimmer Star"}],
+      decorations:[{x:2395,y:515,type:"sign",text:"Look high where starlight gathers."}],
+      ladderSites:[{x:1180,y:485,h:170,label:"HOLLOW STAR"},{x:1815,y:495,h:175,label:"STAR LADDER"},{x:2480,y:485,h:170,label:"GLIMMER ROUTE"},{x:3000,y:500,h:160,label:"HIGH STAR"}]
+    },
+    {
+      name:"Level 4 · Firefly Library",
+      hint:"Sentence choices: build word ladders to reach the library stars. Complexity rises with multi-route climbs.",
+      width:3850, groundY:640,
+      spawn:{x:100,y:520}, portal:{x:3650,y:400,w:105,h:165}, trash:{x:3550,y:536,w:58,h:74},
+      platforms:[
+        {x:0,y:640,w:360,h:100},{x:455,y:565,w:210,h:30},{x:760,y:505,w:220,h:30},
+        {x:1080,y:585,w:210,h:30},{x:1390,y:505,w:240,h:30},{x:1745,y:575,w:220,h:30},
+        {x:2075,y:495,w:240,h:30},{x:2435,y:580,w:220,h:30},{x:2760,y:500,w:240,h:30},
+        {x:3110,y:575,w:200,h:30},{x:3440,y:610,w:410,h:100},
+        {x:900,y:335,w:130,h:24,secret:true},{x:1570,y:310,w:145,h:24,moving:true,axis:"x",range:210,speed:1.15},
+        {x:2260,y:315,w:145,h:24,secret:true},{x:2990,y:300,w:150,h:24,moving:true,axis:"y",range:120,speed:1.3}
+      ],
+      crystals:[
+        {x:265,y:565,word:"because"},{x:850,y:435,word:"doesn't"},{x:1480,y:435,word:"too"},
+        {x:2160,y:425,word:"your"},{x:2850,y:430,word:"their"},{x:3200,y:505,word:"were"}
+      ],
+      monsters:[
+        {x:485,y:517,word:"becuz",minX:470,maxX:640},{x:790,y:457,word:"dont",minX:775,maxX:960},
+        {x:1420,y:457,word:"to",minX:1405,maxX:1605},{x:2100,y:447,word:"you're",minX:2090,maxX:2290},
+        {x:2790,y:452,word:"there",minX:2775,maxX:2975},{x:3140,y:527,word:"was",minX:3120,maxX:3290}
+      ],
+      rewards:[
+        {x:965,y:145,label:"Library Star"},
+        {x:2328,y:145,label:"Firefly Star"},
+        {x:3060,y:130,label:"Scholar Star"}
+      ],
+      decorations:[{x:1830,y:525,type:"sign",text:"Correct words can build the way upward."}],
+      ladderSites:[{x:850,y:500,h:190,label:"LIBRARY STAR"},{x:2200,y:490,h:195,label:"BUILD UP"},{x:2930,y:490,h:190,label:"SCHOLAR STAR"}]
+    },
+    {
+      name:"Level 5 · Aurora Crown",
+      hint:"Mid-campaign test: use nets, parachute, and multiple ladder placements to reach the crown.",
+      width:4200, groundY:650,
+      spawn:{x:100,y:530}, portal:{x:3990,y:385,w:115,h:175}, trash:{x:3890,y:546,w:60,h:74},
+      platforms:[
+        {x:0,y:650,w:340,h:100},{x:430,y:580,w:200,h:30},{x:740,y:505,w:205,h:30},
+        {x:1060,y:590,w:215,h:30},{x:1390,y:500,w:220,h:30},{x:1720,y:585,w:220,h:30},
+        {x:2060,y:490,w:225,h:30},{x:2395,y:580,w:220,h:30},{x:2730,y:495,w:230,h:30},
+        {x:3075,y:580,w:215,h:30},{x:3410,y:500,w:220,h:30},{x:3750,y:610,w:450,h:100},
+        {x:570,y:345,w:130,h:24,moving:true,axis:"x",range:220,speed:1.25},
+        {x:1210,y:305,w:135,h:24,secret:true},{x:1880,y:300,w:145,h:24,moving:true,axis:"y",range:145,speed:1.4},
+        {x:2575,y:300,w:145,h:24,secret:true},{x:3290,y:285,w:150,h:24,moving:true,axis:"x",range:230,speed:1.5}
+      ],
+      crystals:[
+        {x:250,y:575,word:"would have"},{x:820,y:435,word:"fewer"},{x:1480,y:430,word:"whose"},
+        {x:2145,y:420,word:"affect"},{x:2815,y:425,word:"then"},{x:3495,y:430,word:"you're"}
+      ],
+      monsters:[
+        {x:465,y:532,word:"would of",minX:450,maxX:610},{x:770,y:457,word:"less",minX:755,maxX:930},
+        {x:1420,y:452,word:"who's",minX:1405,maxX:1595},{x:2080,y:442,word:"effect",minX:2070,maxX:2265},
+        {x:2760,y:447,word:"than",minX:2745,maxX:2940},{x:3440,y:452,word:"your",minX:3430,maxX:3605}
+      ],
+      rewards:[
+        {x:1268,y:130,label:"Aurora Star"},
+        {x:2640,y:125,label:"Crown Star"},
+        {x:3370,y:115,label:"Grammar Star"}
+      ],
+      decorations:[{x:2440,y:530,type:"sign",text:"The strongest path is built from words you know."}],
+      ladderSites:[
+        {x:1190,y:475,h:170,label:"STAR TOWER"},
+        {x:2555,y:470,h:170,label:"STACK 2 WORDS"},
+        {x:3260,y:455,h:185,label:"HIGH ROUTE"}
+      ]
+    },
+    {
+      name:"Level 6 · Cloudroot Ruins",
+      hint:"Build upward: several stars sit beyond normal jump height, and stacked ladders become useful.",
+      width:4450, groundY:650,
+      spawn:{x:100,y:530}, portal:{x:4240,y:385,w:115,h:175}, trash:{x:4140,y:546,w:60,h:74},
+      platforms:[
+        {x:0,y:650,w:330,h:100},{x:425,y:585,w:195,h:30},{x:745,y:510,w:200,h:30},
+        {x:1080,y:590,w:190,h:30},{x:1390,y:515,w:210,h:30},{x:1730,y:590,w:205,h:30},
+        {x:2070,y:510,w:210,h:30},{x:2410,y:590,w:210,h:30},{x:2750,y:505,w:220,h:30},
+        {x:3100,y:590,w:210,h:30},{x:3440,y:505,w:220,h:30},{x:3780,y:585,w:220,h:30},
+        {x:4080,y:610,w:370,h:100},
+        {x:860,y:285,w:115,h:22,secret:true},{x:1510,y:260,w:120,h:22,secret:true},
+        {x:2200,y:270,w:120,h:22,moving:true,axis:"x",range:210,speed:1.25},
+        {x:2890,y:250,w:125,h:22,secret:true},{x:3570,y:245,w:125,h:22,moving:true,axis:"y",range:120,speed:1.4}
+      ],
+      crystals:[
+        {x:250,y:575,word:"ran"},{x:820,y:440,word:"teeth"},{x:1475,y:445,word:"better"},
+        {x:2150,y:440,word:"bought"},{x:2825,y:435,word:"many"},{x:3515,y:435,word:"their"}
+      ],
+      monsters:[
+        {x:455,y:537,word:"runned",minX:440,maxX:600},{x:780,y:462,word:"tooths",minX:765,maxX:930},
+        {x:1420,y:467,word:"more better",minX:1405,maxX:1585},{x:2100,y:462,word:"buyed",minX:2085,maxX:2265},
+        {x:2770,y:457,word:"much",minX:2755,maxX:2945},{x:3470,y:457,word:"there",minX:3455,maxX:3615}
+      ],
+      rewards:[
+        {x:915,y:205,label:"Cloud Star"},
+        {x:1568,y:175,label:"Rune Star"},
+        {x:2950,y:165,label:"Sky Star"},
+        {x:3635,y:150,label:"Root Star"}
+      ],
+      ladderSites:[
+        {x:820,y:500,h:215,label:"BUILD UP"},
+        {x:1450,y:505,h:245,label:"2-WORD CLIMB"},
+        {x:2830,y:495,h:245,label:"STAR LADDER"},
+        {x:3500,y:495,h:250,label:"SKY ROUTE"}
+      ],
+      decorations:[{x:2460,y:540,type:"sign",text:"The ruins reward builders, not only jumpers."}]
+    },
+    {
+      name:"Level 7 · Crystal Observatory",
+      hint:"Stack word ladders to reach observatory balconies and stars. Multi-height routes now dominate.",
+      width:4720, groundY:655,
+      spawn:{x:100,y:535}, portal:{x:4500,y:390,w:118,h:175}, trash:{x:4395,y:551,w:60,h:74},
+      platforms:[
+        {x:0,y:655,w:340,h:100},{x:440,y:585,w:195,h:30},{x:770,y:515,w:195,h:30},
+        {x:1100,y:595,w:200,h:30},{x:1435,y:510,w:210,h:30},{x:1780,y:590,w:210,h:30},
+        {x:2120,y:505,w:215,h:30},{x:2470,y:595,w:205,h:30},{x:2810,y:505,w:215,h:30},
+        {x:3160,y:595,w:205,h:30},{x:3500,y:500,w:220,h:30},{x:3860,y:590,w:210,h:30},
+        {x:4190,y:610,w:530,h:100},
+        {x:580,y:315,w:125,h:22,moving:true,axis:"x",range:190,speed:1.3},
+        {x:1250,y:245,w:120,h:22,secret:true},{x:1940,y:220,w:125,h:22,secret:true},
+        {x:2640,y:255,w:125,h:22,moving:true,axis:"y",range:150,speed:1.45},
+        {x:3330,y:215,w:125,h:22,secret:true},{x:4020,y:250,w:125,h:22,moving:true,axis:"x",range:210,speed:1.5}
+      ],
+      crystals:[
+        {x:255,y:580,word:"seen"},{x:845,y:445,word:"fewer"},{x:1515,y:440,word:"whose"},
+        {x:2205,y:435,word:"accept"},{x:2895,y:435,word:"then"},{x:3585,y:430,word:"you're"}
+      ],
+      monsters:[
+        {x:470,y:537,word:"sawen",minX:455,maxX:615},{x:795,y:467,word:"less",minX:780,maxX:950},
+        {x:1460,y:462,word:"who's",minX:1445,maxX:1625},{x:2150,y:457,word:"except",minX:2135,maxX:2315},
+        {x:2840,y:457,word:"than",minX:2825,maxX:3005},{x:3535,y:452,word:"your",minX:3520,maxX:3690}
+      ],
+      rewards:[
+        {x:1310,y:160,label:"Lens Star"},
+        {x:2000,y:135,label:"Orbit Star"},
+        {x:3390,y:130,label:"Crystal Star"},
+        {x:4080,y:165,label:"Comet Star"}
+      ],
+      ladderSites:[
+        {x:1190,y:500,h:255,label:"STACK 2"},
+        {x:1875,y:495,h:275,label:"OBSERVATORY"},
+        {x:3260,y:490,h:275,label:"HIGH BALCONY"},
+        {x:3970,y:505,h:255,label:"COMET DECK"}
+      ],
+      decorations:[{x:2500,y:545,type:"sign",text:"A known word is a rung toward a higher view."}]
+    },
+    {
+      name:"Level 8 · Heart of Grammar Grove",
+      hint:"Final ascent: combine stacked ladders, nets, parachute and the red pen in the most complex biome.",
+      width:5050, groundY:660,
+      spawn:{x:100,y:540}, portal:{x:4800,y:365,w:130,h:190}, trash:{x:4690,y:556,w:62,h:74},
+      platforms:[
+        {x:0,y:660,w:330,h:100},{x:430,y:590,w:190,h:30},{x:750,y:515,w:195,h:30},
+        {x:1080,y:600,w:195,h:30},{x:1410,y:510,w:205,h:30},{x:1745,y:595,w:205,h:30},
+        {x:2080,y:505,w:210,h:30},{x:2420,y:600,w:205,h:30},{x:2760,y:500,w:215,h:30},
+        {x:3110,y:595,w:210,h:30},{x:3460,y:500,w:220,h:30},{x:3820,y:595,w:210,h:30},
+        {x:4170,y:500,w:220,h:30},{x:4520,y:615,w:530,h:100},
+        {x:560,y:300,w:120,h:22,secret:true},{x:1240,y:235,w:125,h:22,secret:true},
+        {x:1920,y:195,w:125,h:22,secret:true},{x:2600,y:245,w:125,h:22,moving:true,axis:"x",range:220,speed:1.45},
+        {x:3290,y:195,w:130,h:22,secret:true},{x:3980,y:225,w:125,h:22,moving:true,axis:"y",range:145,speed:1.55}
+      ],
+      crystals:[
+        {x:250,y:585,word:"had gone"},{x:825,y:445,word:"children"},{x:1490,y:440,word:"fewer"},
+        {x:2160,y:435,word:"its"},{x:2845,y:430,word:"lying"},{x:3545,y:430,word:"whom"},{x:4250,y:430,word:"would have"}
+      ],
+      monsters:[
+        {x:460,y:542,word:"had went",minX:445,maxX:605},{x:780,y:467,word:"childs",minX:765,maxX:940},
+        {x:1440,y:462,word:"less",minX:1425,maxX:1595},{x:2110,y:457,word:"it's",minX:2095,maxX:2265},
+        {x:2795,y:452,word:"laying",minX:2780,maxX:2945},{x:3495,y:452,word:"who",minX:3480,maxX:3650},
+        {x:4200,y:452,word:"would of",minX:4185,maxX:4360}
+      ],
+      rewards:[
+        {x:1300,y:145,label:"Heart Star"},
+        {x:1980,y:105,label:"Ancient Star"},
+        {x:3355,y:105,label:"Wisdom Star"},
+        {x:4040,y:135,label:"Guardian Star"},
+        {x:4650,y:205,label:"Final Star"}
+      ],
+      ladderSites:[
+        {x:1180,y:500,h:265,label:"WORD TOWER"},
+        {x:1850,y:490,h:300,label:"STACK 2–3"},
+        {x:3220,y:490,h:295,label:"WISDOM TOWER"},
+        {x:3910,y:495,h:270,label:"GUARDIAN ROUTE"}
+      ],
+      decorations:[{x:2500,y:550,type:"sign",text:"Build with what you learned. The heart is above."}]
+    }
+  ];
+  const levelTemplates = levels.map(l => ({
+    name:l.name,
+    hint:l.hint,
+    crystals:JSON.parse(JSON.stringify(l.crystals)),
+    monsters:JSON.parse(JSON.stringify(l.monsters))
+  }));
+  let lessonName = "Grammar Grove";
+  let requireTrash = true;
+  let customTeacherConfig = null;
+  let teacherWasRunning = false;
+  let hostWordConfigKey = "";
+
+  function wordsFrom(value){
+    return value.split(/\n|,/).map(v=>v.trim()).filter(Boolean);
+  }
+
+  function currentWordConfig(){
+    return {
+      lessonName,
+      requireTrash,
+      levels: levels.map(l => ({
+        correct:l.crystals.map(c=>c.word),
+        wrong:l.monsters.map(m=>m.word)
+      }))
+    };
+  }
+
+  function applyTeacherConfig(config){
+    customTeacherConfig = config || null;
+    lessonName = config?.lessonName?.trim() || "Grammar Grove";
+    requireTrash = config?.requireTrash !== false;
+    levels.forEach((l,i)=>{
+      const template = levelTemplates[i];
+      const set = config?.levels?.[i];
+      if(set){
+        const correct = (set.correct || []).map(v=>String(v).trim()).filter(Boolean).slice(0,template.crystals.length);
+        const wrong = (set.wrong || []).map(v=>String(v).trim()).filter(Boolean).slice(0,template.monsters.length);
+        l.crystals = correct.map((word,j)=>({...template.crystals[j],word}));
+        l.monsters = wrong.map((word,j)=>({...template.monsters[j],word}));
+        l.hint = `${lessonName} · Sort the words.`;
+      } else {
+        l.crystals = JSON.parse(JSON.stringify(template.crystals));
+        l.monsters = JSON.parse(JSON.stringify(template.monsters));
+        l.hint = template.hint;
+      }
+      l.name = template.name;
+    });
+  }
+
+  let teacherEditLevel=0;
+
+  function renderTeacherFields(){
+    const config=currentWordConfig();
+    lessonNameInput.value=customTeacherConfig ? lessonName : "";
+    requireTrashInput.checked=requireTrash;
+    teacherEditLevel=clamp(teacherEditLevel,0,levels.length-1);
+    const i=teacherEditLevel;
+    const l=levels[i];
+    const tc=levelTemplates[i].crystals.length;
+    const tw=levelTemplates[i].monsters.length;
+    const correct=config.levels[i].correct.join("\n");
+    const wrong=config.levels[i].wrong.join("\n");
+    teacherLevelTitleEl.textContent=l.name;
+    teacherLevelCounterEl.textContent=`${i+1} / ${levels.length}`;
+    teacherPrevLevel.disabled=i===0;
+    teacherNextLevel.disabled=i===levels.length-1;
+    teacherLevelsEl.innerHTML=`
+      <section class="teacherLevel" style="grid-column:1/-1">
+        <h3>${escapeHTML(l.name)}</h3>
+        <div class="capacity">Up to ${tc} correct · ${tw} incorrect</div>
+        <label>Correct words / phrases</label>
+        <textarea data-level="${i}" data-kind="correct" spellcheck="true">${escapeHTML(correct)}</textarea>
+        <label>Incorrect words / phrases</label>
+        <textarea data-level="${i}" data-kind="wrong" spellcheck="true">${escapeHTML(wrong)}</textarea>
+      </section>`;
+  }
+
+  function preserveCurrentTeacherEditor(){
+    const i=teacherEditLevel;
+    const c=teacherLevelsEl.querySelector(`textarea[data-level="${i}"][data-kind="correct"]`);
+    const w=teacherLevelsEl.querySelector(`textarea[data-level="${i}"][data-kind="wrong"]`);
+    if(!c || !w)return;
+    const config=currentWordConfig();
+    config.lessonName=lessonNameInput.value.trim() || "Custom Grammar Lesson";
+    config.requireTrash=requireTrashInput.checked;
+    config.levels[i]={correct:wordsFrom(c.value),wrong:wordsFrom(w.value)};
+    applyTeacherConfig(config);
+  }
+
+  function changeTeacherLevel(delta){
+    preserveCurrentTeacherEditor();
+    teacherEditLevel=clamp(teacherEditLevel+delta,0,levels.length-1);
+    renderTeacherFields();
+    teacherStatusEl.textContent="";
+  }
+
+  function escapeHTML(s){
+    return String(s).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[ch]));
+  }
+
+  function readTeacherForm(){
+    const config=currentWordConfig();
+    config.lessonName=lessonNameInput.value.trim() || "Custom Grammar Lesson";
+    config.requireTrash=requireTrashInput.checked;
+    const i=teacherEditLevel;
+    const c=teacherLevelsEl.querySelector(`textarea[data-level="${i}"][data-kind="correct"]`);
+    const w=teacherLevelsEl.querySelector(`textarea[data-level="${i}"][data-kind="wrong"]`);
+    if(c && w){
+      config.levels[i]={correct:wordsFrom(c.value),wrong:wordsFrom(w.value)};
+    }
+    return config;
+  }
+
+  function validateTeacherConfig(config){
+    for(let i=0;i<config.levels.length;i++){
+      if(!config.levels[i].correct.length) return `Level ${i+1} needs at least one correct word.`;
+      if(!config.levels[i].wrong.length) return `Level ${i+1} needs at least one incorrect word.`;
+    }
+    return "";
+  }
+
+  function saveTeacherConfig(play=false){
+    const config = readTeacherForm();
+    const error = validateTeacherConfig(config);
+    if(error){ teacherStatusEl.textContent = error; return; }
+    localStorage.setItem("grammarGroveTeacher", JSON.stringify(config));
+    applyTeacherConfig(config);
+    teacherStatusEl.textContent = "Saved in this browser.";
+    if(play){
+      teacherOverlay.classList.add("hidden");
+      overlay.classList.add("hidden");
+      xp=0; playerLevel=1;
+      running = true; won = false; levelIndex = 0;
+      loadLevel(0);
+    } else if(running || teacherWasRunning) {
+      loadLevel(levelIndex);
+    }
+  }
+
+  function startTeacherPreview(){
+    const config=readTeacherForm();
+    const error=validateTeacherConfig(config);
+    if(error){ teacherStatusEl.textContent=error; return; }
+    localStorage.setItem("grammarGroveTeacher",JSON.stringify(config));
+    applyTeacherConfig(config);
+    teacherPreview.active=true;
+    teacherPreview.selectedLevel=teacherEditLevel;
+    teacherOverlay.classList.add("hidden");
+    overlay.classList.add("hidden");
+    running=true;
+    won=false;
+    levelIndex=teacherEditLevel;
+    loadLevel(levelIndex);
+    teacherPreview.active=true;
+    previewLevelLabel.textContent=levels[levelIndex].name;
+    teacherPreviewBar.classList.add("show");
+    toast("Teacher Preview: inspect this level manually. Use ← / → below to switch levels.");
+  }
+
+  function changePreviewLevel(delta){
+    if(!teacherPreview.active)return;
+    const next=clamp(levelIndex+delta,0,levels.length-1);
+    if(next===levelIndex)return;
+    levelIndex=next;
+    teacherPreview.selectedLevel=next;
+    loadLevel(levelIndex);
+    teacherPreview.active=true;
+    previewLevelLabel.textContent=levels[levelIndex].name;
+    teacherPreviewBar.classList.add("show");
+  }
+
+  function exitTeacherPreview(){
+    teacherPreview.active=false;
+    teacherPreviewBar.classList.remove("show");
+    running=false;
+    teacherEditLevel=clamp(levelIndex,0,levels.length-1);
+    renderTeacherFields();
+    teacherOverlay.classList.remove("hidden");
+  }
+
+  function openTeacherMode(){
+    if(hostWordConfigKey) return;
+    teacherWasRunning=running;
+    running=false;
+    teacherEditLevel=clamp(levelIndex,0,levels.length-1);
+    teacherStatusEl.textContent="";
+    renderTeacherFields();
+    teacherOverlay.classList.remove("hidden");
+  }
+
+  function closeTeacherMode(){
+    teacherOverlay.classList.add("hidden");
+    running = teacherWasRunning;
+  }
+
+  function resetTeacherConfig(){
+    localStorage.removeItem("grammarGroveTeacher");
+    applyTeacherConfig(null);
+    renderTeacherFields();
+    teacherStatusEl.textContent = "Built-in word lists restored.";
+    if(teacherWasRunning) loadLevel(levelIndex);
+  }
+
+  function parseHostWordConfig(raw){
+    if(raw == null || raw === "") return null;
+    let data = raw;
+    if(typeof raw !== "object"){
+      const text = String(raw).trim();
+      if(!text) return null;
+      try { data = JSON.parse(text); }
+      catch(e) { return null; }
+    }
+    if(!data || !Array.isArray(data.levels)) return null;
+    return data;
+  }
+
+  function lockClassWordEditor(){
+    if(teacherBtn) teacherBtn.hidden = true;
+    if(teacherStartBtn) teacherStartBtn.hidden = true;
+  }
+
+  function applyHostWordConfig(raw, reload){
+    const config = parseHostWordConfig(raw);
+    if(!config) return false;
+    const key = JSON.stringify(config);
+    if(key === hostWordConfigKey) return true;
+    hostWordConfigKey = key;
+    applyTeacherConfig(config);
+    lockClassWordEditor();
+    if(reload) loadLevel(levelIndex);
+    return true;
+  }
+
+  function bootWordConfig(){
+    let host = null;
+    try { host = parseHostWordConfig(new URLSearchParams(location.search).get("lp_config")); }
+    catch(e) {}
+    if(!host && window.LearnPlay) host = parseHostWordConfig(LearnPlay.classConfig);
+    if(host){
+      applyHostWordConfig(host, false);
+      return;
+    }
+    try {
+      const saved = JSON.parse(localStorage.getItem("grammarGroveTeacher") || "null");
+      if(saved) applyTeacherConfig(saved);
+    } catch(err) {
+      localStorage.removeItem("grammarGroveTeacher");
+    }
+  }
+
+  bootWordConfig();
+  addEventListener("learnplay-config", (ev) => { applyHostWordConfig(ev.detail, true); });
+  addEventListener("message", (ev) => {
+    const data = ev.data || {};
+    if(data.source === "learnplay-host" && data.type === "config"){
+      applyHostWordConfig((data.payload && data.payload.config) || "", true);
+    }
+  });
+
+  let levelIndex = 0;
+  let level, platforms=[], crystals=[], monsters=[], rewards=[], dormantWrong=[];
+  let nets = [];
+  let wordLadders = [];
+  let wordInventory = [];
+  let xp = 0;
+  let playerLevel = 1;
+  const PEN_UNLOCK_XP = 12;
+  let playerGender = localStorage.getItem("grammarGroveGender") || "girl";
+  let particles=[];
+  let camera={x:0,y:0};
+  let running=false, won=false;
+  let totalHidden=0, collectedHidden=0;
+  let trashedWrong=0;
+  let lastTime=0;
+  let toastTimer=0;
+  let screenShake=0;
+  let flash=0;
+  let levelTransition={active:false,timer:0,duration:2.45,baseY:0,confettiTick:0};
+  let teacherPreview={active:false,selectedLevel:0};
+
+  const player = {
+    x:0,y:0,w:34,h:48,vx:0,vy:0,
+    speed:390, accel:2200, friction:1800,
+    jump:680, gravity:1900, maxFall:1050,
+    grounded:false, coyote:0, jumpBuffer:0,
+    facing:1, hearts:3, invuln:0, riding:null,
+    collected:0, carriedWord:null, netCooldown:0, penCooldown:0, netAngle:-0.73, parachute:false, fallProtected:false, climbing:false
+  };
+
+  function clone(obj){ return JSON.parse(JSON.stringify(obj)); }
+
+  function loadLevel(i) {
+    levelIndex = i;
+    level = clone(levels[i]);
+    platforms = level.platforms.map((p,idx)=>({
+      ...p, baseX:p.x, baseY:p.y, phase:idx*0.71, dx:0, dy:0, prevX:p.x, prevY:p.y
+    }));
+    crystals = level.crystals.map(c=>({...c,collected:false,bob:rnd(0,Math.PI*2),correct:true}));
+    dormantWrong = level.monsters.map((m,idx)=>({
+      ...m,
+      crystalX:m.x + 28,
+      crystalY:m.y + 12,
+      collected:false,
+      triggered:false,
+      netted:false,
+      correct:false,
+      bob:rnd(0,Math.PI*2),
+      seed:idx
+    }));
+    monsters = [];
+    rewards = level.rewards.map(r=>({...r,collected:false,bob:rnd(0,6.28)}));
+    totalHidden = rewards.length;
+    collectedHidden = 0;
+    trashedWrong = 0;
+    player.x=level.spawn.x; player.y=level.spawn.y;
+    player.vx=0; player.vy=0; player.grounded=false; player.coyote=0; player.jumpBuffer=0;
+    player.hearts=3; player.invuln=0; player.riding=null; player.collected=0; player.carriedWord=null;
+    camera.x=0; camera.y=0; particles=[]; nets=[]; wordLadders=[]; wordInventory=[]; screenShake=0; flash=0; levelTransition.active=false; player.netCooldown=0;
+    teacherPreview.selectedLevel=levelIndex; player.penCooldown=0; player.parachute=false; player.fallProtected=false; player.climbing=false; player.netAngle=-0.73;
+    levelNameEl.textContent = level.name;
+    levelHintEl.textContent = teacherPreview.active ? `Teacher Preview · ${level.hint}` : level.hint;
+    updateHUD();
+    toast("Collect correct words to build ladders. Stars give XP; Level 2 unlocks the red pen.");
+  }
+
+  function updateHUD(){
+    crystalCountEl.textContent = `${player.collected} / ${crystals.length}`;
+    ladderCountEl.textContent = wordInventory.length;
+    trashCountEl.textContent = `${trashedWrong} / ${dormantWrong.length}`;
+    rewardCountEl.textContent = `${collectedHidden} / ${totalHidden}`;
+    playerLevelEl.textContent = playerLevel;
+    xpCountEl.textContent = playerLevel >= 2 ? `${xp} XP` : `${xp}/${PEN_UNLOCK_XP} XP`;
+    penStatusEl.textContent = playerLevel >= 2 ? "READY" : "LOCKED";
+    heartCountEl.textContent = player.hearts;
+  }
+
+  function toast(msg){
+    toastEl.textContent = msg;
+    toastEl.classList.add("show");
+    toastTimer = 2.3;
+  }
+
+  function rects(a,b){
+    return a.x < b.x+b.w && a.x+a.w > b.x && a.y < b.y+b.h && a.y+a.h > b.y;
+  }
+
+  function emit(x,y,count,kind="spark"){
+    for(let i=0;i<count;i++){
+      particles.push({
+        x,y,vx:rnd(-150,150),vy:rnd(-220,-40),life:rnd(.4,1.0),max:1,
+        size:rnd(2,6),kind
+      });
+    }
+  }
+
+  function addXP(amount,reason=""){
+    const before=playerLevel;
+    xp += amount;
+    if(xp >= PEN_UNLOCK_XP) playerLevel = 2;
+    updateHUD();
+    if(before < 2 && playerLevel >= 2){
+      emit(player.x+player.w/2,player.y,40,"levelup");
+      toast("LEVEL 2! Red correction pen unlocked — press P near a wrong word.");
+    }
+  }
+
+  function reportGroveStage(done, finished){
+    try {
+      if(!window.LearnPlay || typeof LearnPlay.stage !== "function") return;
+      LearnPlay.stage(done, levels.length, {
+        id: finished ? "grove-complete" : "grove-level-" + done,
+        label: finished ? "Forest complete" : ((levels[done - 1] && levels[done - 1].name) || ("Level " + done)),
+        points: finished ? 8 : 2,
+        correct: true,
+        complete: !!finished,
+        levelsCompleted: done,
+        score: xp
+      });
+      if(LearnPlay.progress) LearnPlay.progress({ level: done, totalLevels: levels.length });
+    } catch(err) {}
+  }
+  function findLadderPlacement(){
+    const desiredX = player.x + player.w/2 + player.facing*54;
+    const desiredBottom = player.y + player.h + 6;
+    const ladderW = 54;
+    const ladderH = 168;
+    let candidates=[];
+    for(const p of platforms){
+      const topY=p.y;
+      const centerX=clamp(desiredX,p.x+ladderW*.55,p.x+p.w-ladderW*.55);
+      const horizontalGap=Math.abs(centerX-desiredX);
+      const verticalGap=Math.abs(topY-desiredBottom);
+      if(horizontalGap<170 && topY>=player.y-60 && topY<player.y+260){
+        candidates.push({x:centerX,bottom:topY,score:horizontalGap+verticalGap*.65,supportType:"platform",platform:p,support:null});
+      }
+    }
+    for(const l of wordLadders){
+      const topY=l.y+2;
+      const horizontalGap=Math.abs(l.x-desiredX);
+      const verticalGap=Math.abs(topY-desiredBottom);
+      if(horizontalGap<120 && topY>=player.y-90 && topY<player.y+220){
+        candidates.push({x:l.x,bottom:topY,score:horizontalGap*.75+verticalGap*.8,supportType:"ladder",platform:null,support:l});
+      }
+    }
+    if(!candidates.length){
+      candidates.push({
+        x:clamp(desiredX,ladderW*.7,level.width-ladderW*.7),
+        bottom:desiredBottom,
+        score:999,
+        supportType:"ground",
+        platform:null,
+        support:null
+      });
+    }
+    candidates.sort((a,b)=>a.score-b.score);
+    const offsets=[0,42,-42,78,-78,112,-112];
+    for(const c of candidates){
+      for(const off of offsets){
+        const x=clamp(c.x+off,ladderW*.7,level.width-ladderW*.7);
+        const y=c.bottom-ladderH;
+        const body={x:x-ladderW*.46,y:y,w:ladderW*.92,h:ladderH};
+        const climbAccess={x:x-ladderW*.78,y:y-8,w:ladderW*1.56,h:ladderH+16};
+        let blocked=false;
+        for(const p of platforms){
+          if(c.platform===p) continue;
+          const overlapX=Math.min(body.x+body.w,p.x+p.w)-Math.max(body.x,p.x);
+          const overlapY=Math.min(body.y+body.h,p.y+p.h)-Math.max(body.y,p.y);
+          if(overlapX>10 && overlapY>12){ blocked=true; break; }
+        }
+        if(blocked) continue;
+        for(const other of wordLadders){
+          if(c.support===other) continue;
+          const overlapX=Math.min(body.x+body.w,other.x+other.w*.46)-Math.max(body.x,other.x-other.w*.46);
+          const overlapY=Math.min(body.y+body.h,other.y+other.h)-Math.max(body.y,other.y);
+          if(overlapX>16 && overlapY>22){ blocked=true; break; }
+        }
+        if(blocked) continue;
+        let leftBlocked=false,rightBlocked=false;
+        const leftLane={x:climbAccess.x-player.w*.15,y:climbAccess.y+18,w:player.w*.72,h:climbAccess.h-30};
+        const rightLane={x:climbAccess.x+climbAccess.w-player.w*.55,y:climbAccess.y+18,w:player.w*.72,h:climbAccess.h-30};
+        for(const p of platforms){
+          if(c.platform===p) continue;
+          if(rects(leftLane,p)) leftBlocked=true;
+          if(rects(rightLane,p)) rightBlocked=true;
+        }
+        if(leftBlocked && rightBlocked) continue;
+        return {x,y,w:ladderW,h:ladderH,bottom:c.bottom,supportType:c.supportType};
+      }
+    }
+    return {
+      x:clamp(player.x+player.w/2,ladderW*.7,level.width-ladderW*.7),
+      y:desiredBottom-ladderH,
+      w:ladderW,h:ladderH,bottom:desiredBottom,supportType:"ground"
+    };
+  }
+
+  function placeWordLadder(){
+    if(!wordInventory.length){
+      toast("Collect a correct word first — it becomes a ladder.");
+      return false;
+    }
+    const placement=findLadderPlacement();
+    const word=wordInventory.shift();
+    wordLadders.push({ x:placement.x, y:placement.y, w:placement.w, h:placement.h, word });
+    emit(placement.x,placement.bottom-35,18,"ladder");
+    updateHUD();
+    toast(`Built a ladder from “${word}”. Ladders can snap to ground, platforms, and other ladders.`);
+    return true;
+  }
+
+  function nearbyWrongTarget(){
+    const px=player.x+player.w/2, py=player.y+player.h/2;
+    let best=null, bestD=Infinity;
+    for(const w of dormantWrong){
+      if(w.triggered) continue;
+      const d=Math.hypot(w.crystalX-px,w.crystalY-py);
+      if(d<bestD){ best={type:"crystal",obj:w,x:w.crystalX,y:w.crystalY,word:w.word}; bestD=d; }
+    }
+    for(const m of monsters){
+      if(!m.alive) continue;
+      const mx=m.x+m.w/2,my=m.y+m.h/2;
+      const d=Math.hypot(mx-px,my-py);
+      if(d<bestD){ best={type:"monster",obj:m,x:mx,y:my,word:m.word}; bestD=d; }
+    }
+    return bestD<=105?best:null;
+  }
+
+  function useRedPen(){
+    if(playerLevel<2){
+      toast(`${Math.max(0,PEN_UNLOCK_XP-xp)} XP until the red pen unlocks.`);
+      return;
+    }
+    if(player.penCooldown>0) return;
+    const target=nearbyWrongTarget();
+    if(!target){
+      toast("Move closer to a wrong word to use the red pen.");
+      player.penCooldown=.25;
+      return;
+    }
+    if(target.type==="crystal"){
+      target.obj.triggered=true;
+      target.obj.erased=true;
+    }else{
+      target.obj.alive=false;
+    }
+    trashedWrong++;
+    player.penCooldown=.55;
+    emit(target.x,target.y,30,"redpen");
+    addXP(1,"correction");
+    updateHUD();
+    toast(`Red pen corrected “${target.word}”.`);
+  }
+
+  function hurtPlayer(sourceX){
+    if(player.invuln>0) return;
+    player.hearts--;
+    player.invuln=1.35;
+    player.vx = (player.x < sourceX ? -1 : 1)*360;
+    player.vy = -420;
+    screenShake=12;
+    flash=.18;
+    emit(player.x+player.w/2, player.y+player.h/2, 18, "hurt");
+    updateHUD();
+    toast("Incorrect form! Keep exploring.");
+    if(player.hearts<=0) {
+      setTimeout(()=>loadLevel(levelIndex), 150);
+    }
+  }
+
+  function getAimAngle(){
+    let angle = player.netAngle;
+    if(pointerAim.active){
+      const ox = player.x + player.w/2;
+      const oy = player.y + 10;
+      const dx = pointerAim.x - ox;
+      const dy = pointerAim.y - oy;
+      if(Math.abs(dx) > 24 || Math.abs(dy) > 24){
+        player.facing = dx >= 0 ? 1 : -1;
+        const localX = Math.max(30, Math.abs(dx));
+        angle = Math.atan2(dy, localX);
+        angle = clamp(angle, -1.30, -0.16);
+      }
+    }
+    return angle;
+  }
+
+  function getNetLaunch(){
+    const x = player.x + player.w/2 + player.facing*18;
+    const y = player.y + 10;
+    const speed = 700;
+    const angle = getAimAngle();
+    const vx = player.facing * Math.cos(angle) * speed;
+    const vy = Math.sin(angle) * speed;
+    return {x,y,vx,vy,angle};
+  }
+
+  function throwNet(){
+    if(player.netCooldown > 0) return;
+    const launch = getNetLaunch();
+    nets.push({ x:launch.x, y:launch.y, vx:launch.vx, vy:launch.vy, w:34, h:22, life:1.8, landed:false });
+    player.netCooldown = .55;
+    emit(launch.x,launch.y,8,"capture");
+  }
+
+  function trapWrongCrystal(w){
+    if(w.netted || w.triggered) return;
+    w.netted = true;
+    emit(w.crystalX,w.crystalY,18,"capture");
+    toast(`“${w.word}” is trapped. Touching it is now safe.`);
+  }
+
+  function collectCrystal(c){
+    if(c.collected) return;
+    c.collected=true;
+    player.collected++;
+    wordInventory.push(c.word);
+    emit(c.x, c.y, 22, "crystal");
+    addXP(2,"correct word");
+    updateHUD();
+    const remaining = crystals.length-player.collected;
+    if(remaining){
+      toast(`Correct: “${c.word}” · ${remaining} crystal${remaining===1?"":"s"} left.`);
+    } else if(requireTrash && trashedWrong < dormantWrong.length){
+      toast(`Correct: “${c.word}” · Now clean up the remaining wrong words.`);
+    } else {
+      toast(`Correct: “${c.word}” · The portal is open!`);
+    }
+  }
+
+  function awakenWrongWord(w){
+    if(w.triggered) return;
+    w.triggered = true;
+    emit(w.crystalX, w.crystalY, 26, w.netted ? "capture" : "hurt");
+    if(!w.netted){ screenShake = 9; flash = .12; }
+    const monster = {
+      x:w.crystalX-28, y:w.crystalY-20, baseY:w.crystalY-20, w:56,h:42, word:w.word,
+      minX:w.minX, maxX:w.maxX, vx:w.netted ? 0 : (player.x < w.crystalX ? 95 : -95),
+      phase:rnd(0,6.28), alive:true, trapped:!!w.netted
+    };
+    monsters.push(monster);
+    if(w.netted) toast(`Wrong: “${w.word}” — it transformed, but the net keeps it harmless.`);
+    else { toast(`Wrong: “${w.word}” — it woke up!`); player.invuln = Math.max(player.invuln, .18); }
+  }
+
+  function collectReward(r){
+    if(r.collected) return;
+    r.collected=true;
+    collectedHidden++;
+    emit(r.x, r.y, 34, "reward");
+    addXP(3,"star");
+    updateHUD();
+    toast(`Star found: ${r.label}! +3 XP`);
+  }
+
+  function portalReady(){
+    const correctDone = player.collected === crystals.length;
+    const wrongDone = trashedWrong === dormantWrong.length;
+    return correctDone && (!requireTrash || wrongDone);
+  }
+
+  function captureMonster(m){
+    if(player.carriedWord || !m.alive) return;
+    m.alive = false;
+    player.carriedWord = m.word;
+    emit(m.x+m.w/2,m.y+m.h/2,20,"capture");
+    toast(`Bagged “${m.word}”. Carry it to the trash can.`);
+  }
+
+  function trashMonster(m){
+    if(!m.alive) return;
+    m.alive = false;
+    trashedWrong++;
+    emit(level.trash.x+level.trash.w/2,level.trash.y+12,28,"trash");
+    addXP(1,"sorting");
+    updateHUD();
+    toast(`“${m.word}” sorted into the trash. +1 XP`);
+  }
+
+  function depositCarriedWord(){
+    if(!player.carriedWord) return;
+    const word = player.carriedWord;
+    player.carriedWord = null;
+    trashedWrong++;
+    emit(level.trash.x+level.trash.w/2,level.trash.y+10,30,"trash");
+    addXP(1,"sorting");
+    updateHUD();
+    toast(`“${word}” sorted into the trash. +1 XP`);
+  }
+
+  function showFinalWin(){
+    running=false; won=true;
+    overlay.classList.remove("hidden");
+    modal.innerHTML = `
+      <div class="eyebrow">Grammar Grove restored</div>
+      <h1>Forest Champion!</h1>
+      <p class="lead">You crossed all eight finish lines, built routes from correct words, collected hidden stars, sorted mistakes, and mastered every forest tool.</p>
+      <div class="featureGrid">
+        <div class="feature"><strong>8 levels cleared</strong><span>From Whispering Roots to the Heart of Grammar Grove.</span></div>
+        <div class="feature"><strong>${xp} XP earned</strong><span>You unlocked and used the red correction pen.</span></div>
+        <div class="feature"><strong>Word builder</strong><span>Correct grammar became the ladders that opened the highest routes.</span></div>
+      </div>
+      <button id="playAgain">Play again</button>`;
+    document.getElementById("playAgain").onclick = () => {
+      overlay.classList.add("hidden");
+      xp=0; playerLevel=1;
+      running=true; won=false; loadLevel(0);
+    };
+  }
+
+  function startLevelTransition(){
+    if(levelTransition.active) return;
+    levelTransition.active=true;
+    levelTransition.timer=levelTransition.duration;
+    levelTransition.baseY=player.y;
+    levelTransition.confettiTick=0;
+    player.vx=0; player.vy=0; player.parachute=false; player.climbing=false;
+    addXP(2,"finish");
+    emit(player.x+player.w/2,player.y,52,"finish");
+    screenShake=5;
+  }
+
+  function completeLevelTransition(){
+    levelTransition.active=false;
+    if(teacherPreview.active){
+      toast("Finish line reached. Use the teacher arrows to inspect another level.");
+      return;
+    }
+    if(levelIndex < levels.length-1){
+      reportGroveStage(levelIndex+1, false);
+      loadLevel(levelIndex+1);
+      toast(`Level ${levelIndex+1}: ${level.name.split("·")[1]?.trim() || level.name}`);
+    }else{
+      reportGroveStage(levels.length, true);
+      showFinalWin();
+    }
+  }
+
+  function updateLevelTransition(dt){
+    levelTransition.timer-=dt;
+    levelTransition.confettiTick-=dt;
+    const elapsed=levelTransition.duration-levelTransition.timer;
+    player.y=levelTransition.baseY-Math.abs(Math.sin(elapsed*4.4))*34;
+    player.facing=Math.sin(elapsed*7)>0?1:-1;
+    if(levelTransition.confettiTick<=0){
+      levelTransition.confettiTick=.11;
+      for(let i=0;i<7;i++){
+        particles.push({
+          x:player.x+player.w/2+rnd(-65,65), y:player.y+rnd(-45,20),
+          vx:rnd(-120,120),vy:rnd(-260,-70),life:rnd(.8,1.5),max:1, size:rnd(3,7),kind:"finish"
+        });
+      }
+    }
+    for(let i=particles.length-1;i>=0;i--){
+      const q=particles[i];
+      q.life-=dt;q.x+=q.vx*dt;q.y+=q.vy*dt;q.vy+=260*dt;
+      if(q.life<=0)particles.splice(i,1);
+    }
+    if(levelTransition.timer<=0) completeLevelTransition();
+  }
+
+  function update(dt, t){
+    if(!running) return;
+    if(toastTimer>0){ toastTimer-=dt; if(toastTimer<=0) toastEl.classList.remove("show"); }
+    if(levelTransition.active){ updateLevelTransition(dt); return; }
+    player.invuln=Math.max(0,player.invuln-dt);
+    player.netCooldown=Math.max(0,player.netCooldown-dt);
+    player.penCooldown=Math.max(0,player.penCooldown-dt);
+    if(ladderPressed){ placeWordLadder(); ladderPressed=false; }
+    if(penPressed){ useRedPen(); penPressed=false; }
+    const aimDelta = (keys.aimDown?1:0) - (keys.aimUp?1:0);
+    if(aimDelta){
+      pointerAim.active=false;
+      player.netAngle = clamp(player.netAngle + aimDelta*1.15*dt, -1.30, -0.16);
+    }
+    if(netPressed){ throwNet(); netPressed=false; }
+    screenShake=Math.max(0,screenShake-32*dt);
+    flash=Math.max(0,flash-dt);
+    for(const p of platforms){
+      p.prevX=p.x; p.prevY=p.y;
+      if(p.moving){
+        const s = Math.sin(t*p.speed + p.phase);
+        if(p.axis==="x") p.x = p.baseX + s*p.range*.5;
+        else p.y = p.baseY + s*p.range*.5;
+      }
+      p.dx=p.x-p.prevX; p.dy=p.y-p.prevY;
+    }
+    if(player.riding){ player.x += player.riding.dx; player.y += player.riding.dy; }
+    const move = (keys.right?1:0) - (keys.left?1:0);
+    if(move!==0){
+      player.vx += move*player.accel*dt;
+      player.vx=clamp(player.vx,-player.speed,player.speed);
+      player.facing=move;
+    }else{
+      const f=player.friction*dt;
+      if(Math.abs(player.vx)<=f) player.vx=0;
+      else player.vx-=Math.sign(player.vx)*f;
+    }
+    let activeLadder=null;
+    for(const l of wordLadders){
+      const climbZone={x:l.x-l.w*.82,y:l.y-10,w:l.w*1.64,h:l.h+20};
+      if(rects(player,climbZone)){ activeLadder=l; break; }
+    }
+    player.climbing=!!activeLadder && (keys.jump || keys.down || player.climbing);
+    if(player.grounded) player.coyote=.11; else player.coyote=Math.max(0,player.coyote-dt);
+    if(jumpPressed) player.jumpBuffer=.12; else player.jumpBuffer=Math.max(0,player.jumpBuffer-dt);
+    jumpPressed=false;
+    if(activeLadder && player.climbing){
+      player.grounded=false; player.parachute=false; player.fallProtected=false; player.coyote=0; player.jumpBuffer=0;
+      player.vy = keys.jump ? -190 : keys.down ? 190 : 0;
+      const targetX=activeLadder.x-player.w/2;
+      player.x=lerp(player.x,targetX,1-Math.pow(.00005,dt));
+      player.vx*=Math.pow(.02,dt);
+    }else{
+      player.climbing=false;
+      if(player.jumpBuffer>0 && player.coyote>0){
+        player.vy=-player.jump; player.grounded=false; player.riding=null;
+        player.coyote=0; player.jumpBuffer=0; player.parachute=false; player.fallProtected=false;
+        emit(player.x+player.w/2,player.y+player.h,7,"dust");
+      }
+      player.parachute = !player.grounded && player.vy > 110 && keys.jump;
+      if(player.parachute){
+        player.fallProtected = true;
+        player.vy = Math.min(210, player.vy + 380*dt);
+        if(move!==0){
+          player.vx += move*820*dt;
+          player.vx = clamp(player.vx,-player.speed*1.08,player.speed*1.08);
+        }
+      }else{
+        if(!keys.jump && player.vy<0) player.vy += player.gravity*1.25*dt;
+        player.vy = Math.min(player.maxFall, player.vy + player.gravity*dt);
+      }
+    }
+    player.x += player.vx*dt;
+    if(!player.climbing){
+      for(const p of platforms){
+        if(rects(player,p)){
+          if(player.vx>0) player.x=p.x-player.w;
+          else if(player.vx<0) player.x=p.x+p.w;
+          player.vx=0;
+        }
+      }
+    }
+    const prevBottom=player.y+player.h;
+    player.y += player.vy*dt;
+    player.grounded=false; player.riding=null;
+    for(const p of platforms){
+      if(rects(player,p)){
+        const wasAbove = prevBottom <= p.y + Math.max(8, Math.abs(p.dy)+5);
+        if(player.vy>=0 && wasAbove){
+          player.y=p.y-player.h; player.vy=0; player.grounded=true; player.parachute=false; player.fallProtected=false;
+          if(p.moving) player.riding=p;
+        } else if(player.vy<0){
+          player.y=p.y+p.h; player.vy=20;
+        }
+      }
+    }
+    if(player.vy>=0 && !player.climbing){
+      for(const l of wordLadders){
+        const top={x:l.x-l.w*.62,y:l.y-5,w:l.w*1.24,h:10};
+        if(rects(player,top) && prevBottom <= top.y+10){
+          player.y=top.y-player.h; player.vy=0; player.grounded=true; player.parachute=false; player.fallProtected=false;
+          break;
+        }
+      }
+    }
+    player.x=clamp(player.x,0,level.width-player.w);
+    if(player.y>H+500){
+      if(player.fallProtected){
+        player.x=level.spawn.x; player.y=level.spawn.y; player.vx=0; player.vy=0;
+        player.parachute=false; player.fallProtected=false; player.invuln=.35;
+        emit(player.x+player.w/2,player.y+player.h,12,"dust");
+        toast("Parachute saved you — no heart lost.");
+      } else {
+        hurtPlayer(player.x-100);
+        player.x=level.spawn.x; player.y=level.spawn.y; player.vx=0; player.vy=0; player.fallProtected=false;
+      }
+    }
+    for(const m of monsters){
+      if(!m.alive) continue;
+      const playerCenter = player.x + player.w/2;
+      const monsterCenter = m.x + m.w/2;
+      const dir = Math.sign(playerCenter - monsterCenter) || 1;
+      const distance = Math.abs(playerCenter - monsterCenter);
+      if(!m.trapped){
+        if(distance < 520){ m.vx += dir * 430 * dt; m.vx = clamp(m.vx, -150, 150); }
+        else {
+          if(m.x < m.minX) m.vx = Math.abs(m.vx || 55);
+          if(m.x + m.w > m.maxX) m.vx = -Math.abs(m.vx || 55);
+        }
+        m.x += m.vx*dt;
+        m.y = m.baseY + Math.sin(t*4+m.phase)*2.2;
+        const chaseMin = Math.max(0, m.minX - 180);
+        const chaseMax = Math.min(level.width, m.maxX + 180);
+        if(m.x < chaseMin){ m.x = chaseMin; m.vx = Math.abs(m.vx); }
+        if(m.x + m.w > chaseMax){ m.x = chaseMax - m.w; m.vx = -Math.abs(m.vx); }
+      } else {
+        m.vx = 0;
+        m.y = m.baseY + Math.sin(t*3+m.phase)*1.2;
+      }
+      if(rects(m,level.trash)){ trashMonster(m); continue; }
+      const dy = Math.abs((player.y+player.h/2) - (m.y+m.h/2));
+      if(actionPressed && !player.carriedWord && distance < 92 && dy < 74){ captureMonster(m); continue; }
+      if(!m.trapped && rects(player,m)) hurtPlayer(m.x+m.w/2);
+    }
+    actionPressed = false;
+    const playerCarryBox = {x:player.x-10,y:player.y-10,w:player.w+20,h:player.h+20};
+    if(player.carriedWord && rects(playerCarryBox,level.trash)) depositCarriedWord();
+    for(const c of crystals){
+      if(c.collected) continue;
+      const hit={x:c.x-22,y:c.y-28,w:44,h:56};
+      if(rects(player,hit)) collectCrystal(c);
+    }
+    for(const w of dormantWrong){
+      if(w.triggered) continue;
+      const hit={x:w.crystalX-22,y:w.crystalY-28,w:44,h:56};
+      if(rects(player,hit)) awakenWrongWord(w);
+    }
+    for(const r of rewards){
+      if(r.collected) continue;
+      const hit={x:r.x-20,y:r.y-24,w:40,h:48};
+      if(rects(player,hit)) collectReward(r);
+    }
+    const p=level.portal;
+    const finishX=p.x+p.w*.36;
+    if(portalReady() && player.x+player.w/2>=finishX){
+      if(teacherPreview.active){
+        toast("Finish line reached. Use the teacher arrows to inspect another level.");
+        player.x=Math.min(player.x,finishX-player.w/2-4);
+        player.vx=0;
+      }else{
+        startLevelTransition();
+      }
+    }
+    for(let i=nets.length-1;i>=0;i--){
+      const n=nets[i];
+      n.life-=dt;
+      n.vy += player.gravity*.55*dt;
+      n.x += n.vx*dt;
+      n.y += n.vy*dt;
+      let hit=false;
+      for(const w of dormantWrong){
+        if(w.triggered || w.netted) continue;
+        const hitbox={x:w.crystalX-25,y:w.crystalY-31,w:50,h:62};
+        if(rects({x:n.x-n.w/2,y:n.y-n.h/2,w:n.w,h:n.h},hitbox)){ trapWrongCrystal(w); hit=true; break; }
+      }
+      if(!hit){
+        for(const m of monsters){
+          if(!m.alive || m.trapped) continue;
+          if(rects({x:n.x-n.w/2,y:n.y-n.h/2,w:n.w,h:n.h},m)){
+            m.trapped=true; m.vx=0;
+            emit(m.x+m.w/2,m.y+m.h/2,18,"capture");
+            toast(`Net caught “${m.word}”. It can no longer hurt you.`);
+            hit=true; break;
+          }
+        }
+      }
+      if(hit || n.life<=0 || n.y>H+camera.y+220) nets.splice(i,1);
+    }
+    for(let i=particles.length-1;i>=0;i--){
+      const q=particles[i];
+      q.life-=dt; q.x+=q.vx*dt; q.y+=q.vy*dt; q.vy += 300*dt; q.vx*=Math.pow(.08,dt);
+      if(q.life<=0) particles.splice(i,1);
+    }
+    const targetX=clamp(player.x-W*.38,0,Math.max(0,level.width-W));
+    camera.x=lerp(camera.x,targetX,1-Math.pow(.0008,dt));
+  }
+  function roundedRect(x,y,w,h,r){
+    r=Math.min(r,w/2,h/2);
+    ctx.beginPath();
+    ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r);
+    ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath();
+  }
+
+  function drawBackground(theme,t){
+    const g=ctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,theme.sky1); g.addColorStop(1,theme.sky2);
+    ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    ctx.save();
+    const mx=W*.78, my=H*.18, mr=Math.min(82,W*.08);
+    const rg=ctx.createRadialGradient(mx,my,2,mx,my,mr*1.8);
+    if(theme.celestial==="sun"){
+      rg.addColorStop(0,"rgba(255,251,209,.92)"); rg.addColorStop(1,"rgba(255,216,123,0)");
+      ctx.fillStyle=rg; ctx.beginPath(); ctx.arc(mx,my,mr*1.8,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle="#fff8c6"; ctx.beginPath(); ctx.arc(mx,my,mr*.56,0,Math.PI*2); ctx.fill();
+    }else{
+      rg.addColorStop(0,"rgba(235,255,244,.9)"); rg.addColorStop(1,"rgba(180,244,225,0)");
+      ctx.fillStyle=rg; ctx.beginPath(); ctx.arc(mx,my,mr*1.6,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle="#e7fff7"; ctx.beginPath(); ctx.arc(mx,my,mr*.48,0,Math.PI*2); ctx.fill();
+    }
+    ctx.restore();
+    ctx.save(); ctx.globalAlpha=.28;
+    const off=-(camera.x*.22)%260;
+    for(let i=-2;i<W/220+3;i++){
+      const x=off+i*240;
+      ctx.fillStyle=theme.leaf;
+      ctx.beginPath(); ctx.moveTo(x,H); ctx.lineTo(x+25,H*.55); ctx.lineTo(x+90,H*.52); ctx.lineTo(x+120,H); ctx.closePath(); ctx.fill();
+      ctx.fillStyle=theme.leaf2;
+      ctx.beginPath(); ctx.arc(x+50,H*.52,70,0,Math.PI*2); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function drawPlatform(p,theme){
+    const x=p.x-camera.x, y=p.y-camera.y;
+    if(x+p.w<-60||x>W+60) return;
+    roundedRect(x,y,p.w,p.h,12);
+    ctx.fillStyle=p.secret?theme.soilAccent:theme.soilBody; ctx.fill();
+    ctx.fillStyle=theme.soilTop1; roundedRect(x,y,p.w,12,8); ctx.fill();
+    if(p.moving){ ctx.fillStyle="rgba(214,255,242,.30)"; ctx.fillRect(x+12,y+p.h-5,p.w-24,2); }
+  }
+
+  function drawCrystal(c,theme,t){
+    if(c.collected) return;
+    const x=c.x-camera.x, y=c.y-camera.y+Math.sin(t*2.4+c.bob)*7;
+    if(x<-80||x>W+80) return;
+    ctx.save(); ctx.translate(x,y);
+    ctx.shadowColor=theme.glow; ctx.shadowBlur=28; ctx.fillStyle=theme.glow;
+    ctx.beginPath();ctx.moveTo(0,-24);ctx.lineTo(17,-4);ctx.lineTo(8,22);ctx.lineTo(-8,22);ctx.lineTo(-17,-4);ctx.closePath();ctx.fill();
+    ctx.shadowBlur=0;
+    ctx.font="800 13px Inter, system-ui, sans-serif";
+    const tw=ctx.measureText(c.word).width+20;
+    ctx.fillStyle="rgba(4,18,20,.88)";
+    roundedRect(-tw/2,30,tw,26,13);ctx.fill();
+    ctx.fillStyle="#f4fffb";ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText(c.word,0,43);
+    ctx.restore();
+  }
+
+  function drawStaticNet(x,y,w,h){
+    ctx.save(); ctx.translate(x,y);
+    ctx.strokeStyle="rgba(235,248,255,.90)"; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.ellipse(0,0,w/2,h/2,0,0,Math.PI*2); ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawTrajectory(theme){
+    if(!running || player.netCooldown>0) return;
+    const l=getNetLaunch();
+    const g=player.gravity*.55;
+    ctx.save(); ctx.fillStyle="rgba(220,248,255,.76)";
+    for(let i=1;i<=18;i++){
+      const tt=i*.065;
+      const x=l.x+l.vx*tt-camera.x;
+      const y=l.y+l.vy*tt+.5*g*tt*tt-camera.y;
+      ctx.beginPath();ctx.arc(x,y,2,0,Math.PI*2);ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function drawMonster(m,theme,t){
+    const x=m.x-camera.x, y=m.y-camera.y;
+    if(x+m.w<-60||x>W+60) return;
+    ctx.save(); ctx.translate(x+m.w/2,y+m.h/2);
+    ctx.fillStyle="#684477";
+    ctx.beginPath(); ctx.ellipse(0,0,26,20,0,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle="#f7e8ff";
+    ctx.beginPath();ctx.arc(-9,-4,4,0,Math.PI*2);ctx.arc(9,-4,4,0,Math.PI*2);ctx.fill();
+    ctx.font="850 12px Inter, system-ui, sans-serif";
+    const tw=Math.max(62,ctx.measureText(m.word).width+18);
+    ctx.fillStyle="rgba(44,20,52,.95)";
+    roundedRect(-tw/2,22,tw,24,12);ctx.fill();
+    ctx.fillStyle="#ffeef3";ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText(m.word,0,34);
+    if(m.trapped) drawStaticNet(0,0,66,50);
+    ctx.restore();
+  }
+
+  function drawTrashCan(trash){
+    const x=trash.x-camera.x, y=trash.y-camera.y;
+    if(x+trash.w<-80||x>W+80)return;
+    ctx.save(); ctx.translate(x,y);
+    ctx.fillStyle="#263f43"; roundedRect(5,13,trash.w-10,trash.h-13,9); ctx.fill();
+    ctx.fillStyle="#3f6264"; roundedRect(0,7,trash.w,12,6); ctx.fill();
+    ctx.font="900 9px Inter, system-ui, sans-serif"; ctx.textAlign="center"; ctx.fillStyle="#d8fff4";
+    ctx.fillText("WRONG",trash.w/2,40); ctx.fillText("WORDS",trash.w/2,52);
+    ctx.restore();
+  }
+
+  function drawWordLadder(l){
+    const x=l.x-camera.x, y=l.y-camera.y;
+    if(x<-80||x>W+80)return;
+    ctx.strokeStyle="rgba(222,250,240,.88)"; ctx.lineWidth=4;
+    ctx.beginPath();ctx.moveTo(x-l.w*.38,y);ctx.lineTo(x-l.w*.38,y+l.h);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(x+l.w*.38,y);ctx.lineTo(x+l.w*.38,y+l.h);ctx.stroke();
+    ctx.font="800 10px Inter, system-ui, sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle";
+    for(let i=0;i<5;i++){
+      const yy=y+18+i*(l.h-32)/4;
+      ctx.beginPath();ctx.moveTo(x-l.w*.38,yy);ctx.lineTo(x+l.w*.38,yy);ctx.stroke();
+      const label=l.word.length>12?l.word.slice(0,11)+"…":l.word;
+      ctx.fillStyle="#effff8"; ctx.fillText(label,x,yy);
+    }
+  }
+
+  function drawReward(r,t){
+    if(r.collected) return;
+    const x=r.x-camera.x,y=r.y-camera.y+Math.sin(t*2+r.bob)*6;
+    ctx.save();ctx.translate(x,y);ctx.fillStyle="#ffe993";
+    ctx.beginPath();
+    for(let i=0;i<10;i++){
+      const a=i*Math.PI/5-Math.PI/2, rr=i%2===0?16:7;
+      const px=Math.cos(a)*rr,py=Math.sin(a)*rr;
+      if(i===0)ctx.moveTo(px,py);else ctx.lineTo(px,py);
+    }
+    ctx.closePath();ctx.fill();ctx.restore();
+  }
+
+  function drawPortal(p,theme,t){
+    const x=p.x-camera.x,y=p.y-camera.y;
+    const open=portalReady();
+    const lineX=x+p.w*.36;
+    ctx.strokeStyle=open?theme.glow:"#53666b"; ctx.lineWidth=5;
+    ctx.beginPath();ctx.moveTo(lineX,y+8);ctx.lineTo(lineX,y+p.h);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(lineX+p.w*.42,y+8);ctx.lineTo(lineX+p.w*.42,y+p.h);ctx.stroke();
+    ctx.font="900 11px Inter, system-ui, sans-serif"; ctx.textAlign="center";
+    ctx.fillStyle=open?"#effff9":"#9cabad";
+    const portalLabel=open?"FINISH":(player.collected===crystals.length && requireTrash?"CLEAN FOREST":"LOCKED");
+    ctx.fillText(portalLabel,lineX+p.w*.21,y+p.h+16);
+  }
+
+  function drawPlayer(theme,t){
+    const x=player.x-camera.x,y=player.y-camera.y;
+    ctx.save();
+    if(player.invuln>0 && Math.floor(player.invuln*12)%2===0) ctx.globalAlpha=.38;
+    ctx.translate(x+player.w/2,y+player.h/2);
+    ctx.scale(player.facing,1);
+    if(player.parachute){
+      ctx.fillStyle="#8df5d6";
+      ctx.beginPath(); ctx.ellipse(0,-42,36,16,0,Math.PI,0); ctx.fill();
+    }
+    ctx.fillStyle=playerGender==="girl"?"#bb8cff":"#79a8ff";
+    ctx.fillRect(-8,-8,16,22);
+    ctx.fillStyle="#ffd8bd"; ctx.beginPath(); ctx.arc(0,-18,11,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle=playerGender==="girl"?"#27374a":"#263b50";
+    ctx.beginPath(); ctx.arc(0,-22,11,Math.PI,0); ctx.fill();
+    ctx.fillStyle="#1b2832"; ctx.fillRect(-9,12,7,8); ctx.fillRect(2,12,7,8);
+    ctx.shadowColor=theme.glow; ctx.shadowBlur=12; ctx.fillStyle=theme.glow;
+    ctx.beginPath(); ctx.arc(12,2,4,0,Math.PI*2); ctx.fill();
+    if(playerLevel>=2){ ctx.strokeStyle="#ff4f5f"; ctx.lineWidth=4; ctx.beginPath(); ctx.moveTo(-12,2); ctx.lineTo(-20,12); ctx.stroke(); }
+    ctx.restore();
+  }
+
+  function drawCarriedWord(){
+    if(!player.carriedWord) return;
+    const x=player.x-camera.x+player.w/2;
+    const y=player.y-camera.y-22;
+    ctx.save(); ctx.translate(x,y);
+    ctx.fillStyle="rgba(72,47,89,.96)"; roundedRect(-46,-14,92,28,14); ctx.fill();
+    ctx.fillStyle="#fff7d4"; ctx.textAlign="center"; ctx.textBaseline="middle";
+    ctx.font="850 11px Inter, system-ui, sans-serif";
+    ctx.fillText(player.carriedWord,0,0);
+    ctx.restore();
+  }
+
+  function render(t){
+    const theme=palette[levelIndex] || palette[levelIndex%palette.length];
+    drawBackground(theme,t);
+    const shakeX=screenShake?rnd(-screenShake,screenShake):0;
+    const shakeY=screenShake?rnd(-screenShake*.5,screenShake*.5):0;
+    ctx.save(); ctx.translate(shakeX,shakeY);
+    for(const p of platforms) drawPlatform(p,theme);
+    for(const l of wordLadders) drawWordLadder(l);
+    for(const d of level.decorations||[]){
+      const x=d.x-camera.x,y=d.y-camera.y;
+      ctx.fillStyle="#6e4d3d"; roundedRect(x-90,y-36,180,36,8); ctx.fill();
+      ctx.fillStyle="#f5e8d2"; ctx.font="700 12px Inter, system-ui, sans-serif"; ctx.textAlign="center";
+      ctx.fillText(d.text,x,y-16);
+    }
+    for(const r of rewards) drawReward(r,t);
+    for(const c of crystals) drawCrystal(c,theme,t);
+    for(const w of dormantWrong){
+      if(!w.triggered){
+        drawCrystal({x:w.crystalX,y:w.crystalY,word:w.word,collected:false,bob:w.bob},theme,t);
+        if(w.netted) drawStaticNet(w.crystalX-camera.x,w.crystalY-camera.y,44,34);
+      }
+    }
+    for(const m of monsters) if(m.alive) drawMonster(m,theme,t);
+    for(const n of nets) drawStaticNet(n.x-camera.x,n.y-camera.y,n.w,n.h);
+    drawTrashCan(level.trash);
+    drawPortal(level.portal,theme,t);
+    drawPlayer(theme,t);
+    drawCarriedWord();
+    drawTrajectory(theme);
+    for(const q of particles){
+      ctx.globalAlpha=Math.max(0,q.life);
+      ctx.fillStyle=q.kind==="hurt"?"#ff9db2":q.kind==="reward"?"#ffe993":theme.glow;
+      ctx.beginPath(); ctx.arc(q.x-camera.x,q.y-camera.y,q.size,0,Math.PI*2); ctx.fill();
+      ctx.globalAlpha=1;
+    }
+    ctx.restore();
+    if(flash>0){ ctx.fillStyle=`rgba(255,190,205,${flash*1.8})`; ctx.fillRect(0,0,W,H); }
+  }
+
+  function loop(ms){
+    const now=ms/1000;
+    const dt=Math.min(.033, lastTime?now-lastTime:.016);
+    lastTime=now;
+    update(dt,now);
+    render(now);
+    requestAnimationFrame(loop);
+  }
+
+  startBtn.addEventListener("click",()=>{
+    teacherPreview.active=false;
+    teacherPreviewBar.classList.remove("show");
+    overlay.classList.add("hidden");
+    xp=0; playerLevel=1;
+    running=true; won=false; loadLevel(0);
+  });
+  girlChoice.addEventListener("click",()=>setPlayerGender("girl"));
+  boyChoice.addEventListener("click",()=>setPlayerGender("boy"));
+  setPlayerGender(playerGender);
+  teacherBtn.addEventListener("click",openTeacherMode);
+  teacherStartBtn.addEventListener("click",openTeacherMode);
+  teacherCloseBtn.addEventListener("click",closeTeacherMode);
+  teacherSaveBtn.addEventListener("click",()=>saveTeacherConfig(false));
+  teacherPlayBtn.addEventListener("click",()=>saveTeacherConfig(true));
+  teacherPreviewBtn.addEventListener("click",startTeacherPreview);
+  teacherPrevLevel.addEventListener("click",()=>changeTeacherLevel(-1));
+  teacherNextLevel.addEventListener("click",()=>changeTeacherLevel(1));
+  previewPrevBtn.addEventListener("click",()=>changePreviewLevel(-1));
+  previewNextBtn.addEventListener("click",()=>changePreviewLevel(1));
+  previewExitBtn.addEventListener("click",exitTeacherPreview);
+  teacherResetBtn.addEventListener("click",resetTeacherConfig);
+  loadLevel(0);
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

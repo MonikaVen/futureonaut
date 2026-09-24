@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
-import { api, type Game, type Session } from "../api";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { api, type ClassroomDetail, type Game, type Session } from "../api";
 import { useAuth } from "../auth";
 import { GameShare } from "../GameShare";
 import { GameSocial } from "../GameSocial";
@@ -9,6 +9,7 @@ import { UI_LANGS, useLanguage, type LangCode } from "../language";
 import { useTheme, type Theme } from "../theme";
 import { getVisitorId } from "../visitor";
 import { GameFrame } from "../GameFrame";
+import { classIssueNote } from "../grammarGrove";
 
 type SdkMessage = {
   source?: string;
@@ -18,6 +19,8 @@ type SdkMessage = {
 
 export function PlayPage() {
   const { gameId, ownerSlug, gameSlug } = useParams();
+  const [searchParams] = useSearchParams();
+  const classId = searchParams.get("class");
   const playRef = ownerSlug && gameSlug ? `${ownerSlug}/${gameSlug}` : gameId;
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -37,6 +40,8 @@ export function PlayPage() {
   const [error, setError] = useState("");
   const [ready, setReady] = useState(false);
   const [frameHeight, setFrameHeight] = useState<number | null>(null);
+  const [classConfig, setClassConfig] = useState<string | null>(classId ? null : "");
+  const [className, setClassName] = useState("");
   const frameRef = useRef<HTMLIFrameElement>(null);
   const iframeSrcRef = useRef("");
   const iframeGameIdRef = useRef<string | null>(null);
@@ -45,6 +50,8 @@ export function PlayPage() {
   gameRef.current = game;
   const prefsRef = useRef({ theme: gameTheme, lang });
   prefsRef.current = { theme: gameTheme, lang };
+  const classConfigRef = useRef(classConfig);
+  classConfigRef.current = classConfig;
 
   const postPrefs = useCallback((target?: Window | MessageEventSource | null) => {
     const win = (target && "postMessage" in target ? target : frameRef.current?.contentWindow) as
@@ -54,6 +61,18 @@ export function PlayPage() {
     if (!win || typeof win.postMessage !== "function") return;
     win.postMessage(
       { source: "learnplay-host", type: "prefs", payload: { ...prefsRef.current } },
+      "*"
+    );
+  }, []);
+
+  const postClassConfig = useCallback((target?: Window | MessageEventSource | null) => {
+    const win = (target && "postMessage" in target ? target : frameRef.current?.contentWindow) as
+      | Window
+      | null
+      | undefined;
+    if (!win || typeof win.postMessage !== "function" || classConfigRef.current == null) return;
+    win.postMessage(
+      { source: "learnplay-host", type: "config", payload: { config: classConfigRef.current } },
       "*"
     );
   }, []);
@@ -131,9 +150,13 @@ export function PlayPage() {
 
       if (data.type === "resize") {
         const height = Number(payload.height);
-        if (Number.isFinite(height) && height > 0) {
-          setFrameHeight(Math.min(16000, Math.max(420, Math.ceil(height) + 12)));
-        }
+        if (!Number.isFinite(height) || height <= 0) return;
+        const reported = Math.ceil(height);
+        const current = frameRef.current?.clientHeight ?? 0;
+        // A game that fills the frame reports its own height. Growing the frame
+        // makes the next report taller, so the page slides down without stopping.
+        if (current > 0 && reported <= current + 80) return;
+        setFrameHeight(Math.min(16000, Math.max(current || 420, reported)));
         return;
       }
 
@@ -205,17 +228,50 @@ export function PlayPage() {
     postPrefs();
   }, [gameTheme, lang, ready, postPrefs]);
 
+  useEffect(() => {
+    if (!classId || !user) {
+      setClassConfig("");
+      setClassName("");
+      return;
+    }
+    if (!game?.id) return;
+    let cancelled = false;
+    setClassConfig(null);
+    api<ClassroomDetail>(`/api/classrooms/${classId}`)
+      .then((detail) => {
+        if (cancelled) return;
+        const assignment = detail.assignments.find((item) => item.game_id === game.id);
+        setClassName(detail.name);
+        setClassConfig(assignment?.config || "");
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setClassName("");
+          setClassConfig("");
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [classId, game?.id, user]);
+
+  useEffect(() => {
+    if (classConfig == null) return;
+    postClassConfig();
+  }, [classConfig, postClassConfig]);
+
   const src = useMemo(() => {
-    if (!game) return "";
+    if (!game || classConfig === null) return "";
     if (iframeGameIdRef.current === game.id && iframeSrcRef.current) {
       return iframeSrcRef.current;
     }
     const params = new URLSearchParams({ theme: gameTheme, lang });
+    if (classConfig) params.set("lp_config", classConfig);
     const next = `/api/games/${game.id}/files/${game.entry_path}?${params.toString()}`;
     iframeGameIdRef.current = game.id;
     iframeSrcRef.current = next;
     return next;
-  }, [game, gameTheme, lang]);
+  }, [game, gameTheme, lang, classConfig]);
 
   if (error) {
     return (
@@ -280,14 +336,27 @@ export function PlayPage() {
         />
         <GameShare gameId={game.id} title={game.title} description={game.description} />
       </div>
-      <GameFrame
-        ref={frameRef}
-        className="frame"
-        title={game.title}
-        src={src}
-        onLoad={() => postPrefs()}
-        style={frameHeight ? { height: frameHeight, minHeight: frameHeight } : undefined}
-      />
+      {classId && classConfig ? (
+        <div className="panel class-issue" style={{ marginBottom: 12 }}>
+          <h3 style={{ marginTop: 0 }}>{className ? `${className} issue` : "Class issue"}</h3>
+          <p className="class-issue-note">{classIssueNote(classConfig)}</p>
+        </div>
+      ) : null}
+      {src ? (
+        <GameFrame
+          ref={frameRef}
+          className="frame"
+          title={game.title}
+          src={src}
+          onLoad={() => {
+            postPrefs();
+            postClassConfig();
+          }}
+          style={frameHeight ? { height: frameHeight, minHeight: frameHeight } : undefined}
+        />
+      ) : (
+        <p className="meta">Loading class issue…</p>
+      )}
       {completed && session && (
         <div className="player-after">
           <ScoreCard

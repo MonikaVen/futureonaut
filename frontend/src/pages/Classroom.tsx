@@ -1,10 +1,20 @@
 import { FormEvent, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import { api, type Classroom, type ClassroomDetail, type Game } from "../api";
+import { Link, useNavigate } from "react-router-dom";
+import { api, type Classroom, type ClassroomDetail, type Game, type IssuedLogin } from "../api";
 import { useAuth } from "../auth";
+import { GrammarGroveConfigEditor } from "../components/GrammarGroveConfig";
+import {
+  classIssueNote,
+  defaultGrammarGroveConfig,
+  grammarGroveConfigError,
+  isGrammarGrove,
+  parseGrammarGroveConfig,
+  serializeGrammarGroveConfig,
+} from "../grammarGrove";
 
 export function ClassroomPage() {
   const { user, refreshMe } = useAuth();
+  const navigate = useNavigate();
   const [classrooms, setClassrooms] = useState<Classroom[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<ClassroomDetail | null>(null);
@@ -14,6 +24,16 @@ export function ClassroomPage() {
   const [newName, setNewName] = useState("");
   const [joinCode, setJoinCode] = useState("");
   const [assignGameId, setAssignGameId] = useState("");
+  const [assignConfig, setAssignConfig] = useState("");
+  const [assignPublished, setAssignPublished] = useState(true);
+  const [configs, setConfigs] = useState<Record<string, string>>({});
+  const [studentName, setStudentName] = useState("");
+  const [studentEmail, setStudentEmail] = useState("");
+  const [studentPassword, setStudentPassword] = useState("");
+  const [studentGroup, setStudentGroup] = useState("");
+  const [groupName, setGroupName] = useState("");
+  const [issued, setIssued] = useState<IssuedLogin | null>(null);
+  const [passwordDrafts, setPasswordDrafts] = useState<Record<string, string>>({});
 
   async function loadClassrooms() {
     const list = await api<Classroom[]>("/api/classrooms/mine");
@@ -34,7 +54,12 @@ export function ClassroomPage() {
       return;
     }
     api<ClassroomDetail>(`/api/classrooms/${selectedId}`)
-      .then(setDetail)
+      .then((d) => {
+        setDetail(d);
+        const next: Record<string, string> = {};
+        for (const assignment of d.assignments) next[assignment.id] = assignment.config || "";
+        setConfigs(next);
+      })
       .catch((err) => setError(err.message));
   }, [selectedId]);
 
@@ -78,15 +103,31 @@ export function ClassroomPage() {
   async function assignGame(e: FormEvent) {
     e.preventDefault();
     if (!selectedId || !assignGameId) return;
+    const game = games.find((item) => item.id === assignGameId);
+    const config = isGrammarGrove(game?.title)
+      ? serializeGrammarGroveConfig(parseGrammarGroveConfig(assignConfig))
+      : assignConfig;
+    if (isGrammarGrove(game?.title)) {
+      const problem = grammarGroveConfigError(config);
+      if (problem) {
+        setError(problem);
+        return;
+      }
+    }
     setError("");
     try {
       await api(`/api/classrooms/${selectedId}/assignments`, {
         method: "POST",
-        body: JSON.stringify({ game_id: assignGameId }),
+        body: JSON.stringify({
+          game_id: assignGameId,
+          config,
+          published: assignPublished,
+        }),
       });
-      setMessage("Game assigned to class.");
-      const d = await api<ClassroomDetail>(`/api/classrooms/${selectedId}`);
-      setDetail(d);
+      setAssignConfig("");
+      setAssignPublished(true);
+      setMessage(assignPublished ? "Game published to the class." : "Game saved as a draft.");
+      await refreshDetail();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Assign failed");
     }
@@ -96,6 +137,160 @@ export function ClassroomPage() {
     if (!selectedId) return;
     const d = await api<ClassroomDetail>(`/api/classrooms/${selectedId}`);
     setDetail(d);
+    const next: Record<string, string> = {};
+    for (const assignment of d.assignments) next[assignment.id] = assignment.config || "";
+    setConfigs(next);
+  }
+
+  function issueConfig(assignmentId: string, gameTitle: string) {
+    const raw = configs[assignmentId] ?? "";
+    if (!isGrammarGrove(gameTitle)) return raw;
+    return serializeGrammarGroveConfig(parseGrammarGroveConfig(raw));
+  }
+
+  async function saveIssue(assignmentId: string, published?: boolean) {
+    if (!selectedId || !detail) return;
+    const assignment = detail.assignments.find((item) => item.id === assignmentId);
+    const config = issueConfig(assignmentId, assignment?.game_title || "");
+    if (isGrammarGrove(assignment?.game_title)) {
+      const problem = grammarGroveConfigError(config);
+      if (problem) {
+        setError(problem);
+        return;
+      }
+    }
+    setError("");
+    try {
+      await api(`/api/classrooms/${selectedId}/assignments/${assignmentId}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          config,
+          ...(published === undefined ? {} : { published }),
+        }),
+      });
+      setMessage(published === false ? "Issue unpublished." : "Class issue saved.");
+      await refreshDetail();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save the class issue");
+    }
+  }
+
+  async function openTeacherView(assignmentId: string, gameId: string) {
+    if (!selectedId || !detail) return;
+    const assignment = detail.assignments.find((item) => item.id === assignmentId);
+    const config = issueConfig(assignmentId, assignment?.game_title || "");
+    if (isGrammarGrove(assignment?.game_title)) {
+      const problem = grammarGroveConfigError(config);
+      if (problem) {
+        setError(problem);
+        return;
+      }
+    }
+    setError("");
+    try {
+      await api(`/api/classrooms/${selectedId}/assignments/${assignmentId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ config }),
+      });
+      navigate(`/play/${gameId}?class=${selectedId}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not open the teacher view");
+    }
+  }
+
+  async function createStudent(e: FormEvent) {
+    e.preventDefault();
+    if (!selectedId) return;
+    if (studentPassword && studentPassword.length < 8) {
+      setError("Password must be at least 8 characters.");
+      return;
+    }
+    setError("");
+    try {
+      const login = await api<IssuedLogin>(`/api/classrooms/${selectedId}/students`, {
+        method: "POST",
+        body: JSON.stringify({
+          email: studentEmail,
+          display_name: studentName,
+          password: studentPassword || null,
+          group_id: studentGroup || null,
+        }),
+      });
+      setIssued(login);
+      setStudentName("");
+      setStudentEmail("");
+      setStudentPassword("");
+      setStudentGroup("");
+      setMessage(`Login issued for ${login.display_name}. Copy it now — the password is not shown again.`);
+      await refreshDetail();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not create the student");
+    }
+  }
+
+  async function resetPassword(studentId: string) {
+    if (!selectedId) return;
+    const password = (passwordDrafts[studentId] || "").trim();
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters.");
+      return;
+    }
+    setError("");
+    try {
+      const login = await api<IssuedLogin>(`/api/classrooms/${selectedId}/students/${studentId}/password`, {
+        method: "PATCH",
+        body: JSON.stringify({ password }),
+      });
+      setIssued(login);
+      setPasswordDrafts((prev) => ({ ...prev, [studentId]: "" }));
+      setMessage(`Password updated for ${login.display_name}.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not update the password");
+    }
+  }
+
+  async function createGroup(e: FormEvent) {
+    e.preventDefault();
+    if (!selectedId) return;
+    setError("");
+    try {
+      await api(`/api/classrooms/${selectedId}/groups`, {
+        method: "POST",
+        body: JSON.stringify({ name: groupName }),
+      });
+      setGroupName("");
+      setMessage("Group created.");
+      await refreshDetail();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not create the group");
+    }
+  }
+
+  async function removeGroup(groupId: string) {
+    if (!selectedId) return;
+    if (!confirm("Delete this group? Students stay in the class.")) return;
+    setError("");
+    try {
+      await api(`/api/classrooms/${selectedId}/groups/${groupId}`, { method: "DELETE" });
+      setMessage("Group deleted.");
+      await refreshDetail();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not delete the group");
+    }
+  }
+
+  async function moveStudent(studentId: string, groupId: string) {
+    if (!selectedId) return;
+    setError("");
+    try {
+      await api(`/api/classrooms/${selectedId}/members/${studentId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ group_id: groupId || null }),
+      });
+      await refreshDetail();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not move the student");
+    }
   }
 
   async function unassign(assignmentId: string) {
@@ -158,7 +353,9 @@ export function ClassroomPage() {
     <div>
       <section className="hero">
         <h1>Classrooms</h1>
-        <p>Create a class, share a join code, assign games, and track student progress.</p>
+        <p>
+          Issue a game to a class with your own configuration. Students see it after you add them and publish it.
+        </p>
       </section>
       {error && <div className="error">{error}</div>}
       {message && <div className="panel" style={{ marginBottom: 12 }}>{message}</div>}
@@ -250,7 +447,7 @@ export function ClassroomPage() {
                 </div>
               </div>
 
-              <h3>Assignments</h3>
+              <h3>Class issues</h3>
               {detail.assignments.length === 0 && <p className="meta">No games assigned yet.</p>}
               <ul className="assignment-list">
                 {detail.assignments.map((a) => {
@@ -277,6 +474,12 @@ export function ClassroomPage() {
                           </span>
                         ) : null}
                         {a.points ? <span className="meta">{a.points} pts</span> : null}
+                        {detail.is_teacher ? (
+                          <span className={`status-chip ${a.published === false ? "idle" : "solved"}`}>
+                            {a.published === false ? "Draft" : "Published"}
+                          </span>
+                        ) : null}
+                        {a.config ? <p className="meta class-issue-note">{classIssueNote(a.config)}</p> : null}
                         {detail.is_teacher && a.solved_count != null ? (
                           <span className="meta">
                             {a.solved_count}/{detail.member_count} solved
@@ -287,9 +490,19 @@ export function ClassroomPage() {
                         </span>
                       </div>
                       <span className="row" style={{ gap: 8 }}>
-                        <Link className="btn accent btn-sm" to={`/play/${a.game_id}`}>
-                          {a.completed ? "Replay" : "Play"}
-                        </Link>
+                        {detail.is_teacher && isGrammarGrove(a.game_title) ? (
+                          <button
+                            className="btn accent btn-sm"
+                            type="button"
+                            onClick={() => void openTeacherView(a.id, a.game_id)}
+                          >
+                            Teacher view
+                          </button>
+                        ) : (
+                          <Link className="btn accent btn-sm" to={`/play/${a.game_id}?class=${detail.id}`}>
+                            {detail.is_teacher ? "Teacher view" : a.completed ? "Replay" : "Play"}
+                          </Link>
+                        )}
                         {detail.is_teacher && (
                           <button className="btn secondary btn-sm" type="button" onClick={() => unassign(a.id)}>
                             Remove
@@ -302,10 +515,23 @@ export function ClassroomPage() {
               </ul>
 
               {detail.is_teacher && (
-                <form className="form row" onSubmit={assignGame} style={{ marginTop: 16 }}>
-                  <label style={{ flex: 1 }}>
-                    Assign game
-                    <select value={assignGameId} onChange={(e) => setAssignGameId(e.target.value)} required>
+                <form className="form" onSubmit={assignGame} style={{ marginTop: 16 }}>
+                  <label>
+                    Issue a game
+                    <select
+                      value={assignGameId}
+                      onChange={(e) => {
+                        const id = e.target.value;
+                        setAssignGameId(id);
+                        const picked = games.find((item) => item.id === id);
+                        if (isGrammarGrove(picked?.title)) {
+                          setAssignConfig(serializeGrammarGroveConfig(defaultGrammarGroveConfig()));
+                        } else {
+                          setAssignConfig("");
+                        }
+                      }}
+                      required
+                    >
                       <option value="">Choose a game…</option>
                       {games.map((g) => (
                         <option key={g.id} value={g.id}>
@@ -314,10 +540,210 @@ export function ClassroomPage() {
                       ))}
                     </select>
                   </label>
+                  {isGrammarGrove(games.find((item) => item.id === assignGameId)?.title) ? (
+                    <GrammarGroveConfigEditor value={assignConfig} onChange={setAssignConfig} />
+                  ) : (
+                    <label>
+                      Configuration for this class
+                      <textarea
+                        rows={4}
+                        value={assignConfig}
+                        onChange={(e) => setAssignConfig(e.target.value)}
+                        placeholder="Instructions, level, or JSON the game can read as LearnPlay.classConfig"
+                      />
+                    </label>
+                  )}
+                  <label className="row" style={{ gap: 8, alignItems: "center" }}>
+                    <input
+                      type="checkbox"
+                      checked={assignPublished}
+                      onChange={(e) => setAssignPublished(e.target.checked)}
+                    />
+                    Publish so students in this class can see it
+                  </label>
                   <button className="btn" type="submit" disabled={!assignGameId}>
-                    Assign
+                    Issue to class
                   </button>
                 </form>
+              )}
+
+              {detail.is_teacher &&
+                detail.assignments.map((a) => (
+                  <form
+                    key={`cfg-${a.id}`}
+                    className="form"
+                    style={{ marginTop: 12 }}
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      void saveIssue(a.id);
+                    }}
+                  >
+                    {isGrammarGrove(a.game_title) ? (
+                      <>
+                        <h3 style={{ marginBottom: 0 }}>{a.game_title} word lists</h3>
+                        <GrammarGroveConfigEditor
+                          value={configs[a.id] ?? ""}
+                          onChange={(next) => setConfigs((prev) => ({ ...prev, [a.id]: next }))}
+                        />
+                      </>
+                    ) : (
+                      <label>
+                        {a.game_title} configuration
+                        <textarea
+                          rows={3}
+                          value={configs[a.id] ?? ""}
+                          onChange={(e) => setConfigs((prev) => ({ ...prev, [a.id]: e.target.value }))}
+                        />
+                      </label>
+                    )}
+                    <span className="row" style={{ gap: 8, flexWrap: "wrap" }}>
+                      <button className="btn btn-sm" type="submit">
+                        Save configuration
+                      </button>
+                      {isGrammarGrove(a.game_title) ? (
+                        <button
+                          className="btn accent btn-sm"
+                          type="button"
+                          onClick={() => void openTeacherView(a.id, a.game_id)}
+                        >
+                          Teacher view
+                        </button>
+                      ) : null}
+                      <button
+                        className="btn secondary btn-sm"
+                        type="button"
+                        onClick={() => void saveIssue(a.id, a.published === false)}
+                      >
+                        {a.published === false ? "Publish" : "Unpublish"}
+                      </button>
+                    </span>
+                  </form>
+                ))}
+
+              {detail.is_teacher && (
+                <>
+                  <h3 style={{ marginTop: 24 }}>Groups</h3>
+                  {(detail.groups || []).length === 0 && <p className="meta">No groups yet.</p>}
+                  <ul className="assignment-list">
+                    {(detail.groups || []).map((g) => (
+                      <li key={g.id} className="assignment-row">
+                        <div className="assignment-main">
+                          <span className="assignment-title">{g.name}</span>
+                          <span className="meta">{g.member_count} students</span>
+                        </div>
+                        <button className="btn secondary btn-sm" type="button" onClick={() => void removeGroup(g.id)}>
+                          Delete
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                  <form className="form row" onSubmit={createGroup}>
+                    <label style={{ flex: 1 }}>
+                      New group
+                      <input value={groupName} onChange={(e) => setGroupName(e.target.value)} required />
+                    </label>
+                    <button className="btn" type="submit">
+                      Add group
+                    </button>
+                  </form>
+
+                  <h3 style={{ marginTop: 24 }}>Students</h3>
+                  {issued && (
+                    <div className="panel" style={{ marginBottom: 12 }}>
+                      <p>
+                        <b>{issued.display_name}</b>
+                      </p>
+                      <p className="meta">Email: {issued.email}</p>
+                      <p className="meta">Password: {issued.password}</p>
+                    </div>
+                  )}
+                  {(detail.members || []).length === 0 && <p className="meta">No student accounts in this class yet.</p>}
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th>Student</th>
+                        <th>Login</th>
+                        <th>Group</th>
+                        <th>New password</th>
+                        <th />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(detail.members || []).map((m) => (
+                        <tr key={m.user_id}>
+                          <td>{m.display_name}</td>
+                          <td>{m.email}</td>
+                          <td>
+                            <select
+                              value={m.group_id || ""}
+                              onChange={(e) => void moveStudent(m.user_id, e.target.value)}
+                            >
+                              <option value="">No group</option>
+                              {(detail.groups || []).map((g) => (
+                                <option key={g.id} value={g.id}>
+                                  {g.name}
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+                          <td>
+                            <input
+                              type="text"
+                              value={passwordDrafts[m.user_id] || ""}
+                              onChange={(e) =>
+                                setPasswordDrafts((prev) => ({ ...prev, [m.user_id]: e.target.value }))
+                              }
+                              placeholder="At least 8 characters"
+                            />
+                          </td>
+                          <td>
+                            <button className="btn secondary btn-sm" type="button" onClick={() => void resetPassword(m.user_id)}>
+                              Set password
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <form className="form" onSubmit={createStudent} style={{ marginTop: 16 }}>
+                    <h3 style={{ marginBottom: 8 }}>Create a student login</h3>
+                    <label>
+                      Name
+                      <input value={studentName} onChange={(e) => setStudentName(e.target.value)} required />
+                    </label>
+                    <label>
+                      Email
+                      <input
+                        type="email"
+                        value={studentEmail}
+                        onChange={(e) => setStudentEmail(e.target.value)}
+                        required
+                      />
+                    </label>
+                    <label>
+                      Password
+                      <input
+                        value={studentPassword}
+                        onChange={(e) => setStudentPassword(e.target.value)}
+                        placeholder="Leave blank to generate one"
+                      />
+                    </label>
+                    <label>
+                      Group
+                      <select value={studentGroup} onChange={(e) => setStudentGroup(e.target.value)}>
+                        <option value="">No group</option>
+                        {(detail.groups || []).map((g) => (
+                          <option key={g.id} value={g.id}>
+                            {g.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <button className="btn accent" type="submit">
+                      Create student
+                    </button>
+                  </form>
+                </>
               )}
 
               {detail.is_teacher && detail.progress.length > 0 && (

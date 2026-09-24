@@ -442,12 +442,16 @@ class ClassroomOut(BaseModel):
 
 class AssignmentCreate(BaseModel):
     game_id: uuid.UUID
+    config: str = Field(default="", max_length=8000)
+    published: bool = True
 
 
 class ClassroomAssignmentOut(BaseModel):
     id: uuid.UUID
     game_id: uuid.UUID
     game_title: str
+    config: str = ""
+    published: bool = True
     created_at: datetime
     completed: bool = False
     points: int = 0
@@ -461,6 +465,60 @@ class ClassroomAssignmentOut(BaseModel):
     avg_points: float = 0.0
     avg_levels: float = 0.0
     avg_accuracy: float = 0.0
+
+
+class AssignmentUpdate(BaseModel):
+    config: str | None = Field(default=None, max_length=8000)
+    published: bool | None = None
+
+
+class ClassGroupCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+
+
+class ClassGroupOut(BaseModel):
+    id: uuid.UUID
+    name: str
+    member_count: int = 0
+
+
+class ClassMemberOut(BaseModel):
+    user_id: uuid.UUID
+    display_name: str
+    email: str
+    group_id: uuid.UUID | None = None
+    group_name: str = ""
+
+
+class ClassMemberUpdate(BaseModel):
+    group_id: uuid.UUID | None = None
+
+
+class StudentAccountCreate(BaseModel):
+    email: EmailStr
+    display_name: str = Field(default="", max_length=120)
+    password: str | None = Field(default=None, min_length=8, max_length=128)
+    group_id: uuid.UUID | None = None
+
+
+class IssuedLoginOut(BaseModel):
+    user_id: uuid.UUID
+    email: str
+    display_name: str
+    password: str
+
+
+class StudentPasswordUpdate(BaseModel):
+    password: str = Field(min_length=8, max_length=128)
+
+
+class ClassIssuedOut(BaseModel):
+    classroom_id: uuid.UUID
+    classroom_name: str
+    assignment_id: uuid.UUID
+    game_id: uuid.UUID
+    game_title: str
+    config: str = ""
 
 
 class StudentProgressOut(BaseModel):
@@ -486,6 +544,8 @@ class ClassroomDetailOut(BaseModel):
     member_count: int
     assignments: list[ClassroomAssignmentOut]
     progress: list[StudentProgressOut]
+    groups: list[ClassGroupOut] = []
+    members: list[ClassMemberOut] = []
     solved_assignments: int = 0
     total_assignments: int = 0
     students_solved_all: int = 0

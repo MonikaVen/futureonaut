@@ -5,18 +5,37 @@ import string
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
-from app.auth import get_current_user
+from app.auth import get_current_user, hash_password
 from app.database import get_db
-from app.models import Classroom, ClassroomAssignment, ClassroomMember, Game, PlaySession, User, UserRole
+from app.models import (
+    ClassGroup,
+    Classroom,
+    ClassroomAssignment,
+    ClassroomMember,
+    Game,
+    PlaySession,
+    User,
+    UserRole,
+)
 from app.schemas import (
     AssignmentCreate,
+    AssignmentUpdate,
+    ClassGroupCreate,
+    ClassGroupOut,
+    ClassIssuedOut,
+    ClassMemberOut,
+    ClassMemberUpdate,
     ClassroomAssignmentOut,
     ClassroomCreate,
     ClassroomDetailOut,
     ClassroomJoin,
     ClassroomOut,
+    IssuedLoginOut,
+    StudentAccountCreate,
+    StudentPasswordUpdate,
     StudentProgressOut,
 )
 from app.services.progress import (
@@ -34,6 +53,11 @@ JOIN_CODE_MASK = "••••••"
 def _gen_code() -> str:
     alphabet = string.ascii_uppercase + string.digits
     return "".join(secrets.choice(alphabet) for _ in range(6))
+
+
+def _gen_password() -> str:
+    alphabet = string.ascii_letters + string.digits
+    return "".join(secrets.choice(alphabet) for _ in range(12))
 
 
 def _require_classroom(db: Session, classroom_id: UUID) -> Classroom:
@@ -84,10 +108,36 @@ def _assignment_out(
         id=assignment.id,
         game_id=assignment.game_id,
         game_title=game.title if game else "",
+        config=assignment.config or "",
+        published=bool(assignment.published),
         created_at=assignment.created_at,
         **progress,
         **extra,
     )
+
+
+def _require_teacher(classroom: Classroom, user: User) -> None:
+    if classroom.teacher_id != user.id:
+        raise HTTPException(status_code=403, detail="Only the teacher can do that")
+
+
+def _learner_member(db: Session, classroom: Classroom, user_id: UUID) -> ClassroomMember:
+    member = (
+        db.query(ClassroomMember)
+        .options(joinedload(ClassroomMember.user))
+        .filter(ClassroomMember.classroom_id == classroom.id, ClassroomMember.user_id == user_id)
+        .first()
+    )
+    if member is None or member.user is None:
+        raise HTTPException(status_code=404, detail="Student not found")
+    if member.user.role != UserRole.learner:
+        raise HTTPException(status_code=400, detail="Only student accounts can be managed here")
+    return member
+
+
+def _gen_password() -> str:
+    alphabet = string.ascii_letters + string.digits
+    return "".join(secrets.choice(alphabet) for _ in range(12))
 
 
 @router.post("", response_model=ClassroomOut, status_code=status.HTTP_201_CREATED)
@@ -155,6 +205,38 @@ def my_classrooms(
     return out
 
 
+@router.get("/issued", response_model=list[ClassIssuedOut])
+def issued_for_student(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> list[ClassIssuedOut]:
+    memberships = db.query(ClassroomMember).filter(ClassroomMember.user_id == user.id).all()
+    if not memberships:
+        return []
+    class_ids = [m.classroom_id for m in memberships]
+    rows = (
+        db.query(ClassroomAssignment)
+        .options(joinedload(ClassroomAssignment.game), joinedload(ClassroomAssignment.classroom))
+        .filter(
+            ClassroomAssignment.classroom_id.in_(class_ids),
+            ClassroomAssignment.published.is_(True),
+        )
+        .order_by(ClassroomAssignment.created_at.desc())
+        .all()
+    )
+    return [
+        ClassIssuedOut(
+            classroom_id=row.classroom_id,
+            classroom_name=row.classroom.name if row.classroom else "",
+            assignment_id=row.id,
+            game_id=row.game_id,
+            game_title=row.game.title if row.game else "",
+            config=row.config or "",
+        )
+        for row in rows
+    ]
+
+
 @router.get("/{classroom_id}", response_model=ClassroomDetailOut)
 def classroom_detail(
     classroom_id: UUID,
@@ -174,12 +256,21 @@ def classroom_detail(
         .order_by(ClassroomAssignment.created_at.desc())
         .all()
     )
+    if not is_teacher:
+        assignments = [a for a in assignments if a.published]
     members = (
         db.query(ClassroomMember)
         .options(joinedload(ClassroomMember.user))
         .filter(ClassroomMember.classroom_id == classroom.id)
         .all()
     )
+    groups = (
+        db.query(ClassGroup)
+        .filter(ClassGroup.classroom_id == classroom.id)
+        .order_by(ClassGroup.name.asc())
+        .all()
+    )
+    group_names = {g.id: g.name for g in groups}
 
     progress: list[StudentProgressOut] = []
     member_ids = [m.user_id for m in members]
@@ -221,6 +312,21 @@ def classroom_detail(
             ):
                 students_solved_all += 1
 
+    group_counts: dict[UUID, int] = {}
+    for member in members:
+        if member.group_id:
+            group_counts[member.group_id] = group_counts.get(member.group_id, 0) + 1
+    member_outs = [
+        ClassMemberOut(
+            user_id=member.user_id,
+            display_name=member.user.display_name if member.user else "",
+            email=member.user.email if member.user else "",
+            group_id=member.group_id,
+            group_name=group_names.get(member.group_id, "") if member.group_id else "",
+        )
+        for member in members
+        if is_teacher and member.user and member.user.role == UserRole.learner
+    ]
     return ClassroomDetailOut(
         id=classroom.id,
         name=classroom.name,
@@ -230,6 +336,13 @@ def classroom_detail(
         member_count=len(members),
         assignments=assignment_outs,
         progress=progress,
+        groups=[
+            ClassGroupOut(id=g.id, name=g.name, member_count=group_counts.get(g.id, 0))
+            for g in groups
+        ]
+        if is_teacher
+        else [],
+        members=member_outs,
         solved_assignments=solved_assignments,
         total_assignments=len(assignments),
         students_solved_all=students_solved_all,
@@ -258,9 +371,38 @@ def assign_game(
     )
     if exists:
         raise HTTPException(status_code=400, detail="Game already assigned")
-    db.add(ClassroomAssignment(classroom_id=classroom.id, game_id=game.id))
+    db.add(
+        ClassroomAssignment(
+            classroom_id=classroom.id,
+            game_id=game.id,
+            config=(body.config or "").strip(),
+            published=body.published,
+        )
+    )
     db.commit()
     return {"ok": True}
+
+
+@router.patch("/{classroom_id}/assignments/{assignment_id}", response_model=ClassroomAssignmentOut)
+def update_assignment(
+    classroom_id: UUID,
+    assignment_id: UUID,
+    body: AssignmentUpdate,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> ClassroomAssignmentOut:
+    classroom = _require_classroom(db, classroom_id)
+    _require_teacher(classroom, user)
+    assignment = db.get(ClassroomAssignment, assignment_id)
+    if assignment is None or assignment.classroom_id != classroom.id:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    if body.config is not None:
+        assignment.config = body.config.strip()
+    if body.published is not None:
+        assignment.published = body.published
+    db.commit()
+    db.refresh(assignment)
+    return _assignment_out(db, assignment, user.id)
 
 
 @router.delete("/{classroom_id}/assignments/{assignment_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
@@ -323,6 +465,139 @@ def remove_member(
     db.commit()
 
 
+@router.post("/{classroom_id}/students", response_model=IssuedLoginOut, status_code=status.HTTP_201_CREATED)
+def create_student(
+    classroom_id: UUID,
+    body: StudentAccountCreate,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> IssuedLoginOut:
+    classroom = _require_classroom(db, classroom_id)
+    _require_teacher(classroom, user)
+    email = body.email.lower()
+    if db.query(User).filter(User.email == email).first():
+        raise HTTPException(status_code=400, detail="Email already registered")
+    if body.group_id is not None:
+        group = db.get(ClassGroup, body.group_id)
+        if group is None or group.classroom_id != classroom.id:
+            raise HTTPException(status_code=404, detail="Group not found")
+    password = body.password or _gen_password()
+    student = User(
+        email=email,
+        password_hash=hash_password(password),
+        display_name=(body.display_name or email.split("@")[0]).strip(),
+        role=UserRole.learner,
+        managed_by_id=user.id,
+    )
+    db.add(student)
+    db.flush()
+    from app.services.handles import allocate_profile_slug
+
+    student.profile_slug = allocate_profile_slug(db, student)
+    db.add(ClassroomMember(classroom_id=classroom.id, user_id=student.id, group_id=body.group_id))
+    db.commit()
+    db.refresh(student)
+    return IssuedLoginOut(
+        user_id=student.id,
+        email=student.email,
+        display_name=student.display_name,
+        password=password,
+    )
+
+
+@router.patch("/{classroom_id}/students/{student_id}/password", response_model=IssuedLoginOut)
+def set_student_password(
+    classroom_id: UUID,
+    student_id: UUID,
+    body: StudentPasswordUpdate,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> IssuedLoginOut:
+    classroom = _require_classroom(db, classroom_id)
+    _require_teacher(classroom, user)
+    member = _learner_member(db, classroom, student_id)
+    member.user.password_hash = hash_password(body.password)
+    db.commit()
+    return IssuedLoginOut(
+        user_id=member.user.id,
+        email=member.user.email,
+        display_name=member.user.display_name,
+        password=body.password,
+    )
+
+
+@router.post("/{classroom_id}/groups", response_model=ClassGroupOut, status_code=status.HTTP_201_CREATED)
+def create_group(
+    classroom_id: UUID,
+    body: ClassGroupCreate,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> ClassGroupOut:
+    classroom = _require_classroom(db, classroom_id)
+    _require_teacher(classroom, user)
+    name = body.name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Group name is required")
+    group = ClassGroup(classroom_id=classroom.id, name=name)
+    db.add(group)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="A group with that name already exists")
+    db.refresh(group)
+    return ClassGroupOut(id=group.id, name=group.name, member_count=0)
+
+
+@router.delete("/{classroom_id}/groups/{group_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
+def delete_group(
+    classroom_id: UUID,
+    group_id: UUID,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> None:
+    classroom = _require_classroom(db, classroom_id)
+    _require_teacher(classroom, user)
+    group = db.get(ClassGroup, group_id)
+    if group is None or group.classroom_id != classroom.id:
+        raise HTTPException(status_code=404, detail="Group not found")
+    (
+        db.query(ClassroomMember)
+        .filter(ClassroomMember.group_id == group.id)
+        .update({ClassroomMember.group_id: None}, synchronize_session=False)
+    )
+    db.delete(group)
+    db.commit()
+
+
+@router.patch("/{classroom_id}/members/{member_user_id}", response_model=ClassMemberOut)
+def move_member(
+    classroom_id: UUID,
+    member_user_id: UUID,
+    body: ClassMemberUpdate,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> ClassMemberOut:
+    classroom = _require_classroom(db, classroom_id)
+    _require_teacher(classroom, user)
+    member = _learner_member(db, classroom, member_user_id)
+    group_name = ""
+    if body.group_id is not None:
+        group = db.get(ClassGroup, body.group_id)
+        if group is None or group.classroom_id != classroom.id:
+            raise HTTPException(status_code=404, detail="Group not found")
+        group_name = group.name
+    member.group_id = body.group_id
+    db.commit()
+    return ClassMemberOut(
+        user_id=member.user_id,
+        display_name=member.user.display_name,
+        email=member.user.email,
+        group_id=member.group_id,
+        group_name=group_name,
+    )
+
+
 @router.delete("/{classroom_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 def delete_classroom(
     classroom_id: UUID,
@@ -332,5 +607,10 @@ def delete_classroom(
     classroom = _require_classroom(db, classroom_id)
     if classroom.teacher_id != user.id and user.role != UserRole.admin:
         raise HTTPException(status_code=403, detail="Only the teacher can delete this class")
+    (
+        db.query(ClassroomMember)
+        .filter(ClassroomMember.classroom_id == classroom.id)
+        .update({ClassroomMember.group_id: None}, synchronize_session=False)
+    )
     db.delete(classroom)
     db.commit()

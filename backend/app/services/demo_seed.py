@@ -80,6 +80,14 @@ def catalog_owner(db) -> User | None:
         owner = db.query(User).filter(User.email == email).first()
         if owner is not None:
             return owner
+    display = (settings.creator_display_name or "futureonaut").strip()
+    if display:
+        named = db.query(User).filter(User.display_name.ilike(display)).all()
+        creator_named = next((user for user in named if user.role == UserRole.creator), None)
+        if creator_named is not None:
+            return creator_named
+        if named:
+            return named[0]
     creator = db.query(User).filter(User.role == UserRole.creator).first()
     if creator is not None:
         return creator
@@ -169,6 +177,7 @@ def seed_demo_games() -> None:
             db.commit()
             seed_html_pack(db, owner.id)
 
+        ensure_flagged_seed_games(db, owner.id)
         backfill_seed_files(db)
         normalize_game_topics(db)
         restore_published_html(db)
@@ -302,6 +311,57 @@ def normalize_game_topics(db) -> None:
             game.topic_tags = updated
             changed = True
     if changed:
+        db.commit()
+
+
+def ensure_flagged_seed_games(db, owner_id) -> None:
+    """Insert seed titles marked ensure=true when a live catalog does not have them yet."""
+    manifest_path = _seed_dir() / "manifest.json"
+    if not manifest_path.exists():
+        return
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    flagged = [item for item in manifest if item.get("ensure")]
+    if not flagged:
+        return
+    existing_files = {g.seed_file for g in db.query(Game).all() if g.seed_file}
+    existing_titles = {g.title for g in db.query(Game.title).all()}
+    owner = db.get(User, owner_id)
+    added = 0
+    for item in flagged:
+        title = item.get("title") or item["file"]
+        seed_file = item.get("file")
+        if seed_file in existing_files or title in existing_titles:
+            continue
+        src = _seed_dir() / item["file"]
+        if not src.is_file():
+            continue
+        html = src.read_text(encoding="utf-8", errors="replace")
+        game_id = uuid4()
+        entry = save_uploaded_html(game_id, html, "index.html")
+        tags = ensure_topic_tag(
+            item.get("topic_tags") or [],
+            title,
+            item.get("description") or "",
+        )
+        db.add(
+            Game(
+                id=game_id,
+                title=title,
+                description=item.get("description") or "",
+                owner_id=owner_id,
+                source=GameSource.upload,
+                topic_tags=tags,
+                difficulty=int(item.get("difficulty") or 1),
+                entry_path=entry,
+                seed_file=seed_file,
+                html=html,
+                handle=allocate_handle(db, owner, title),
+            )
+        )
+        existing_files.add(seed_file)
+        existing_titles.add(title)
+        added += 1
+    if added:
         db.commit()
 
 

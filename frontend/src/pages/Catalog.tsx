@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { api, type Game } from "../api";
+import { Link } from "react-router-dom";
+import { api, type ClassIssued, type Game } from "../api";
 import { GameCard } from "../GameCard";
 import { ContinuePlaying } from "../ContinuePlaying";
 import { useAuth } from "../auth";
 import { useLanguage } from "../language";
 import { TOPICS, primaryTopic } from "../gameMeta";
+import { classIssueNote } from "../grammarGrove";
 
 const AI_FOCUS_LABELS = [
   "Computer Vision",
@@ -66,12 +68,23 @@ export function CatalogPage() {
   const [level, setLevel] = useState<"All" | "1" | "2" | "3" | "4" | "5">("All");
   const [sort, setSort] = useState<SortKey>("recent");
   const [onlyFavs, setOnlyFavs] = useState(false);
+  const [issued, setIssued] = useState<ClassIssued[]>([]);
 
   useEffect(() => {
     api<Game[]>("/api/games")
       .then(setGames)
       .catch((err) => setError(err.message));
   }, []);
+
+  useEffect(() => {
+    if (!user) {
+      setIssued([]);
+      return;
+    }
+    api<ClassIssued[]>("/api/classrooms/issued")
+      .then(setIssued)
+      .catch(() => setIssued([]));
+  }, [user]);
 
   function patchGame(id: string, patch: Partial<Game>) {
     setGames((prev) => prev.map((g) => (g.id === id ? { ...g, ...patch } : g)));
@@ -107,6 +120,26 @@ export function CatalogPage() {
       {error && <div className="error">{error}</div>}
 
       <ContinuePlaying />
+
+      {issued.length > 0 && (
+        <section className="preview-card-section" aria-label="From your class">
+          <h2>From your class</h2>
+          <ul className="assignment-list">
+            {issued.map((item) => (
+              <li key={item.assignment_id} className="assignment-row">
+                <div className="assignment-main">
+                  <span className="assignment-title">{item.game_title}</span>
+                  <span className="meta">{item.classroom_name}</span>
+                  {item.config ? <p className="meta class-issue-note">{classIssueNote(item.config)}</p> : null}
+                </div>
+                <Link className="btn accent btn-sm" to={`/play/${item.game_id}?class=${item.classroom_id}`}>
+                  Play
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <div className="topic-tabs" role="tablist" aria-label={t("topic")}>
         {(["All", ...TOPICS] as const).map((tp) => (

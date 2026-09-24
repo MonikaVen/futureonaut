@@ -39,6 +39,7 @@ class CatalogCurationTests(unittest.TestCase):
         db = MagicMock()
         admin = SimpleNamespace(id=uuid4(), role="admin")
         db.query.return_value.filter.return_value.first.return_value = admin
+        db.query.return_value.filter.return_value.all.return_value = []
         db.query.return_value.count.return_value = 5
         with (
             patch("app.services.demo_seed.SessionLocal", return_value=db),
@@ -51,9 +52,11 @@ class CatalogCurationTests(unittest.TestCase):
             patch("app.services.demo_seed.refresh_game_previews"),
             patch("app.services.demo_seed.backfill_game_handles"),
             patch("app.services.demo_seed.assign_catalog_to_owner"),
+            patch("app.services.demo_seed.ensure_flagged_seed_games") as ensure,
         ):
             seed_demo_games()
         pack.assert_not_called()
+        ensure.assert_called_once()
 
     def test_title_update_rejects_blank(self) -> None:
         with self.assertRaises(ValidationError):

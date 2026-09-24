@@ -203,6 +203,19 @@ def ensure_schema() -> None:
                 "BOOLEAN NOT NULL DEFAULT FALSE"
             )
         )
+        conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS managed_by_id UUID"))
+        conn.execute(
+            text("ALTER TABLE classroom_assignments ADD COLUMN IF NOT EXISTS config TEXT NOT NULL DEFAULT ''")
+        )
+        conn.execute(
+            text(
+                "ALTER TABLE classroom_assignments ADD COLUMN IF NOT EXISTS published "
+                "BOOLEAN NOT NULL DEFAULT TRUE"
+            )
+        )
+        conn.execute(
+            text("ALTER TABLE classroom_members ADD COLUMN IF NOT EXISTS group_id UUID")
+        )
         conn.execute(
             text(
                 """

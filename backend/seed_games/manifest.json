@@ -1,5 +1,13 @@
 [
   {
+    "file": "grammar-grove.html",
+    "title": "Grammar Grove",
+    "description": "Run a magical forest platformer and sort correct words from identical-looking mistakes.",
+    "topic_tags": ["Math"],
+    "difficulty": 2,
+    "ensure": true
+  },
+  {
     "file": "find_liucians_friends_knn.html",
     "title": "Find Liucians Friends KNN",
     "description": "Interactive Liucian learning game: Find Liucians Friends KNN.",

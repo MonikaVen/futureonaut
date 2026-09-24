@@ -55,6 +55,9 @@ class User(Base):
     style_source: Mapped[str] = mapped_column(String(16), nullable=False, default="futureonaut")
     style_guidelines: Mapped[str | None] = mapped_column(Text, nullable=True)
     profile_slug: Mapped[str | None] = mapped_column(String(48), unique=True, index=True, nullable=True)
+    managed_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     games: Mapped[list["Game"]] = relationship(back_populates="owner")
@@ -177,9 +180,22 @@ class Classroom(Base):
 
     teacher: Mapped[User] = relationship(foreign_keys=[teacher_id])
     members: Mapped[list["ClassroomMember"]] = relationship(back_populates="classroom", cascade="all, delete-orphan")
+    groups: Mapped[list["ClassGroup"]] = relationship(back_populates="classroom", cascade="all, delete-orphan")
     assignments: Mapped[list["ClassroomAssignment"]] = relationship(
         back_populates="classroom", cascade="all, delete-orphan"
     )
+
+
+class ClassGroup(Base):
+    __tablename__ = "class_groups"
+    __table_args__ = (UniqueConstraint("classroom_id", "name", name="uq_class_group_name"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    classroom_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("classrooms.id"), nullable=False)
+    name: Mapped[str] = mapped_column(String(80), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    classroom: Mapped[Classroom] = relationship(back_populates="groups")
 
 
 class ClassroomMember(Base):
@@ -189,6 +205,9 @@ class ClassroomMember(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     classroom_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("classrooms.id"), nullable=False)
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    group_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("class_groups.id", ondelete="SET NULL"), nullable=True
+    )
     joined_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     classroom: Mapped[Classroom] = relationship(back_populates="members")
@@ -202,6 +221,8 @@ class ClassroomAssignment(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     classroom_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("classrooms.id"), nullable=False)
     game_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("games.id"), nullable=False)
+    config: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    published: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     classroom: Mapped[Classroom] = relationship(back_populates="assignments")

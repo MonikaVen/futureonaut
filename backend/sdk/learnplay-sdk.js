@@ -145,6 +145,7 @@
     setPrefs: function (opts) {
       applyPrefs(opts || {}, false);
     },
+    classConfig: "",
   };
 
   global.LearnPlay = LearnPlay;
@@ -357,9 +358,20 @@
     if (select) select.value = currentLang;
   }
 
+  function hostedInFrame() {
+    try {
+      return global.parent && global.parent !== global;
+    } catch (e) {
+      return true;
+    }
+  }
+
   function ensureToolbar() {
     var doc = global.document;
     if (!doc || !doc.body || typeof doc.createElement !== "function") return;
+    // The play page already sets theme and language. A toolbar in the frame
+    // pushes the game down and the host then grows the frame to match.
+    if (hostedInFrame()) return;
     if (toolbar && toolbar.parentNode) {
       paintToolbar();
       return;
@@ -438,13 +450,37 @@
     }
   }
 
+  function readClassConfig() {
+    try {
+      var params = new URLSearchParams(global.location && global.location.search);
+      return params.get("lp_config") || "";
+    } catch (e) {
+      return "";
+    }
+  }
+
+  function applyClassConfig(text) {
+    LearnPlay.classConfig = String(text || "");
+    try {
+      global.dispatchEvent(new CustomEvent("learnplay-config", { detail: LearnPlay.classConfig }));
+    } catch (e) {
+      /* ignore */
+    }
+  }
+
   function bootPrefs() {
     applyPrefs(readQueryPrefs(), false);
+    applyClassConfig(readClassConfig());
     emit("ready", { theme: currentTheme, lang: currentLang });
     try {
       global.addEventListener("message", function (ev) {
         var data = ev.data || {};
-        if (data.source !== "learnplay-host" || data.type !== "prefs") return;
+        if (data.source !== "learnplay-host") return;
+        if (data.type === "config") {
+          applyClassConfig((data.payload && data.payload.config) || "");
+          return;
+        }
+        if (data.type !== "prefs") return;
         skipHostEcho = true;
         applyPrefs(data.payload || {}, false);
         skipHostEcho = false;
