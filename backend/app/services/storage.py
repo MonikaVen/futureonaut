@@ -21,6 +21,10 @@ def i18n_source_path() -> Path:
     return Path(__file__).resolve().parents[2] / "sdk" / "learnplay-i18n.js"
 
 
+def game_phrases_source_path() -> Path:
+    return Path(__file__).resolve().parents[2] / "sdk" / "learnplay-game-phrases.js"
+
+
 def games_root() -> Path:
     root = Path(get_settings().games_dir)
     root.mkdir(parents=True, exist_ok=True)
@@ -39,6 +43,61 @@ def _inline_script(path: Path) -> str:
     return f"<script>\n{source}\n</script>"
 
 
+def _strip_game_phrases(html: str) -> str:
+    return re.sub(
+        r"<script>\s*\(function \(global\) \{\s*var LEARNPLAY_GAME_PHRASES[\s\S]*?</script>\s*",
+        "",
+        html,
+        count=1,
+    )
+
+
+def _insert_game_phrases(html: str) -> str:
+    path = game_phrases_source_path()
+    if not path.is_file() or "LEARNPLAY_GAME_PHRASES" in html:
+        return html
+    marker = "global.LEARNPLAY_I18N"
+    start = html.find(marker)
+    if start < 0:
+        return html
+    script_close = html.find("</script>", start)
+    if script_close < 0:
+        return html
+    insert_at = script_close + len("</script>")
+    return html[:insert_at] + "\n" + _inline_script(path) + html[insert_at:]
+
+
+def refresh_i18n_in_html(html: str) -> str:
+    """Replace a baked-in language pack so every stored game picks up new languages."""
+    html = _strip_game_phrases(html)
+    marker = "global.LEARNPLAY_I18N"
+    start = html.find(marker)
+    i18n = i18n_source_path()
+    if start < 0 or not i18n.is_file():
+        return _insert_game_phrases(inject_sdk_into_html(html))
+    script_open = html.rfind("<script", 0, start)
+    script_close = html.find("</script>", start)
+    if script_open < 0 or script_close < 0:
+        return _insert_game_phrases(inject_sdk_into_html(html))
+    block = _inline_script(i18n)
+    return _insert_game_phrases(html[:script_open] + block + html[script_close + len("</script>") :])
+
+
+def refresh_sdk_in_html(html: str) -> str:
+    """Replace a baked-in game runtime so stored games pick up translation fixes."""
+    marker = 'source: "learnplay-sdk"'
+    start = html.find(marker)
+    sdk = sdk_source_path()
+    if start < 0 or not sdk.is_file():
+        return inject_sdk_into_html(html)
+    script_open = html.rfind("<script", 0, start)
+    script_close = html.find("</script>", start)
+    if script_open < 0 or script_close < 0:
+        return inject_sdk_into_html(html)
+    block = _inline_script(sdk)
+    return html[:script_open] + block + html[script_close + len("</script>") :]
+
+
 def inject_sdk_into_html(html: str) -> str:
     html = re.sub(
         r"<script[^>]+src=['\"][^'\"]*learnplay-(?:i18n|sdk)\.js['\"][^>]*>\s*</script>\s*",
@@ -50,6 +109,9 @@ def inject_sdk_into_html(html: str) -> str:
     i18n = i18n_source_path()
     if i18n.exists() and "LEARNPLAY_I18N" not in html:
         tags.append(_inline_script(i18n))
+    phrases = game_phrases_source_path()
+    if phrases.is_file() and "LEARNPLAY_GAME_PHRASES" not in html and "LEARNPLAY_I18N" not in html:
+        tags.append(_inline_script(phrases))
     if 'source: "learnplay-sdk"' not in html:
         tags.append(_inline_script(sdk_source_path()))
     if not tags:

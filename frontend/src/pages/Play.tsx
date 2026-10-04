@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { api, getAccessToken, type ClassroomDetail, type Game, type Session } from "../api";
+import { api, type ClassroomDetail, type Game, type Session } from "../api";
 import { useAuth } from "../auth";
 import { GameShare } from "../GameShare";
 import { GameSocial } from "../GameSocial";
@@ -41,6 +41,7 @@ export function PlayPage() {
   const [ready, setReady] = useState(false);
   const [frameHeight, setFrameHeight] = useState<number | null>(null);
   const [classConfig, setClassConfig] = useState<string | null>(classId ? null : "");
+  const [fileToken, setFileToken] = useState<string | null>(null);
   const [className, setClassName] = useState("");
   const frameRef = useRef<HTMLIFrameElement>(null);
   const iframeSrcRef = useRef("");
@@ -137,9 +138,10 @@ export function PlayPage() {
 
   useEffect(() => {
     if (ready && game?.handle && playRef && game.handle !== playRef) {
-      navigate(`/play/${game.handle}`, { replace: true });
+      const search = searchParams.toString();
+      navigate(search ? `/play/${game.handle}?${search}` : `/play/${game.handle}`, { replace: true });
     }
-  }, [ready, game, playRef, navigate]);
+  }, [ready, game, playRef, navigate, searchParams]);
 
   useEffect(() => {
     function onMessage(ev: MessageEvent<SdkMessage>) {
@@ -256,24 +258,45 @@ export function PlayPage() {
   }, [classId, game?.id, user]);
 
   useEffect(() => {
+    if (!game) {
+      setFileToken(null);
+      return;
+    }
+    if (!user || game.is_public !== false) {
+      setFileToken("");
+      return;
+    }
+    let cancelled = false;
+    setFileToken(null);
+    api<{ token: string }>(`/api/games/${game.id}/file-token`, { method: "POST" })
+      .then((res) => {
+        if (!cancelled) setFileToken(res.token || "");
+      })
+      .catch(() => {
+        if (!cancelled) setError("This private game could not be opened.");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [game, user]);
+
+  useEffect(() => {
     if (classConfig == null) return;
     postClassConfig();
   }, [classConfig, postClassConfig]);
 
   const src = useMemo(() => {
-    if (!game || classConfig === null) return "";
-    if (iframeGameIdRef.current === game.id && iframeSrcRef.current) {
-      return iframeSrcRef.current;
-    }
+    if (!game || classConfig === null || fileToken === null) return "";
+    const key = `${game.id}\n${classConfig}\n${fileToken}`;
+    if (iframeSrcRef.current && iframeGameIdRef.current === key) return iframeSrcRef.current;
     const params = new URLSearchParams({ theme: gameTheme, lang });
     if (classConfig) params.set("lp_config", classConfig);
-    const token = getAccessToken();
-    if (token) params.set("access_token", token);
+    if (fileToken) params.set("file_token", fileToken);
     const next = `/api/games/${game.id}/files/${game.entry_path}?${params.toString()}`;
-    iframeGameIdRef.current = game.id;
+    iframeGameIdRef.current = key;
     iframeSrcRef.current = next;
     return next;
-  }, [game, gameTheme, lang, classConfig]);
+  }, [game, gameTheme, lang, classConfig, fileToken]);
 
   if (error) {
     return (

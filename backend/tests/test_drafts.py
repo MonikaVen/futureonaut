@@ -15,6 +15,7 @@ from app.routers.games import (
     _draft_to_out,
     chat_draft,
     create_edit_draft,
+    game_asset_sources,
     game_file_headers,
     generate_html_game_endpoint,
     publish_draft,
@@ -233,6 +234,7 @@ class FrameIsolationTests(unittest.TestCase):
         headers = game_file_headers()
         csp = headers["Content-Security-Policy"]
         self.assertIn("connect-src 'none'", csp)
+        self.assertIn("navigate-to 'self'", csp)
         self.assertIn("sandbox allow-scripts allow-forms", csp)
         self.assertIn("form-action 'none'", csp)
         self.assertNotIn("frame-ancestors", csp)
@@ -241,6 +243,35 @@ class FrameIsolationTests(unittest.TestCase):
         self.assertEqual(csp, GAME_FRAME_CSP)
         self.assertEqual(GAME_IFRAME_SANDBOX, "allow-scripts allow-forms")
         self.assertNotIn("allow-same-origin", GAME_IFRAME_SANDBOX)
+
+    def test_zip_games_may_load_only_their_own_files(self) -> None:
+        from starlette.requests import Request
+
+        game_id = "7cb453e6-6731-4130-a569-67bf7b2b5292"
+        scope = {
+            "type": "http",
+            "http_version": "1.1",
+            "method": "GET",
+            "path": "/",
+            "raw_path": b"/",
+            "query_string": b"",
+            "headers": [(b"host", b"app.example")],
+            "client": ("127.0.0.1", 1),
+            "server": ("app.example", 443),
+            "scheme": "https",
+        }
+        sources = game_asset_sources(Request(scope), f"api/games/{game_id}/files")
+        self.assertIn(f"https://app.example/api/games/{game_id}/files/", sources)
+        self.assertNotIn("*", sources)
+        self.assertEqual(game_asset_sources(Request(scope), "api/games/not-a-uuid/files"), "")
+        poisoned = dict(scope)
+        poisoned["headers"] = [(b"host", b"evil.example; default-src *")]
+        self.assertNotIn("evil", game_asset_sources(Request(poisoned), f"api/games/{game_id}/files"))
+        widened = game_file_headers(asset_sources=sources)
+        csp = widened["Content-Security-Policy"]
+        self.assertIn("connect-src 'none'", csp)
+        self.assertNotIn("allow-same-origin", csp)
+        self.assertIn(f"https://app.example/api/games/{game_id}/files/", csp)
 
     def test_play_and_creator_iframes_are_opaque(self) -> None:
         from pathlib import Path
@@ -251,10 +282,15 @@ class FrameIsolationTests(unittest.TestCase):
         creator = (root / "frontend/src/pages/Creator.tsx").read_text(encoding="utf-8")
         studio = (root / "frontend/src/CreatorDraftStudio.tsx").read_text(encoding="utf-8")
         self.assertIn("GameFrame", play)
+        self.assertNotIn("access_token", play)
+        self.assertIn("file_token", play)
+        self.assertIn("searchParams.toString()", play)
+        self.assertIn("lp_config", play)
         self.assertNotIn("allow-same-origin", play)
         self.assertNotIn("allow-same-origin", frame)
         self.assertIn("allow-scripts allow-forms", frame)
         self.assertIn("connect-src 'none'", frame)
+        self.assertIn("navigate-to 'self'", frame)
         self.assertIn("form-action 'none'", frame)
         self.assertIn("sandbox={GAME_IFRAME_SANDBOX}", frame)
         self.assertIn("sandbox allow-scripts allow-forms", frame)

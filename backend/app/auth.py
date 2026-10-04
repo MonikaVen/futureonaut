@@ -151,6 +151,32 @@ def require_game_author(
     return user
 
 
+def create_game_file_token(user_id: UUID, game_id: UUID) -> str:
+    """Lets a sandboxed game load its files. It is not an account session."""
+    now = datetime.now(timezone.utc)
+    payload: dict[str, Any] = {
+        "sub": str(user_id),
+        "game": str(game_id),
+        "type": "game_file",
+        "iat": now,
+        "exp": now + timedelta(hours=2),
+    }
+    return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
+
+
+def user_id_from_game_file_token(token: str, game_id: UUID) -> UUID | None:
+    try:
+        payload = decode_token(token)
+    except HTTPException:
+        return None
+    if payload.get("type") != "game_file" or str(payload.get("game") or "") != str(game_id):
+        return None
+    try:
+        return UUID(str(payload.get("sub")))
+    except (TypeError, ValueError):
+        return None
+
+
 def create_draft_file_token(draft_id: UUID, owner_id: UUID) -> str:
     now = datetime.now(timezone.utc)
     payload: dict[str, Any] = {

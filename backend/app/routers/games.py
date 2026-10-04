@@ -1,19 +1,24 @@
+import re
 from datetime import datetime, timedelta, timezone
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Query, UploadFile, status
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Query, Request, UploadFile, status
+from fastapi.responses import FileResponse, HTMLResponse
 from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.auth import (
     create_draft_file_token,
+    create_game_file_token,
     decode_draft_file_token,
-    decode_token,
+    get_current_user,
     get_optional_user,
     require_game_author,
+    user_id_from_game_file_token,
 )
+from app.config import get_settings
 from app.database import get_db
+from app.public_url import safe_host
 from app.limits import MAX_LUNA_QUERY_CHARS
 from app.models import (
     Classroom,
@@ -34,6 +39,7 @@ from app.schemas import (
     DraftPublishRequest,
     DraftReviseRequest,
     GameDraftOut,
+    GameFileTokenOut,
     GameOut,
     GameUpdate,
     HtmlGenerateRequest,
@@ -55,6 +61,9 @@ from app.services.storage import (
     delete_game_files,
     draft_dir,
     game_dir,
+    i18n_source_path,
+    refresh_i18n_in_html,
+    refresh_sdk_in_html,
     save_draft_html,
     save_uploaded_html,
     save_uploaded_zip,
@@ -64,34 +73,61 @@ from app.services.demo_seed import restore_game_html_files
 from app.services.prompts import generation_context
 from app.services.handles import allocate_handle, resolve_game, user_slug_for_game
 from app.services.topics import ensure_topic_tag
-from app.services.visibility import can_view_game
+from app.services.visibility import can_view_game, game_is_public
 
 # Document CSP sandbox (no allow-same-origin) makes game HTML a unique origin even
 # if opened top-level or framed without the Play UI sandbox, so it cannot read SPA
-# localStorage tokens. Do not add X-Frame-Options or frame-ancestors: Chrome then
-# treats the unique origin as a framing violation ("This content is blocked").
+# localStorage, cookies, or account tokens. Do not add X-Frame-Options or
+# frame-ancestors: Chrome then treats the unique origin as a framing violation.
 GAME_FRAME_CSP = (
     "sandbox allow-scripts allow-forms; "
     "default-src 'unsafe-inline'; "
     "connect-src 'none'; "
+    "navigate-to 'self'; "
     "object-src 'none'; "
     "frame-src 'none'; "
     "form-action 'none'; "
     "base-uri 'none'"
 )
 GAME_IFRAME_SANDBOX = "allow-scripts allow-forms"
+_ASSET_DIR_RE = re.compile(
+    r"^(?:api/games/[0-9a-fA-F-]{36}/files|api/games/drafts/[0-9a-fA-F-]{36}/t/[A-Za-z0-9._-]+)$"
+)
 VIEW_DEDUP_WINDOW = timedelta(hours=1)
 VIEW_BURST_WINDOW = timedelta(minutes=10)
 VIEW_BURST_MAX = 60
 
 
-def game_file_headers(*, store: bool = False) -> dict[str, str]:
+def game_asset_sources(request: Request, file_dir: str) -> str:
+    """CSP sources for one game's own files. Sibling assets stay allowed; other hosts do not."""
+    file_dir = file_dir.strip("/")
+    if not _ASSET_DIR_RE.fullmatch(file_dir):
+        return ""
+    origins: list[str] = []
+    configured = (get_settings().public_base_url or "").strip().rstrip("/")
+    if configured.startswith(("https://", "http://")):
+        origins.append(configured)
+    host = safe_host(request.headers.get("x-forwarded-host")) or safe_host(request.headers.get("host"))
+    if host:
+        origins.append(f"https://{host}")
+        origins.append(f"http://{host}")
+    return " ".join(dict.fromkeys(f"{origin}/{file_dir}/" for origin in origins))
+
+
+def game_file_headers(*, store: bool = False, asset_sources: str = "") -> dict[str, str]:
+    csp = GAME_FRAME_CSP
+    if asset_sources:
+        csp = GAME_FRAME_CSP.replace(
+            "default-src 'unsafe-inline'",
+            f"default-src 'unsafe-inline' {asset_sources}",
+            1,
+        )
     return {
         # Opaque sandboxed play iframes fetch sibling assets with Origin: null.
         "Access-Control-Allow-Origin": "*",
         "Cross-Origin-Resource-Policy": "cross-origin",
         "X-Content-Type-Options": "nosniff",
-        "Content-Security-Policy": GAME_FRAME_CSP,
+        "Content-Security-Policy": csp,
         "Referrer-Policy": "no-referrer",
         "Cache-Control": "public, max-age=60" if store else "no-store",
     }
@@ -326,20 +362,13 @@ def _game_or_404(db: Session, ref: str) -> Game:
     return game
 
 
-def _user_from_access_token(db: Session, token: str | None) -> User | None:
-    if not token:
+def _viewer_for_game_file(db: Session, game_id: UUID, user: User | None, file_token: str | None) -> User | None:
+    if user is not None or not file_token:
+        return user
+    user_id = user_id_from_game_file_token(file_token, game_id)
+    if user_id is None:
         return None
-    try:
-        payload = decode_token(token)
-    except HTTPException:
-        return None
-    if payload.get("type") != "access":
-        return None
-    user_id = payload.get("sub")
-    try:
-        return db.get(User, UUID(user_id)) if user_id else None
-    except (TypeError, ValueError):
-        return None
+    return db.get(User, user_id)
 
 
 def _visible_or_404(db: Session, game: Game, user: User | None) -> Game:
@@ -678,6 +707,7 @@ def serve_draft_file(
     draft_id: UUID,
     token: str,
     file_path: str,
+    request: Request,
     db: Session = Depends(get_db),
 ):
     owner_id = decode_draft_file_token(token, draft_id)
@@ -695,7 +725,9 @@ def serve_draft_file(
         raise HTTPException(status_code=404, detail="File not found")
     return FileResponse(
         target,
-        headers=game_file_headers(),
+        headers=game_file_headers(
+            asset_sources=game_asset_sources(request, f"api/games/drafts/{draft_id}/t/{token}"),
+        ),
     )
 
 
@@ -904,18 +936,34 @@ def delete_game(
     db.commit()
 
 
+@router.post("/{game_id}/file-token", response_model=GameFileTokenOut)
+def issue_game_file_token(
+    game_id: UUID,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> GameFileTokenOut:
+    game = db.get(Game, game_id)
+    if game is None:
+        raise HTTPException(status_code=404, detail="Game not found")
+    _visible_or_404(db, game, user)
+    if game_is_public(game):
+        return GameFileTokenOut(token="")
+    return GameFileTokenOut(token=create_game_file_token(user.id, game.id))
+
+
 @router.get("/{game_id}/files/{file_path:path}")
 def serve_game_file(
     game_id: UUID,
     file_path: str,
+    request: Request,
     db: Session = Depends(get_db),
     user: User | None = Depends(get_optional_user),
-    access_token: str | None = Query(default=None),
+    file_token: str | None = Query(default=None),
 ):
     game = db.get(Game, game_id)
     if game is None:
         raise HTTPException(status_code=404, detail="Game not found")
-    _visible_or_404(db, game, user or _user_from_access_token(db, access_token))
+    _visible_or_404(db, game, _viewer_for_game_file(db, game_id, user, file_token))
     base = game_dir(game_id).resolve()
     target = (base / file_path).resolve()
     if not target.is_file() or not target.is_relative_to(base):
@@ -934,7 +982,18 @@ def serve_game_file(
         target = (base / file_path).resolve()
     if not target.is_file() or not target.is_relative_to(base):
         raise HTTPException(status_code=404, detail="File not found")
+    headers = game_file_headers(
+        store=True,
+        asset_sources=game_asset_sources(request, f"api/games/{game_id}/files"),
+    )
+    if target.name == "learnplay-i18n.js":
+        fresh = i18n_source_path()
+        if fresh.is_file():
+            target = fresh
+    elif target.suffix.lower() in {".html", ".htm"}:
+        html = refresh_sdk_in_html(refresh_i18n_in_html(target.read_text(encoding="utf-8", errors="replace")))
+        return HTMLResponse(html, headers=headers)
     return FileResponse(
         target,
-        headers=game_file_headers(store=True),
+        headers=headers,
     )

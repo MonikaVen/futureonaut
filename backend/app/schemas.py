@@ -21,6 +21,10 @@ class TokenPair(BaseModel):
     token_type: str = "bearer"
 
 
+class GameFileTokenOut(BaseModel):
+    token: str = ""
+
+
 class TokenRefresh(BaseModel):
     refresh_token: str
 

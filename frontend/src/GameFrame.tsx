@@ -2,7 +2,7 @@ import { forwardRef, type CSSProperties, type ReactEventHandler } from "react";
 
 export const GAME_IFRAME_SANDBOX = "allow-scripts allow-forms";
 export const GAME_IFRAME_CSP =
-  "sandbox allow-scripts allow-forms; default-src 'unsafe-inline'; connect-src 'none'; object-src 'none'; frame-src 'none'; form-action 'none'; base-uri 'none'";
+  "sandbox allow-scripts allow-forms; default-src 'unsafe-inline'; connect-src 'none'; navigate-to 'self'; object-src 'none'; frame-src 'none'; form-action 'none'; base-uri 'none'";
 
 type Props = {
   title: string;
@@ -27,7 +27,6 @@ export const GameFrame = forwardRef<HTMLIFrameElement, Props>(function GameFrame
       sandbox={GAME_IFRAME_SANDBOX}
       allow=""
       referrerPolicy="no-referrer"
-      {...{ csp: GAME_IFRAME_CSP }}
     />
   );
 });
